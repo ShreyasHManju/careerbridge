@@ -62,7 +62,7 @@ careerbridge/
 - [x] **Phase 4**: Alembic Migrations Configuration (Alembic 1.20, env.py, initial users migration, upgrade/downgrade verified)
 - [x] **Phase 5**: User CRUD Endpoints (Pydantic Schemas, Bcrypt hashing, paginated CRUD API, robust validation)
 - [x] **Phase 6**: Authentication & JWT Foundation (JWT access tokens, Bcrypt verification, Login endpoint, Bearer dependency, Protected /me)
-- [ ] **Phase 7**: Role-Based Access Control (Student, Company, Admin)
+- [x] **Phase 7**: Role-Based Access Control (RBAC dependencies, single/multi-role authorization, 401 vs 403 enforcement)
 - [ ] **Phase 8**: Student Profile & UI
 - [ ] **Phase 9**: Company Profile & Verification
 - [ ] **Phase 10**: Internship CRUD & Publishing
@@ -332,5 +332,52 @@ Execute the 16-test suite covering token generation, password verification, expi
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_auth.py
 ```
+
+---
+
+## 10. Role-Based Access Control (RBAC) (Phase 7)
+
+Phase 7 establishes the backend authorization foundation for CareerBridge using clean, parameterized FastAPI dependency injection.
+
+### Authentication vs. Authorization
+- **Authentication ("Who are you?")**: Handled in Phase 6 via `get_current_user`. Decodes the JWT Bearer token and verifies the user exists and is active in PostgreSQL.
+- **Role Authorization ("What can you do?")**: Handled in Phase 7 via `require_role(...)`. Checks if the authenticated user's role matches the required role(s) for the endpoint.
+- **Resource Ownership ("Can you access THIS resource?")**: Deferred to future domain phases (e.g., student editing only their own profile, recruiter editing only their own job postings).
+
+### Reusable RBAC Dependency (`backend/app/core/deps.py`)
+```python
+# Single-role protection
+@router.get("/admin-only")
+def admin_route(user: User = Depends(require_role(UserRole.ADMIN))):
+    ...
+
+# Multi-role protection
+@router.get("/shared")
+def shared_route(user: User = Depends(require_role(UserRole.STUDENT, UserRole.RECRUITER))):
+    ...
+```
+
+### Status Code Semantics
+- **`401 Unauthorized`**: Unauthenticated requests (missing, expired, forged, or malformed Bearer token, or inactive account). Response header: `WWW-Authenticate: Bearer`.
+- **`403 Forbidden`**: Authenticated requests where the user's role lacks permission for the endpoint. Detail: `{"detail": "Not enough permissions"}`.
+- **`200 OK`**: Authenticated and authorized requests.
+
+### Source of Truth
+Role evaluation relies exclusively on `current_user.role` from the PostgreSQL `users` table loaded by `get_current_user`. Roles supplied in request bodies, headers, or query parameters are never trusted.
+
+### Demonstration Endpoints (`/api/v1/rbac`)
+| Method | Endpoint | Allowed Roles | Forbidden (403) |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/rbac/student` | `student` | `recruiter`, `admin` |
+| `GET` | `/api/v1/rbac/recruiter` | `recruiter` | `student`, `admin` |
+| `GET` | `/api/v1/rbac/admin` | `admin` | `student`, `recruiter` |
+| `GET` | `/api/v1/rbac/student-or-recruiter` | `student`, `recruiter` | `admin` |
+
+### Run RBAC Test Suite
+Execute the 16-test suite covering role enforcement, cross-role blocking, multi-role routes, and error status codes:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_rbac.py
+```
+
 
 

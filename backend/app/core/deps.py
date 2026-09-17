@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Set
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import jwt
@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
-from app.models.user import User
+from app.models.user import User, UserRole
 
 # Standard HTTP Bearer scheme for OpenAPI/Swagger documentation
 security_bearer = HTTPBearer(
@@ -65,3 +65,38 @@ def get_current_user(
         )
 
     return user
+
+
+class RoleChecker:
+    """
+    Reusable FastAPI dependency to enforce Role-Based Access Control (RBAC).
+
+    Usage:
+        @router.get("/admin-only", dependencies=[Depends(require_role(UserRole.ADMIN))])
+        def admin_route(): ...
+
+        # Or inject current_user:
+        @router.get("/student-only")
+        def student_route(current_user: User = Depends(require_role(UserRole.STUDENT))): ...
+
+        # Multiple allowed roles:
+        @router.get("/shared")
+        def shared_route(current_user: User = Depends(require_role(UserRole.STUDENT, UserRole.RECRUITER))): ...
+    """
+
+    def __init__(self, *allowed_roles: UserRole):
+        if not allowed_roles:
+            raise ValueError("RoleChecker requires at least one UserRole.")
+        self.allowed_roles: Set[UserRole] = set(allowed_roles)
+
+    def __call__(self, current_user: User = Depends(get_current_user)) -> User:
+        if current_user.role not in self.allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions",
+            )
+        return current_user
+
+
+require_role = RoleChecker
+
