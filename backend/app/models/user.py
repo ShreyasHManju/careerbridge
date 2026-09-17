@@ -6,7 +6,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.recruiter_profile import RecruiterProfile
     from app.models.student_profile import StudentProfile
+
 
 
 class UserRole(str, enum.Enum):
@@ -53,5 +55,14 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    # One-to-one relationship with RecruiterProfile
+    recruiter_profile: Mapped[Optional["RecruiterProfile"]] = relationship(
+        "RecruiterProfile",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
     def __repr__(self) -> str:
+
         return f'<User id={self.id} email={self.email} role={self.role}>'

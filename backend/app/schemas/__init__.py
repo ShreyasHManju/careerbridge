@@ -1,4 +1,9 @@
 from app.schemas.auth import LoginRequest, TokenPayload, TokenResponse
+from app.schemas.recruiter_profile import (
+    RecruiterProfileCreate,
+    RecruiterProfileResponse,
+    RecruiterProfileUpdate,
+)
 from app.schemas.student_profile import (
     StudentProfileCreate,
     StudentProfileResponse,
@@ -16,5 +21,9 @@ __all__ = [
     "StudentProfileCreate",
     "StudentProfileUpdate",
     "StudentProfileResponse",
+    "RecruiterProfileCreate",
+    "RecruiterProfileUpdate",
+    "RecruiterProfileResponse",
 ]
+
 

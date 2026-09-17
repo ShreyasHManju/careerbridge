@@ -63,7 +63,7 @@ The system enforces three primary roles directly on the FastAPI backend:
 
 - **Phase 1-5**: `users` (core accounts, bcrypt credentials, role enums)
 - **Phase 8**: `student_profiles` (1-to-1 extension with cascading deletes, education/contact metadata)
-- **Phase 9**: `company_profiles`
+- **Phase 9**: `recruiter_profiles` (1-to-1 extension with cascading deletes, organization/contact metadata)
 - **Phase 10-11**: `internships`, `applications`
 - **Phase 13-14**: `saved_internships`, `skills`, `student_skills`
 - **Phase 17-20**: `notifications`, `interviews`, `conversations`, `messages`, `audit_logs`
@@ -75,6 +75,7 @@ The system enforces three primary roles directly on the FastAPI backend:
 CareerBridge separates identity and access into three explicit tiers:
 
 1. **Authentication ("Who are you?")**: Verified cryptographically via `get_current_user` reading the JWT Bearer token and verifying the active account in PostgreSQL.
-2. **Role Authorization ("What group do you belong to?")**: Enforced via `require_role(allowed_roles)`. Protects routes from unauthorized roles (e.g. recruiters accessing student endpoints return `403 Forbidden`).
-3. **Resource Ownership ("Do you own this specific record?")**: Strictly derived from `current_user.id`. Endpoints never accept `user_id` from client payloads. Queries filter by `StudentProfile.user_id == current_user.id`, preventing horizontal privilege escalation (IDOR) and ownership spoofing.
+2. **Role Authorization ("What group do you belong to?")**: Enforced via `require_role(allowed_roles)`. Protects routes from unauthorized roles (e.g. students accessing recruiter endpoints return `403 Forbidden`).
+3. **Resource Ownership ("Do you own this specific record?")**: Strictly derived from `current_user.id`. Endpoints never accept `user_id` from client payloads. Queries filter by `Model.user_id == current_user.id` (e.g., `StudentProfile` or `RecruiterProfile`), preventing horizontal privilege escalation (IDOR) and ownership spoofing.
+
 
