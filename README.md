@@ -55,7 +55,7 @@ student-internship-management-system/
 ## 4. Phase Roadmap
 
 - [x] **Phase 0**: Project Planning & Workspace Assessment
-- [ ] **Phase 1**: FastAPI Foundation (Basic server, health check, docs)
+- [x] **Phase 1**: FastAPI Foundation (Basic server, health check, docs)
 - [ ] **Phase 2**: PostgreSQL Configuration & Connection
 - [ ] **Phase 3**: SQLAlchemy ORM Setup & Initial User Model
 - [ ] **Phase 4**: Alembic Migrations Configuration
