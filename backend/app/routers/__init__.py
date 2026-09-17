@@ -1,3 +1,4 @@
+from app.routers.applications import router as applications_router
 from app.routers.auth import router as auth_router
 from app.routers.job_posting import router as job_posting_router
 from app.routers.rbac import router as rbac_router
@@ -12,7 +13,9 @@ __all__ = [
     "student_profile_router",
     "recruiter_profile_router",
     "job_posting_router",
+    "applications_router",
 ]
+
 
 
 

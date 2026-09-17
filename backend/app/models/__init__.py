@@ -1,3 +1,4 @@
+from app.models.application import Application, ApplicationStatus
 from app.models.base import Base
 from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
 from app.models.recruiter_profile import RecruiterProfile
@@ -13,7 +14,10 @@ __all__ = [
     "JobPosting",
     "OpportunityType",
     "EmploymentType",
+    "Application",
+    "ApplicationStatus",
 ]
+
 
 
 

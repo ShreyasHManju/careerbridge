@@ -65,7 +65,7 @@ The system enforces three primary roles directly on the FastAPI backend:
 - **Phase 8**: `student_profiles` (1-to-1 extension with cascading deletes, education/contact metadata)
 - **Phase 9**: `recruiter_profiles` (1-to-1 extension with cascading deletes, organization/contact metadata)
 - **Phase 10**: `job_postings` (1-to-many opportunities posted by recruiters with cascading deletes)
-- **Phase 11**: `applications`
+- **Phase 11**: `applications` (many-to-1 with `job_postings` and `users`, unique constraint on `(job_posting_id, student_id)`, status lifecycle pipeline: applied -> reviewing -> shortlisted -> rejected / accepted)
 - **Phase 13-14**: `saved_internships`, `skills`, `student_skills`
 - **Phase 17-20**: `notifications`, `interviews`, `conversations`, `messages`, `audit_logs`
 
@@ -77,7 +77,7 @@ CareerBridge separates identity and access into three explicit tiers:
 
 1. **Authentication ("Who are you?")**: Verified cryptographically via `get_current_user` reading the JWT Bearer token and verifying the active account in PostgreSQL.
 2. **Role Authorization ("What group do you belong to?")**: Enforced via `require_role(allowed_roles)`. Protects routes from unauthorized roles (e.g. students attempting recruiter creation/modification return `403 Forbidden`).
-3. **Resource Ownership ("Do you own this specific record?")**: Strictly derived from `current_user.id`. Endpoints never accept `user_id` or `recruiter_id` from client payloads. Queries filter by `Model.user_id == current_user.id` (for profiles) or `JobPosting.recruiter_id == current_user.id` (for postings), preventing horizontal privilege escalation (IDOR) and ownership spoofing.
+3. **Resource Ownership ("Do you own this specific record?")**: Strictly derived from `current_user.id`. Endpoints never accept `user_id`, `recruiter_id`, or `student_id` from client payloads. Queries filter by `Model.user_id == current_user.id` (for profiles), `JobPosting.recruiter_id == current_user.id` (for postings), `Application.student_id == current_user.id` (for student application tracking), or `application.job_posting.recruiter_id == current_user.id` (for recruiter application review), preventing horizontal privilege escalation (IDOR) and ownership spoofing.
 
 
 

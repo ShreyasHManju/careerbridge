@@ -7,7 +7,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.application import Application
     from app.models.user import User
+
 
 
 class OpportunityType(str, enum.Enum):
@@ -83,5 +85,13 @@ class JobPosting(Base):
     # Many-to-one relationship back to the recruiter User
     recruiter: Mapped["User"] = relationship("User", back_populates="job_postings")
 
+    # One-to-many relationship with Application
+    applications: Mapped[list["Application"]] = relationship(
+        "Application",
+        back_populates="job_posting",
+        cascade="all, delete-orphan",
+    )
+
     def __repr__(self) -> str:
         return f"<JobPosting id={self.id} title={self.title!r} company={self.company_name!r} recruiter_id={self.recruiter_id}>"
+
