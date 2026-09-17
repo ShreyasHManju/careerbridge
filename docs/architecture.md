@@ -39,8 +39,7 @@ Every request follows a rigorous vertical slice to ensure safety, auditability, 
 1. **Client**: React frontend issues an HTTP request using an Axios/Fetch client.
 2. **FastAPI Router**: Receives request and triggers dependency injection:
    - Authenticates JWT token via get_current_user.
-   - Evaluates RBAC permissions (e.g., 
-equire_role('company')).
+   - Evaluates RBAC permissions (e.g., `require_role('company')`).
 3. **Pydantic Schema Validation**: Request payload is parsed and strictly validated against defined schema models.
 4. **Service Layer**: Executes domain logic and checks business rules (e.g., verify company approval status, check application deadline).
 5. **Data Access (SQLAlchemy ORM)**: Executes parameterized queries against PostgreSQL inside a managed database session transaction.
@@ -64,7 +63,6 @@ The system enforces three primary roles directly on the FastAPI backend:
 
 - **Phase 1-5**: users
 - **Phase 8-9**: students, companies
-- **Phase 10-11**: internships, pplications
+- **Phase 10-11**: internships, applications
 - **Phase 13-14**: saved_internships, skills, student_skills
-- **Phase 17-20**: 
-otifications, interviews, conversations, messages, udit_logs
+- **Phase 17-20**: notifications, interviews, conversations, messages, audit_logs

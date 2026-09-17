@@ -60,7 +60,7 @@ careerbridge/
 - [x] **Phase 2**: PostgreSQL Configuration & Connection (PostgreSQL 16, SQLAlchemy, pydantic-settings)
 - [x] **Phase 3**: SQLAlchemy ORM Setup & Initial User Model (DeclarativeBase, User model, role enum, metadata verification)
 - [x] **Phase 4**: Alembic Migrations Configuration (Alembic 1.20, env.py, initial users migration, upgrade/downgrade verified)
-- [ ] **Phase 5**: User CRUD Endpoints
+- [x] **Phase 5**: User CRUD Endpoints (Pydantic Schemas, Bcrypt hashing, paginated CRUD API, robust validation)
 - [ ] **Phase 6**: Authentication (JWT, Refresh Tokens, Password Hashing)
 - [ ] **Phase 7**: Role-Based Access Control (Student, Company, Admin)
 - [ ] **Phase 8**: Student Profile & UI
@@ -236,3 +236,37 @@ Execute the migration verification test:
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_migrations.py
 ```
+
+---
+
+## 8. User Schemas & CRUD API (Phase 5)
+
+Phase 5 establishes the Pydantic data schemas, secure password hashing foundation, and standard development CRUD endpoints for managing `User` accounts.
+
+### Pydantic Schemas (`backend/app/schemas/user.py`)
+- **`UserCreate`**: Validates input on user registration (`email: EmailStr`, `password: str` with minimum 8 characters, optional `role: UserRole`).
+- **`UserUpdate`**: Enables partial updates (`email: Optional[EmailStr]`, `role: Optional[UserRole]`, `is_active: Optional[bool]`, `is_verified: Optional[bool]`).
+- **`UserResponse`**: Safe serialization response model configured with `model_config = ConfigDict(from_attributes=True)`. Returns `id`, `email`, `role`, `is_active`, `is_verified`, `created_at`, and `updated_at`. **Plaintext passwords and `password_hash` are strictly excluded from responses.**
+
+### Password Security (`backend/app/core/security.py`)
+- Standardized password hashing using `bcrypt`:
+  - `hash_password(password: str) -> str`: Generates salt and hashes passwords.
+  - `verify_password(plain_password: str, hashed_password: str) -> bool`: Verifies plain passwords against stored hashes.
+
+### Endpoints (`/api/v1/users`)
+| Method | Endpoint | Status Code | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/users` | `201 Created` | Creates a new user with hashed password; checks for duplicate email (`409 Conflict`). |
+| `GET` | `/api/v1/users` | `200 OK` | Retrieves paginated user records via `skip` (default 0) and `limit` (default 20, max 100). |
+| `GET` | `/api/v1/users/{user_id}` | `200 OK` | Retrieves a single user by primary key ID (`404 Not Found` if nonexistent). |
+| `PATCH` | `/api/v1/users/{user_id}` | `200 OK` | Partially updates user properties; rejects email collision (`409 Conflict`). |
+| `DELETE` | `/api/v1/users/{user_id}` | `204 No Content` | Removes user record (`404 Not Found` if nonexistent). |
+
+> **Development-Stage Notice**: These initial CRUD endpoints are intentionally open for foundational development and verification. JWT authentication, login endpoints, refresh tokens, and role-based permissions will be layered on top during Phase 6 and Phase 7.
+
+### Run User CRUD Verification Suite
+Run the 14-point test suite covering creation, validation, password exclusion, duplication checks, pagination, updates, and deletion:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_users_crud.py
+```
+
