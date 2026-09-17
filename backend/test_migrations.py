@@ -24,16 +24,17 @@ def test_migrations():
     assert "users" in Base.metadata.tables, "Table 'users' missing from Base.metadata"
     print("  -> Base.metadata contains 'users' table definition.")
 
-    print("[3/7] Verifying database schema after migration")
+    print("[3/8] Verifying database schema after migration")
     inspector = inspect(engine)
     tables = inspector.get_table_names()
     print(f"  -> Tables found in PostgreSQL: {tables}")
     assert "users" in tables, "Table 'users' not found in database!"
     assert "student_profiles" in tables, "Table 'student_profiles' not found in database!"
     assert "recruiter_profiles" in tables, "Table 'recruiter_profiles' not found in database!"
+    assert "job_postings" in tables, "Table 'job_postings' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
 
-    print("[4/7] Verifying 'users' table columns and indexes")
+    print("[4/8] Verifying 'users' table columns and indexes")
     columns = {col["name"]: col for col in inspector.get_columns("users")}
     expected_cols = [
         "id",
@@ -54,7 +55,7 @@ def test_migrations():
     index_names = [idx["name"] for idx in indexes]
     assert any("email" in name for name in index_names), "Email index missing from 'users' table"
 
-    print("[5/7] Verifying 'student_profiles' table columns, indexes, and FKs")
+    print("[5/8] Verifying 'student_profiles' table columns, indexes, and FKs")
     sp_columns = {col["name"]: col for col in inspector.get_columns("student_profiles")}
     expected_sp_cols = [
         "id",
@@ -83,7 +84,7 @@ def test_migrations():
     print(f"  -> Foreign keys on 'student_profiles': {sp_fks}")
     assert any(fk.get("referred_table") == "users" for fk in sp_fks), "Foreign key to 'users' table missing!"
 
-    print("[6/7] Verifying 'recruiter_profiles' table columns, indexes, and FKs")
+    print("[6/8] Verifying 'recruiter_profiles' table columns, indexes, and FKs")
     rp_columns = {col["name"]: col for col in inspector.get_columns("recruiter_profiles")}
     expected_rp_cols = [
         "id",
@@ -109,11 +110,44 @@ def test_migrations():
     print(f"  -> Foreign keys on 'recruiter_profiles': {rp_fks}")
     assert any(fk.get("referred_table") == "users" for fk in rp_fks), "Foreign key to 'users' table missing on recruiter_profiles!"
 
-    print("[7/7] Verifying alembic_version table in PostgreSQL")
+    print("[7/8] Verifying 'job_postings' table columns, indexes, and FKs")
+    jp_columns = {col["name"]: col for col in inspector.get_columns("job_postings")}
+    expected_jp_cols = [
+        "id",
+        "recruiter_id",
+        "title",
+        "description",
+        "opportunity_type",
+        "company_name",
+        "location",
+        "is_remote",
+        "employment_type",
+        "skills",
+        "minimum_qualification",
+        "experience_required",
+        "salary_min",
+        "salary_max",
+        "application_deadline",
+        "is_active",
+        "created_at",
+        "updated_at",
+    ]
+    for col_name in expected_jp_cols:
+        assert col_name in jp_columns, f"Column '{col_name}' missing from 'job_postings' table"
+        print(f"     - {col_name}: {jp_columns[col_name]['type']} (nullable={jp_columns[col_name]['nullable']})")
+
+    jp_indexes = inspector.get_indexes("job_postings")
+    print(f"  -> Indexes on 'job_postings': {[idx['name'] for idx in jp_indexes]}")
+    jp_fks = inspector.get_foreign_keys("job_postings")
+    print(f"  -> Foreign keys on 'job_postings': {jp_fks}")
+    assert any(fk.get("referred_table") == "users" for fk in jp_fks), "Foreign key to 'users' table missing on job_postings!"
+
+    print("[8/8] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")
         assert db_version == head_revision, f"Database version ({db_version}) != Alembic head ({head_revision})"
+
 
 
 

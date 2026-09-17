@@ -6,8 +6,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.job_posting import JobPosting
     from app.models.recruiter_profile import RecruiterProfile
     from app.models.student_profile import StudentProfile
+
 
 
 
@@ -63,6 +65,14 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    # One-to-many relationship with JobPosting
+    job_postings: Mapped[list["JobPosting"]] = relationship(
+        "JobPosting",
+        back_populates="recruiter",
+        cascade="all, delete-orphan",
+    )
+
     def __repr__(self) -> str:
+
 
         return f'<User id={self.id} email={self.email} role={self.role}>'

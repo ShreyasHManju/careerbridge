@@ -1,4 +1,10 @@
 from app.schemas.auth import LoginRequest, TokenPayload, TokenResponse
+from app.schemas.job_posting import (
+    JobPostingCreate,
+    JobPostingResponse,
+    JobPostingUpdate,
+)
+
 from app.schemas.recruiter_profile import (
     RecruiterProfileCreate,
     RecruiterProfileResponse,
@@ -24,6 +30,10 @@ __all__ = [
     "RecruiterProfileCreate",
     "RecruiterProfileUpdate",
     "RecruiterProfileResponse",
+    "JobPostingCreate",
+    "JobPostingUpdate",
+    "JobPostingResponse",
 ]
+
 
 
