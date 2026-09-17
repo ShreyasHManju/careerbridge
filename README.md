@@ -1,6 +1,6 @@
-# Student Internship Management System
+# CareerBridge
 
-A production-quality platform connecting students, companies, and administrators for end-to-end internship management. Built using **React + TypeScript**, **FastAPI**, and **PostgreSQL**.
+A production-quality internship management platform connecting students, companies, and administrators. Built using **React + TypeScript**, **FastAPI**, and **PostgreSQL**.
 
 ---
 
@@ -40,15 +40,16 @@ A production-quality platform connecting students, companies, and administrators
 
 ## 3. Directory Structure
 
-	ext
-student-internship-management-system/
+```text
+careerbridge/
 ├── backend/            # FastAPI application, SQLAlchemy models, Alembic migrations
 ├── frontend/           # React + TypeScript SPA built with Vite
 ├── docs/               # System architecture and technical documentation
 │   └── architecture.md
 ├── .gitignore          # Git ignore rules for Python, Node, secrets, and IDEs
-├── .env.example        # Environment variable template
+├── .env.example        # Environment variable template with safe placeholders
 └── README.md           # Project documentation
+```
 
 ---
 
@@ -56,7 +57,7 @@ student-internship-management-system/
 
 - [x] **Phase 0**: Project Planning & Workspace Assessment
 - [x] **Phase 1**: FastAPI Foundation (Basic server, health check, docs)
-- [ ] **Phase 2**: PostgreSQL Configuration & Connection
+- [x] **Phase 2**: PostgreSQL Configuration & Connection (PostgreSQL 16, SQLAlchemy, pydantic-settings)
 - [ ] **Phase 3**: SQLAlchemy ORM Setup & Initial User Model
 - [ ] **Phase 4**: Alembic Migrations Configuration
 - [ ] **Phase 5**: User CRUD Endpoints
@@ -88,12 +89,81 @@ student-internship-management-system/
 
 ---
 
-## 5. Getting Started (Preview)
+## 5. Getting Started
 
 ### Prerequisites
-- Python 3.11+
-- Node.js 18+ (Node 24 detected)
-- PostgreSQL 16+
+- **Python**: 3.11+ (running in `backend/.venv`)
+- **PostgreSQL**: Version 16.x running on port `5432`
+- **Database**: `internship_db`
 
-### Setup Instructions
-Instructions will be expanded step-by-step as each phase is implemented.
+### 1. PostgreSQL Service Setup
+Ensure the PostgreSQL 16 service is running on your machine:
+```powershell
+# Check service status
+Get-Service -Name postgresql-x64-16
+
+# Start service if stopped
+Start-Service -Name postgresql-x64-16
+```
+
+Ensure the development database exists:
+```powershell
+# Connect via psql and create the database if not present
+psql -U postgres -p 5432 -h localhost -c "CREATE DATABASE internship_db;"
+```
+
+### 2. Environment Configuration
+Create `backend/.env` using `.env.example` as a template:
+```powershell
+Copy-Item .env.example backend/.env
+```
+Open `backend/.env` and supply your local PostgreSQL password:
+```env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_actual_password
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=internship_db
+```
+*(Note: `backend/.env` is ignored by Git and will never be committed).*
+
+### 3. Install Backend Dependencies
+Always use the virtual environment binaries:
+```powershell
+backend\.venv\Scripts\pip.exe install -r backend/requirements.txt
+```
+
+### 4. Verify Database Connectivity
+Execute the database verification script:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_db_connection.py
+```
+Expected output:
+```text
+[1/3] Testing Python sqlalchemy connectivity to PostgreSQL
+  -> Successfully executed 'SELECT 1' ping query.
+  -> Database Name: internship_db
+  -> Database User: postgres
+  -> Server Version: PostgreSQL 16.13
+  -> Host: localhost
+  -> Port: 5432
+[2/3] Verifying database selection
+  -> Confirmed: connected to 'internship_db'.
+[3/3] All SQLAlchemy -> PostgreSQL connectivity checks PASSED SUCCESSFULLY!
+```
+
+### 5. Run the FastAPI Application
+From the `backend` directory:
+```powershell
+cd backend
+.\.venv\Scripts\uvicorn.exe app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+Or from the project root:
+```powershell
+backend\.venv\Scripts\uvicorn.exe app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload
+```
+
+### 6. Verify Endpoints
+- **Root**: `http://127.0.0.1:8000/` (`200 OK`)
+- **Database & Service Health**: `http://127.0.0.1:8000/health` (`200 OK`, reports database connected)
+- **Interactive OpenAPI Documentation**: `http://127.0.0.1:8000/docs`

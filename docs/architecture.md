@@ -1,8 +1,8 @@
-# System Architecture & Design
+# CareerBridge — System Architecture & Design
 
 ## 1. High-Level Architecture Overview
 
-The Student Internship Management System is built on a clean multi-tier architecture separating the client application from the core business logic and database persistence.
+CareerBridge is built on a clean multi-tier architecture separating the client application from the core business logic and database persistence.
 
                     +--------------------+
                     |       Client       |
