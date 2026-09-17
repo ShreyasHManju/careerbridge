@@ -1,8 +1,12 @@
 from datetime import datetime
 import enum
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy import Boolean, DateTime, Enum, Integer, String, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
+
+if TYPE_CHECKING:
+    from app.models.student_profile import StudentProfile
 
 
 class UserRole(str, enum.Enum):
@@ -39,6 +43,14 @@ class User(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    # One-to-one relationship with StudentProfile
+    student_profile: Mapped[Optional["StudentProfile"]] = relationship(
+        "StudentProfile",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:

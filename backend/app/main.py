@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, status
 from app.core.config import settings
 from app.core.database import check_db_connection
-from app.routers import auth_router, rbac_router, users_router
+from app.routers import auth_router, rbac_router, student_profile_router, users_router
 
 app = FastAPI(
     title="CareerBridge API",
@@ -14,7 +14,9 @@ app = FastAPI(
 # Register API v1 Routers
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(rbac_router, prefix=settings.API_V1_STR)
+app.include_router(student_profile_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)
+
 
 
 @app.get("/", tags=["Health"])

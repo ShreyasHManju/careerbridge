@@ -24,14 +24,15 @@ def test_migrations():
     assert "users" in Base.metadata.tables, "Table 'users' missing from Base.metadata"
     print("  -> Base.metadata contains 'users' table definition.")
 
-    print("[3/5] Verifying database schema after migration")
+    print("[3/6] Verifying database schema after migration")
     inspector = inspect(engine)
     tables = inspector.get_table_names()
     print(f"  -> Tables found in PostgreSQL: {tables}")
     assert "users" in tables, "Table 'users' not found in database!"
+    assert "student_profiles" in tables, "Table 'student_profiles' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
 
-    print("[4/5] Verifying 'users' table columns and indexes")
+    print("[4/6] Verifying 'users' table columns and indexes")
     columns = {col["name"]: col for col in inspector.get_columns("users")}
     expected_cols = [
         "id",
@@ -52,7 +53,36 @@ def test_migrations():
     index_names = [idx["name"] for idx in indexes]
     assert any("email" in name for name in index_names), "Email index missing from 'users' table"
 
-    print("[5/5] Verifying alembic_version table in PostgreSQL")
+    print("[5/6] Verifying 'student_profiles' table columns, indexes, and FKs")
+    sp_columns = {col["name"]: col for col in inspector.get_columns("student_profiles")}
+    expected_sp_cols = [
+        "id",
+        "user_id",
+        "full_name",
+        "phone",
+        "college",
+        "degree",
+        "branch",
+        "graduation_year",
+        "bio",
+        "skills",
+        "github_url",
+        "linkedin_url",
+        "portfolio_url",
+        "created_at",
+        "updated_at",
+    ]
+    for col_name in expected_sp_cols:
+        assert col_name in sp_columns, f"Column '{col_name}' missing from 'student_profiles' table"
+        print(f"     - {col_name}: {sp_columns[col_name]['type']} (nullable={sp_columns[col_name]['nullable']})")
+
+    sp_indexes = inspector.get_indexes("student_profiles")
+    print(f"  -> Indexes on 'student_profiles': {[idx['name'] for idx in sp_indexes]}")
+    sp_fks = inspector.get_foreign_keys("student_profiles")
+    print(f"  -> Foreign keys on 'student_profiles': {sp_fks}")
+    assert any(fk.get("referred_table") == "users" for fk in sp_fks), "Foreign key to 'users' table missing!"
+
+    print("[6/6] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")
