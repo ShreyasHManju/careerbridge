@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import computed_field
+from pydantic import AliasChoices, Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +22,19 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "internship_db"
+
+    # Security & JWT Configuration
+    JWT_SECRET_KEY: str = Field(
+        ...,
+        validation_alias=AliasChoices("JWT_SECRET_KEY", "SECRET_KEY"),
+        description="Secret cryptographic key for signing JWT tokens",
+    )
+    JWT_ALGORITHM: str = Field(
+        default="HS256",
+        validation_alias=AliasChoices("JWT_ALGORITHM", "ALGORITHM"),
+        description="Algorithm used for signing JWT tokens",
+    )
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # Optional explicit DATABASE_URL
     DATABASE_URL: Optional[str] = None

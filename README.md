@@ -61,7 +61,7 @@ careerbridge/
 - [x] **Phase 3**: SQLAlchemy ORM Setup & Initial User Model (DeclarativeBase, User model, role enum, metadata verification)
 - [x] **Phase 4**: Alembic Migrations Configuration (Alembic 1.20, env.py, initial users migration, upgrade/downgrade verified)
 - [x] **Phase 5**: User CRUD Endpoints (Pydantic Schemas, Bcrypt hashing, paginated CRUD API, robust validation)
-- [ ] **Phase 6**: Authentication (JWT, Refresh Tokens, Password Hashing)
+- [x] **Phase 6**: Authentication & JWT Foundation (JWT access tokens, Bcrypt verification, Login endpoint, Bearer dependency, Protected /me)
 - [ ] **Phase 7**: Role-Based Access Control (Student, Company, Admin)
 - [ ] **Phase 8**: Student Profile & UI
 - [ ] **Phase 9**: Company Profile & Verification
@@ -269,4 +269,68 @@ Run the 14-point test suite covering creation, validation, password exclusion, d
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_users_crud.py
 ```
+
+---
+
+## 9. Authentication & JWT Foundation (Phase 6)
+
+Phase 6 implements the core authentication layer for CareerBridge, providing token-based authentication using JSON Web Tokens (JWT) and Bearer authorization.
+
+### Authentication Architecture & Request Flow
+```text
+POST /api/v1/auth/login
+        ↓
+Pydantic LoginRequest Validation
+        ↓
+PostgreSQL Query: Look up User by email
+        ↓
+verify_password(plain, password_hash) [bcrypt]
+        ↓
+Verify Account Active (user.is_active == True)
+        ↓
+create_access_token(subject=user.id) [PyJWT HS256]
+        ↓
+Return TokenResponse: {"access_token": "...", "token_type": "bearer"}
+```
+
+```text
+GET /api/v1/auth/me
+        ↓
+HTTP Header: Authorization: Bearer <access_token>
+        ↓
+FastAPI Dependency: get_current_user
+        ↓
+decode_access_token(): Validate signature + expiration
+        ↓
+Extract subject user ID ('sub')
+        ↓
+PostgreSQL Query: Retrieve active User
+        ↓
+Return safe UserResponse (strictly excludes password and password_hash)
+```
+
+### Endpoints (`/api/v1/auth`)
+| Method | Endpoint | Status Code | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/auth/login` | `200 OK` | Authenticates user; returns JWT Bearer access token. Returns generic `401 Unauthorized` on unknown email or incorrect password. |
+| `GET` | `/api/v1/auth/me` | `200 OK` | Protected endpoint requiring valid Bearer token; returns current user's profile. |
+
+### Security & Payload Design
+- **Minimal JWT Claims**:
+  - `sub`: User's primary key ID as string.
+  - `exp`: Expiration UTC timestamp (defaults to 30 minutes).
+  - `iat`: Issued-at UTC timestamp.
+- **Data Protection**: Neither plaintext passwords nor `password_hash` are ever included in the JWT payload or API responses.
+- **Generic Error Messages**: Invalid email and incorrect password return identical `401 Unauthorized` (`"Incorrect email or password"`), preventing user enumeration.
+- **Account Inactivity Guard**: Inactive accounts (`is_active=False`) are blocked with `401 Unauthorized` (`"Inactive user account"`).
+
+> **Architectural Boundary Notice**:
+> Authentication (identifying who the user is) is now complete. Role-Based Access Control (RBAC - authorizing what a student, recruiter, or admin can do) and token rotation/refresh workflows will be layered on in subsequent phases.
+
+### Run Authentication Test Suite
+Execute the 16-test suite covering token generation, password verification, expiration, tampering, and protected routes:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_auth.py
+```
+
 
