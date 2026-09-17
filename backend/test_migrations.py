@@ -1,0 +1,68 @@
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+from sqlalchemy import inspect, text
+from app.core.database import engine
+from app.models import Base
+
+
+def test_migrations():
+    print("[1/5] Verifying Alembic configuration and ScriptDirectory")
+    base_dir = Path(__file__).resolve().parent
+    alembic_cfg = Config(str(base_dir / "alembic.ini"))
+    alembic_cfg.set_main_option("script_location", str(base_dir / "alembic"))
+    script_dir = ScriptDirectory.from_config(alembic_cfg)
+    head_revision = script_dir.get_current_head()
+    print(f"  -> Alembic head revision from script directory: {head_revision}")
+    assert head_revision is not None, "No migration head found in script directory"
+
+    print("[2/5] Verifying target metadata discovery")
+    assert "users" in Base.metadata.tables, "Table 'users' missing from Base.metadata"
+    print("  -> Base.metadata contains 'users' table definition.")
+
+    print("[3/5] Verifying database schema after migration")
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    print(f"  -> Tables found in PostgreSQL: {tables}")
+    assert "users" in tables, "Table 'users' not found in database!"
+    assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
+
+    print("[4/5] Verifying 'users' table columns and indexes")
+    columns = {col["name"]: col for col in inspector.get_columns("users")}
+    expected_cols = [
+        "id",
+        "email",
+        "password_hash",
+        "role",
+        "is_active",
+        "is_verified",
+        "created_at",
+        "updated_at",
+    ]
+    for col_name in expected_cols:
+        assert col_name in columns, f"Column '{col_name}' missing from 'users' table"
+        print(f"     - {col_name}: {columns[col_name]['type']} (nullable={columns[col_name]['nullable']})")
+
+    indexes = inspector.get_indexes("users")
+    print(f"  -> Indexes on 'users': {[idx['name'] for idx in indexes]}")
+    index_names = [idx["name"] for idx in indexes]
+    assert any("email" in name for name in index_names), "Email index missing from 'users' table"
+
+    print("[5/5] Verifying alembic_version table in PostgreSQL")
+    with engine.connect() as conn:
+        db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
+        print(f"  -> Database alembic_version: {db_version}")
+        assert db_version == head_revision, f"Database version ({db_version}) != Alembic head ({head_revision})"
+
+
+    print("\n==========================================================")
+    print("ALL BACKEND ALEMBIC MIGRATION TESTS PASSED SUCCESSFULLY!")
+    print("=========================================================\n")
+
+
+if __name__ == "__main__":
+    test_migrations()

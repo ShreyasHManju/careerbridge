@@ -59,7 +59,7 @@ careerbridge/
 - [x] **Phase 1**: FastAPI Foundation (Basic server, health check, docs)
 - [x] **Phase 2**: PostgreSQL Configuration & Connection (PostgreSQL 16, SQLAlchemy, pydantic-settings)
 - [x] **Phase 3**: SQLAlchemy ORM Setup & Initial User Model (DeclarativeBase, User model, role enum, metadata verification)
-- [ ] **Phase 4**: Alembic Migrations Configuration
+- [x] **Phase 4**: Alembic Migrations Configuration (Alembic 1.20, env.py, initial users migration, upgrade/downgrade verified)
 - [ ] **Phase 5**: User CRUD Endpoints
 - [ ] **Phase 6**: Authentication (JWT, Refresh Tokens, Password Hashing)
 - [ ] **Phase 7**: Role-Based Access Control (Student, Company, Admin)
@@ -192,4 +192,47 @@ Defined in [`backend/app/models/user.py`](backend/app/models/user.py) using SQLA
 Run the metadata verification test:
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_user_model.py
+```
+
+---
+
+## 7. Database Migrations (Phase 4)
+
+CareerBridge utilizes **Alembic** to manage database schema evolution safely, reproducibly, and under version control.
+
+### Why Migrations?
+- **Version Control for Databases**: Track exact schema changes alongside application code.
+- **Team & Environment Parity**: Ensure development, staging, and production databases share identical schema states.
+- **Reversible Changes**: Every migration provides both an `upgrade()` and `downgrade()` function.
+
+### Migration Structure
+- `backend/alembic.ini`: Configuration file specifying migration directory and logging. Does **not** contain raw credentials.
+- `backend/alembic/env.py`: Migration environment runner. Dynamically pulls `settings.sync_database_url` and imports `Base.metadata`.
+- `backend/alembic/versions/`: Contains version-controlled migration scripts.
+
+### Common Migration Commands
+Always run migration commands from the `backend` directory using the virtual environment:
+```powershell
+cd backend
+
+# View current database revision
+.\.venv\Scripts\alembic.exe current
+
+# View migration history
+.\.venv\Scripts\alembic.exe history --verbose
+
+# Apply all pending migrations to head
+.\.venv\Scripts\alembic.exe upgrade head
+
+# Rollback one migration
+.\.venv\Scripts\alembic.exe downgrade -1
+
+# Generate a new auto-migration after modifying models
+.\.venv\Scripts\alembic.exe revision --autogenerate -m "describe changes"
+```
+
+### Run Migration Tests
+Execute the migration verification test:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_migrations.py
 ```
