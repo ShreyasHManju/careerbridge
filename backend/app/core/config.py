@@ -64,6 +64,17 @@ class Settings(BaseSettings):
         upload_path.mkdir(parents=True, exist_ok=True)
         return upload_path
 
+    # Email Notification Configuration
+    EMAIL_PROVIDER: str = "local"  # "local" or "smtp"
+    EMAIL_FROM: str = "no-reply@careerbridge.io"
+    EMAIL_FROM_NAME: str = "CareerBridge"
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_USE_TLS: bool = True
+    FRONTEND_URL: str = "http://localhost:5173"
+
     # Optional explicit DATABASE_URL
     DATABASE_URL: Optional[str] = None
 

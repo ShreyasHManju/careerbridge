@@ -1,7 +1,7 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_role
@@ -14,6 +14,7 @@ from app.schemas.application import (
     ApplicationResponse,
     ApplicationUpdate,
 )
+from app.services.email_service import EmailService
 from app.services.notification_service import NotificationService
 
 router = APIRouter(tags=["Applications"])
@@ -32,6 +33,7 @@ router = APIRouter(tags=["Applications"])
 def apply_to_job_posting(
     job_id: int,
     payload: ApplicationCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_role(UserRole.STUDENT)),
     db: Session = Depends(get_db),
 ):
@@ -53,7 +55,7 @@ def apply_to_job_posting(
     if not job.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot apply to inactive job posting",
+            detail="Cannot apply to an inactive job posting",
         )
 
     # Check for duplicate submission
@@ -88,6 +90,17 @@ def apply_to_job_posting(
 
     db.commit()
     db.refresh(new_app)
+
+    # Transactional email confirmation to the student
+    EmailService.dispatch_application_confirmation_email(
+        to_email=current_user.email,
+        student_name=current_user.email.split("@")[0],
+        job_title=job.title,
+        company_name=job.company_name,
+        application_id=new_app.id,
+        background_tasks=background_tasks,
+    )
+
     return new_app
 
 
@@ -226,6 +239,7 @@ def get_recruiter_application_by_id(
 def update_application_status(
     application_id: int,
     payload: ApplicationUpdate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_role(UserRole.RECRUITER)),
     db: Session = Depends(get_db),
 ):
@@ -235,7 +249,12 @@ def update_application_status(
     - Prevents modification of student_id or job_posting_id.
     """
     application = db.scalar(
-        select(Application).where(Application.id == application_id)
+        select(Application)
+        .options(
+            joinedload(Application.job_posting),
+            joinedload(Application.student),
+        )
+        .where(Application.id == application_id)
     )
     if not application:
         raise HTTPException(
@@ -249,6 +268,7 @@ def update_application_status(
             detail="Not enough permissions to update this application",
         )
 
+    old_status = application.status
     application.status = payload.status
 
     # In-app notification for the applicant student
@@ -262,4 +282,19 @@ def update_application_status(
 
     db.commit()
     db.refresh(application)
+
+    # Dispatch transactional status update email only when status has actually transitioned
+    if old_status != payload.status:
+        student_email = application.student.email if application.student else None
+        if student_email:
+            EmailService.dispatch_application_status_update_email(
+                to_email=student_email,
+                student_name=student_email.split("@")[0],
+                job_title=application.job_posting.title,
+                company_name=application.job_posting.company_name,
+                new_status=payload.status.value,
+                application_id=application.id,
+                background_tasks=background_tasks,
+            )
+
     return application

@@ -76,7 +76,7 @@ careerbridge/
 - [x] **Phase 18**: Interviews & Interview Scheduling Foundation (Interview model, types & statuses, double-booking conflict protection, student notifications, chronological listings, soft-cancellation, RBAC & ownership)
 - [x] **Phase 19**: Messaging Foundation (One-to-one conversations, message delivery, participant authorization with no admin bypass, get-or-create deduplication, read/unread tracking, notification integration)
 - [x] **Phase 20**: Real-Time Messaging / WebSockets Foundation (WebSocket transport layer, WebSocketConnectionManager, query/header JWT auth, participant authorization without admin bypass, multi-tab support, real-time broadcast, read receipts, offline persistence, notification triggers)
-- [ ] **Phase 21**: Email Notifications
+- [x] **Phase 21**: Email Notification Foundation (Decoupled transactional email architecture, Local & SMTP providers, background jobs integration, HTML/text templates, injection escaping, failure isolation)
 - [ ] **Phase 22**: Aggregated Role Dashboards
 - [ ] **Phase 23**: Unified Error Handling & Frontend States
 - [ ] **Phase 24**: End-to-End & Unit Testing
@@ -1060,14 +1060,51 @@ Execute the 48-test suite covering authentication, authorization, multi-tab life
 backend\.venv\Scripts\python.exe backend/test_websocket_messaging.py
 ```
 
+---
 
+## 24. Phase 21: Email Notification Foundation
 
+CareerBridge implements a robust, asynchronous transactional email foundation designed to notify students and recruiters about critical lifecycle events while maintaining total database failure isolation and zero external message broker dependencies.
 
+### Key Capabilities & Architectural Highlights
+- **Pluggable Provider Architecture (`BaseEmailProvider`)**:
+  - `LocalEmailProvider`: In-memory development and test provider capturing emails with zero third-party dependencies. Includes inspection (`get_sent_emails`, `get_last_email`) and safe resetting (`clear`).
+  - `SMTPEmailProvider`: Standard transactional SMTP delivery leveraging Python's built-in `smtplib` and `email.message.EmailMessage`, with configurable STARTTLS, authentication, and error wrapping.
+  - `get_email_provider()`: Factory switching between providers via `EMAIL_PROVIDER` setting (`"local"` or `"smtp"`).
+- **Asynchronous & Decoupled Execution**:
+  - Leverages CareerBridge's existing in-memory background job framework (`background_jobs.py`) and FastAPI's `BackgroundTasks`.
+  - HTTP endpoints dispatch jobs non-blockingly and return responses immediately.
+  - Failures in email dispatch or network connectivity are trapped in `_execute_job_safe`, recorded to execution history with `"status": "failed"`, and **never** roll back primary database transactions or abort user-facing requests.
+- **Supported Notification Events**:
+  1. **Welcome Email** (`EmailEventType.WELCOME`): Dispatched upon successful user account creation (`POST /api/v1/users`). Contains account role and dashboard access link. Strictly omits plaintext passwords and hashes.
+  2. **Email Verification** (`EmailEventType.EMAIL_VERIFICATION`): Foundational template and service interface delivering secure verification links.
+  3. **Password Reset** (`EmailEventType.PASSWORD_RESET`): Foundational template and service interface delivering time-sensitive password recovery links.
+  4. **Application Confirmation** (`EmailEventType.APPLICATION_CONFIRMATION`): Dispatched to the applying student upon submitting an application (`POST /api/v1/jobs/{job_id}/applications`).
+  5. **Application Status Update** (`EmailEventType.APPLICATION_STATUS_UPDATE`): Dispatched to the applicant student when a hiring recruiter modifies pipeline status (`PATCH /api/v1/recruiter/applications/{id}`). Protected against redundant dispatches when status is unchanged.
+  6. **Interview Invitation** (`EmailEventType.INTERVIEW_INVITATION`): Dispatched to candidate students upon interview scheduling (`POST /api/v1/applications/{id}/interviews`), providing time, type, duration, link, and notes.
+- **Security & Injection Prevention**:
+  - Dual-format templates (plain text `.txt` and responsive HTML `.html`) in `backend/app/templates/email/`.
+  - HTML escaping with `html.escape()` protects all interpolated user parameters against HTML injection and cross-site scripting (XSS).
+  - Recipient emails are strictly derived from authenticated server entities (e.g. `user.email`, `application.student.email`), never accepting unauthenticated client-provided recipient parameters.
+  - **No Email Flooding**: One-to-one conversation messages and WebSockets strictly do NOT trigger email notifications.
+  - Credentials, database connection strings, and JWT secrets are strictly masked and absent from logs and email content.
 
+### Configuration (`.env` / `config.py`)
 
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `EMAIL_PROVIDER` | `"local"` | Email delivery engine: `"local"` (in-memory) or `"smtp"` |
+| `EMAIL_FROM` | `"no-reply@careerbridge.io"` | Default sender email address |
+| `EMAIL_FROM_NAME` | `"CareerBridge"` | Sender display name |
+| `SMTP_HOST` | `None` | SMTP server hostname |
+| `SMTP_PORT` | `587` | SMTP server port |
+| `SMTP_USERNAME` | `None` | SMTP authentication username |
+| `SMTP_PASSWORD` | `None` | SMTP authentication password |
+| `SMTP_USE_TLS` | `True` | Enable STARTTLS for SMTP connections |
+| `FRONTEND_URL` | `"http://localhost:5173"` | Base frontend URL for links |
 
-
-
-
-
-
+### Run Email Notification Test Suite
+Execute the 43-test suite covering providers, templates, background jobs, HTML escaping, and end-to-end API workflows:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_email_notifications.py
+```

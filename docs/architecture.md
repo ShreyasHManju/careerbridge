@@ -256,6 +256,80 @@ The Real-Time Messaging architecture extends the one-to-one messaging foundation
 - **Bi-Directional HTTP & WebSocket Sync**:
   - HTTP actions (`POST /conversations/{id}/messages`, `PATCH /conversations/{id}/read`, `PATCH /messages/{id}/read`) broadcast real-time events to active WebSocket connections, ensuring unified platform state regardless of transport method.
 
+---
+
+## 13. Transactional Email Notification Architecture (Phase 21)
+
+The Transactional Email Notification architecture provides decoupled, asynchronous, and secure email delivery across core platform lifecycle events without introducing external message brokers or third-party infrastructure dependencies.
+
+```text
+               +-------------------------------------------------------+
+               |                  FastAPI HTTP Router                  |
+               | (create_user / apply_to_job / update_status / etc.)  |
+               +---------------------------+---------------------------+
+                                           |
+                                           | 1. DB Commit & Refresh
+                                           | 2. dispatch_*_email(background_tasks)
+                                           v
+               +-------------------------------------------------------+
+               |            FastAPI BackgroundTasks Queue              |
+               |       (Response returned immediately to client)       |
+               +---------------------------+---------------------------+
+                                           |
+                                           | Post-Response Execution
+                                           v
+               +-------------------------------------------------------+
+               |               Background Jobs Framework               |
+               |        (_execute_job_safe with failure isolation)     |
+               +---------------------------+---------------------------+
+                                           |
+                                           v
+               +-------------------------------------------------------+
+               |                     EmailService                      |
+               |  (Template rendering, HTML escaping, context merging)|
+               +---------------------------+---------------------------+
+                                           |
+                                           | provider.send()
+                                           v
+                      +--------------------+--------------------+
+                      |                                         |
+                      v                                         v
+       +------------------------------+          +------------------------------+
+       |      LocalEmailProvider      |          |       SMTPEmailProvider      |
+       |  (In-Memory for Dev/Testing) |          | (TLS/Auth Production Engine) |
+       +------------------------------+          +------------------------------+
+```
+
+### Key Architectural Pillars
+- **Decoupled Asynchronous Dispatch**:
+  - Email sending is decoupled from HTTP request handling using FastAPI's `BackgroundTasks` combined with CareerBridge's in-memory background job framework (`background_jobs.py`).
+  - Endpoints complete business mutations, persist them to PostgreSQL, and enqueue background email tasks before returning HTTP 200/201 responses immediately.
+- **Total Transaction & HTTP Isolation**:
+  - Email failures (network timeouts, invalid SMTP credentials, connection drops) are safely captured by `_execute_job_safe`.
+  - Failures are recorded into execution history with `"status": "failed"` and logged with stack traces.
+  - **Critical Invariant**: An email delivery failure will **never** roll back a database transaction or cause an HTTP error response to the client.
+- **Pluggable Provider Abstraction (`BaseEmailProvider`)**:
+  - `BaseEmailProvider`: Abstract base class defining `send(to_email, subject, text_body, html_body, event_type) -> bool`.
+  - `LocalEmailProvider`: In-memory provider for zero-configuration development and automated testing. Captures emails in thread-safe memory with full inspection capabilities (`get_sent_emails()`, `get_last_email()`, `clear()`).
+  - `SMTPEmailProvider`: Production-grade SMTP engine utilizing Python's built-in `smtplib` and `email.message.EmailMessage`. Supports configurable STARTTLS, standard ports, and credentials.
+  - Provider selection is managed dynamically via `get_email_provider()` based on the `EMAIL_PROVIDER` configuration setting.
+- **Dual-Format Templates & HTML Escaping**:
+  - Templates for both plain-text (`.txt`) and HTML (`.html`) reside in `backend/app/templates/email/`.
+  - Template rendering uses `string.Template` safe variable substitution (`$variable` notation) to eliminate parsing conflicts with CSS curly braces.
+  - All user-controlled variables (student names, job titles, company names, locations, notes) are sanitized with `html.escape()` before injection into HTML templates, guaranteeing comprehensive XSS and HTML injection prevention.
+- **Supported Lifecycle Events**:
+  1. `WELCOME`: User account creation (`POST /api/v1/users`).
+  2. `EMAIL_VERIFICATION`: Foundational verification email delivery interface.
+  3. `PASSWORD_RESET`: Foundational password reset email delivery interface.
+  4. `APPLICATION_CONFIRMATION`: Student job application submission (`POST /api/v1/jobs/{id}/applications`).
+  5. `APPLICATION_STATUS_UPDATE`: Recruiter application status change (`PATCH /api/v1/recruiter/applications/{id}`). Only dispatches when `old_status != new_status`.
+  6. `INTERVIEW_INVITATION`: Recruiter interview scheduling (`POST /api/v1/applications/{id}/interviews`).
+- **Security & Privacy Guarantees**:
+  - Recipient email addresses are strictly obtained from server-side database entities (e.g. `current_user.email`, `application.student.email`), never from client request bodies.
+  - Plaintext passwords, password hashes, JWT secrets, and database credentials are strictly excluded from emails and logs.
+  - Chat messages and WebSocket communications strictly do NOT dispatch emails, preventing inbox flooding.
+
+
 
 
 

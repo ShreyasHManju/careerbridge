@@ -1,0 +1,17 @@
+Hello $student_name,
+
+Congratulations! An interview has been scheduled for your application to $job_title at $company_name.
+
+Interview Details:
+- Type: $interview_type
+- Date & Time: $scheduled_at
+- Duration: $duration_minutes minutes
+- Location / Meeting Link: $location_or_link
+- Notes: $notes
+
+Please ensure you are prepared and on time. You can view all interview details and links directly on your CareerBridge dashboard:
+$dashboard_url
+
+Best regards,
+The CareerBridge Team
+$frontend_url

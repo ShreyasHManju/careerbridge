@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.core.security import hash_password
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
+from app.services.email_service import EmailService
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -19,7 +20,11 @@ router = APIRouter(prefix="/users", tags=["Users"])
     summary="Create a new user",
     description="Creates a new user record. Plaintext password is safe-hashed before storage.",
 )
-def create_user(payload: UserCreate, db: Session = Depends(get_db)):
+def create_user(
+    payload: UserCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     existing_user = db.scalar(select(User).where(User.email == payload.email))
     if existing_user:
         raise HTTPException(
@@ -43,7 +48,17 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_409_CONFLICT,
             detail=f"A user with email '{payload.email}' already exists.",
         )
+
+    role_str = new_user.role.value if hasattr(new_user.role, "value") else str(new_user.role)
+    EmailService.dispatch_welcome_email(
+        to_email=new_user.email,
+        role=role_str,
+        user_name=new_user.email.split("@")[0],
+        background_tasks=background_tasks,
+    )
+
     return new_user
+
 
 
 @router.get(

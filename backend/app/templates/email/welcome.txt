@@ -1,0 +1,16 @@
+Hello $user_name,
+
+Welcome to CareerBridge! Your account has been successfully created.
+
+Account Details:
+- Email: $user_email
+- Role: $role
+
+You can now log in and access your portal at:
+$portal_url
+
+If you did not sign up for this account, please contact our support team immediately.
+
+Best regards,
+The CareerBridge Team
+$frontend_url

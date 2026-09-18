@@ -1,0 +1,13 @@
+Hello $student_name,
+
+The status of your application for $job_title at $company_name has been updated.
+
+New Status: $new_status
+Application ID: #$application_id
+
+You can review your updated application and next steps on your CareerBridge dashboard:
+$dashboard_url
+
+Best regards,
+The CareerBridge Team
+$frontend_url

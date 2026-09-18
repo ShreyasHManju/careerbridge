@@ -1,0 +1,18 @@
+Hello $student_name,
+
+Your application for the position of $job_title at $company_name has been successfully submitted!
+
+Application Summary:
+- Application ID: #$application_id
+- Position: $job_title
+- Company: $company_name
+- Status: Applied
+
+You can track your application status at any time on your dashboard:
+$dashboard_url
+
+Good luck with your application!
+
+Best regards,
+The CareerBridge Team
+$frontend_url

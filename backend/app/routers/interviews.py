@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -31,6 +31,7 @@ router = APIRouter(tags=["Interviews"])
 def schedule_interview(
     application_id: int,
     payload: InterviewCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_role(UserRole.RECRUITER)),
     db: Session = Depends(get_db),
 ):
@@ -39,8 +40,10 @@ def schedule_interview(
         application_id=application_id,
         recruiter_id=current_user.id,
         payload=payload,
+        background_tasks=background_tasks,
     )
     return InterviewResponse.from_interview(interview)
+
 
 
 # --------------------------------------------------------------------------

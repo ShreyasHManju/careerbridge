@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interview Scheduled - CareerBridge</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    .header { background-color: #1e40af; padding: 32px 24px; text-align: center; }
+    .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; }
+    .body { padding: 32px 24px; }
+    .card { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin: 20px 0; }
+    .card-row { margin-bottom: 10px; }
+    .card-label { font-weight: 600; color: #475569; display: inline-block; width: 140px; }
+    .cta-btn { display: inline-block; background-color: #2563eb; color: #ffffff !important; padding: 12px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 20px; }
+    .footer { background-color: #f1f5f9; padding: 24px; text-align: center; font-size: 12px; color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>CareerBridge</h1>
+    </div>
+    <div class="body">
+      <h2>Interview Scheduled!</h2>
+      <p>Hello $student_name,</p>
+      <p>Great news! An interview has been scheduled for your application with <strong>$company_name</strong>.</p>
+      <div class="card">
+        <div class="card-row"><span class="card-label">Position:</span> <span>$job_title</span></div>
+        <div class="card-row"><span class="card-label">Company:</span> <span>$company_name</span></div>
+        <div class="card-row"><span class="card-label">Interview Type:</span> <span style="text-transform: capitalize;">$interview_type</span></div>
+        <div class="card-row"><span class="card-label">Date & Time:</span> <span><strong>$scheduled_at</strong></span></div>
+        <div class="card-row"><span class="card-label">Duration:</span> <span>$duration_minutes minutes</span></div>
+        <div class="card-row"><span class="card-label">Location / Link:</span> <span>$location_or_link</span></div>
+        <div class="card-row"><span class="card-label">Notes:</span> <span>$notes</span></div>
+      </div>
+      <p>Please make sure you test your equipment in advance if this is a video interview.</p>
+      <a href="$dashboard_url" class="cta-btn">View Interview in Dashboard</a>
+    </div>
+    <div class="footer">
+      <p>&copy; CareerBridge Platform. All rights reserved.</p>
+      <p>Good luck with your interview!</p>
+    </div>
+  </div>
+</body>
+</html>

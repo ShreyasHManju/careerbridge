@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
-from fastapi import HTTPException, status
+from fastapi import BackgroundTasks, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -10,7 +10,9 @@ from app.models.job_posting import JobPosting
 from app.models.notification import NotificationType
 from app.models.user import User
 from app.schemas.interview import InterviewCreate, InterviewUpdate
+from app.services.email_service import EmailService
 from app.services.notification_service import NotificationService
+
 
 
 class InterviewService:
@@ -97,6 +99,7 @@ class InterviewService:
         application_id: int,
         recruiter_id: int,
         payload: InterviewCreate,
+        background_tasks: Optional[BackgroundTasks] = None,
     ) -> Interview:
         """
         Schedule a new interview for a job application.
@@ -176,6 +179,23 @@ class InterviewService:
 
         db.commit()
         db.refresh(interview)
+
+        # Dispatch transactional interview invitation email to the student
+        if application.student and application.student.email:
+            student_email = application.student.email
+            EmailService.dispatch_interview_invitation_email(
+                to_email=student_email,
+                student_name=student_email.split("@")[0],
+                job_title=application.job_posting.title,
+                company_name=application.job_posting.company_name,
+                interview_type=payload.interview_type.value,
+                scheduled_at=formatted_time,
+                duration_minutes=payload.duration_minutes,
+                location_or_link=payload.location_or_link,
+                notes=payload.notes,
+                background_tasks=background_tasks,
+            )
+
         return interview
 
     @classmethod
