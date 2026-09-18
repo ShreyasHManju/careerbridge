@@ -70,8 +70,9 @@ The system enforces three primary roles directly on the FastAPI backend:
 - **Phase 13**: `resumes` (1-to-1 extension with `users`, unique constraint on `student_id`, document metadata persistence, physical file storage abstraction, secure MIME/magic-byte validation)
 - **Phase 14**: `profile_images` (1-to-1 extension with `users`, unique constraint on `student_id`, image metadata persistence, physical image storage abstraction, secure JPEG/PNG/WebP magic-byte validation, 2MB limit)
 - **Phase 15**: `saved_jobs` (many-to-1 with `job_postings` and `users`, unique constraint on `(student_id, job_posting_id)`, cascade delete on jobs and users, newest-saved ordering)
-- **Phase 16**: `skills`, `student_skills`
-- **Phase 17-20**: `notifications`, `interviews`, `conversations`, `messages`, `audit_logs`
+- **Phase 16**: `recruiter_profiles.is_verified` (Boolean column added via Alembic migration `01b1d6a76f10` for admin recruiter verification)
+- **Phase 17**: `skills`, `student_skills`
+- **Phase 18-21**: `notifications`, `interviews`, `conversations`, `messages`, `audit_logs`
 
 ---
 
@@ -108,6 +109,26 @@ The Saved Jobs subsystem implements candidate bookmarking and tracking for job a
 - **Referential Integrity**: Cascading deletes on foreign keys to `users.id` and `job_postings.id` eliminate orphaned bookmark rows.
 - **Ordered Discovery**: Saved opportunities are retrieved newest-saved first (`ORDER BY saved_jobs.created_at DESC, saved_jobs.id DESC`) with `joinedload(SavedJob.job_posting)` to avoid N+1 database queries.
 - **Deactivation Handling**: Opportunities saved while active remain preserved in student bookmarks even if later deactivated (`is_active: false`), maintaining tracking historical integrity.
+
+---
+
+## 8. Administrative Management & Moderation Architecture (Phase 16)
+
+The Administration and Moderation subsystem equips system administrators (`UserRole.ADMIN`) with centralized control over platform actors and content:
+- **Centralized Admin RBAC**: All admin operations enforce `current_user: User = Depends(require_role(UserRole.ADMIN))` based on verified database records. Students and Recruiters are rejected with `403 Forbidden`. Inactive accounts receive `401 Unauthorized`.
+- **User Governance**:
+  - `GET /api/v1/admin/users`: Database-side search on email, filtering by role and active status, ordered newest-first with pagination envelope.
+  - `GET /api/v1/admin/users/{user_id}`: Inspect user account details safely without leaking credentials.
+  - `PATCH /api/v1/admin/users/{user_id}/status`: Toggle account active state (`is_active: bool`).
+- **Self-Lockout Prevention**: Prohibits an administrator from deactivating their own currently authenticated account (`target_user.id == current_user.id and not is_active` returns `400 Bad Request`).
+- **Recruiter Profile Verification**:
+  - `RecruiterProfile.is_verified: bool` tracks institutional vetting in PostgreSQL.
+  - `GET /api/v1/admin/recruiters`: Search and verification filter across companies with joined user queries to prevent N+1 overhead.
+  - `PATCH /api/v1/admin/recruiters/{user_id}/verification`: Verifies/unverifies a recruiter profile, updating both profile and user account verification flags.
+- **Job Posting Moderation**:
+  - `GET /api/v1/admin/jobs`: Comprehensive listing across all companies, exposing both active and inactive postings.
+  - `PATCH /api/v1/admin/jobs/{job_id}/status`: Moderates opportunity visibility (`is_active: bool`) while keeping posting ownership and opportunity terms immutable.
+
 
 
 

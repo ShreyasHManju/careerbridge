@@ -102,6 +102,7 @@ def test_migrations():
         "company_location",
         "industry",
         "company_size",
+        "is_verified",
         "created_at",
         "updated_at",
     ]

@@ -80,6 +80,7 @@ class RecruiterProfileResponse(BaseModel):
     company_location: Optional[str] = None
     industry: Optional[str] = None
     company_size: Optional[str] = None
+    is_verified: bool = False
     created_at: datetime
     updated_at: datetime
 

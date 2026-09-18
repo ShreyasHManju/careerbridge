@@ -71,8 +71,7 @@ careerbridge/
 - [x] **Phase 13**: Resume Upload & Student Document Foundation (Secure upload, PDF/DOC/DOCX validation, magic bytes, size bounds, safe replacement, download, deletion, student isolation)
 - [x] **Phase 14**: Secure Student Profile Image Upload (JPEG/PNG/WebP validation, magic bytes, 2MB size limit, UUID filenames, atomic replacement, download, deletion, student isolation)
 - [x] **Phase 15**: Saved Jobs & Internships (SavedJob entity, DB unique constraint on student_id + job_posting_id, save/unsave/status/list endpoints, joined queries, cascade deletion, student-only RBAC)
-- [ ] **Phase 16**: Skills & Matching
-- [ ] **Phase 16**: Admin Dashboard & Moderation
+- [x] **Phase 16**: Admin User Management & Moderation Foundation (User search, role/status filtering, activation/deactivation, self-lockout protection, recruiter review & verification, job moderation, centralized admin RBAC)
 - [ ] **Phase 17**: Notifications
 - [ ] **Phase 18**: Email Notifications
 - [ ] **Phase 19**: Interview Scheduling
@@ -810,6 +809,47 @@ Execute the 20-test suite covering active/inactive validation, duplicate prevent
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_saved_jobs.py
 ```
+
+---
+
+## 19. Phase 16: Admin User Management & Moderation Foundation
+
+The Admin User Management & Moderation subsystem provides platform administrators with backend capabilities to govern users, verify recruiter profiles, and moderate job postings with centralized role-based access control.
+
+### Architectural & Security Highlights
+- **Centralized Admin RBAC**: Every endpoint enforces `current_user: User = Depends(require_role(UserRole.ADMIN))` backed by verified database identities. Students and Recruiters receive `403 Forbidden`. Unauthenticated requests receive `401 Unauthorized`. Inactive accounts receive `401 Unauthorized`.
+- **User Management**:
+  - `GET /api/v1/admin/users`: Database-side search on email, filtering by `role` and `is_active`, ordered newest-first with pagination envelope (`page`, `page_size`, `total`, `total_pages`).
+  - `GET /api/v1/admin/users/{user_id}`: Inspect individual user account metadata safely without exposing credentials.
+  - `PATCH /api/v1/admin/users/{user_id}/status`: Toggle user account activity (`is_active: bool`).
+- **Self-Lockout Prevention**: An administrator cannot deactivate their own currently authenticated account (`target_user.id == current_user.id and not is_active` returns `400 Bad Request`).
+- **Recruiter Review & Verification**:
+  - `RecruiterProfile.is_verified: bool` added to database via Alembic migration (`01b1d6a76f10`).
+  - `GET /api/v1/admin/recruiters`: Search across company name, contact name, and email with `is_verified` filtering. Joined with `User` to eliminate N+1 queries.
+  - `PATCH /api/v1/admin/recruiters/{user_id}/verification`: Verifies/unverifies a recruiter profile. Validates that the target user has role `RECRUITER` and has an existing `RecruiterProfile`.
+- **Job Moderation**:
+  - `GET /api/v1/admin/jobs`: Lists both active and inactive postings across all companies. Supports search across title, company, and location, as well as `opportunity_type`, `employment_type`, and `is_active` filtering.
+  - `PATCH /api/v1/admin/jobs/{job_id}/status`: Activates or deactivates job postings without modifying ownership or listing metadata.
+- **Credential Protection**: Passwords, password hashes, secrets, and JWT tokens are strictly filtered and omitted from all response schemas.
+
+### Admin Endpoints
+
+| Method | Endpoint | Role | Status | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/admin/users` | Admin | `200 OK` | Paginated user listing with email search, role filter, and active status filter. |
+| `GET` | `/api/v1/admin/users/{user_id}` | Admin | `200 OK` | Retrieves safe user metadata by ID (404 if not found). |
+| `PATCH` | `/api/v1/admin/users/{user_id}/status` | Admin | `200 OK` | Activates/deactivates user account. Prevents admin self-lockout (400). |
+| `GET` | `/api/v1/admin/recruiters` | Admin | `200 OK` | Lists recruiters with company info, email, search, and verification filtering. |
+| `PATCH` | `/api/v1/admin/recruiters/{user_id}/verification` | Admin | `200 OK` | Verifies/unverifies a recruiter profile (400 if not recruiter, 404 if no profile). |
+| `GET` | `/api/v1/admin/jobs` | Admin | `200 OK` | Lists all jobs (active & inactive) with search and opportunity/employment filters. |
+| `PATCH` | `/api/v1/admin/jobs/{job_id}/status` | Admin | `200 OK` | Moderates job posting activity status (404 if not found). |
+
+### Run Admin Test Suite
+Execute the 37-test suite covering user listing, filtering, pagination, self-lockout, credential protection, recruiter review and verification, and job moderation:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_admin.py
+```
+
 
 
 

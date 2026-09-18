@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -32,6 +32,12 @@ class RecruiterProfile(Base):
     company_location: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     industry: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     company_size: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    is_verified: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default=text("false"),
+        nullable=False,
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
