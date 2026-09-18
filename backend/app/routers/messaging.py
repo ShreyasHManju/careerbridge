@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
@@ -14,6 +15,7 @@ from app.schemas.messaging import (
     MessageResponse,
 )
 from app.services.messaging_service import MessagingService
+from app.services.websocket_manager import ws_manager
 
 router = APIRouter(tags=["Messaging"])
 
@@ -88,7 +90,7 @@ def get_conversation(
     status_code=status.HTTP_201_CREATED,
     summary="Send a message in a conversation",
 )
-def send_message(
+async def send_message(
     conversation_id: int,
     payload: MessageCreate,
     current_user: User = Depends(get_current_user),
@@ -98,6 +100,7 @@ def send_message(
     Send a new message to a conversation.
     Derives sender identity strictly from the authenticated JWT token.
     Dispatches an in-app notification to the recipient.
+    Broadcasts real-time event to any connected WebSocket clients.
     """
     msg = MessagingService.send_message(
         db,
@@ -105,7 +108,15 @@ def send_message(
         current_user=current_user,
         body=payload.body,
     )
-    return MessagingService._build_message_response(msg)
+    msg_resp = MessagingService._build_message_response(msg)
+    await ws_manager.broadcast_to_conversation(
+        conversation_id,
+        {
+            "type": "new_message",
+            "message": msg_resp.model_dump(mode="json"),
+        },
+    )
+    return msg_resp
 
 
 @router.get(
@@ -145,7 +156,7 @@ def list_messages(
     response_model=MarkReadResponse,
     summary="Mark all received messages in conversation as read",
 )
-def mark_conversation_read(
+async def mark_conversation_read(
     conversation_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -153,10 +164,22 @@ def mark_conversation_read(
     """
     Mark all unread messages received by the current user in this conversation as read.
     Sender's own messages are unaffected.
+    Broadcasts read receipt event to any connected WebSocket clients.
     """
     count = MessagingService.mark_conversation_read(
         db, conversation_id=conversation_id, current_user=current_user
     )
+    if count > 0:
+        await ws_manager.broadcast_to_conversation(
+            conversation_id,
+            {
+                "type": "messages_read",
+                "conversation_id": conversation_id,
+                "reader_id": current_user.id,
+                "marked_read_count": count,
+                "read_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
     return MarkReadResponse(
         conversation_id=conversation_id, marked_read_count=count
     )
@@ -167,7 +190,7 @@ def mark_conversation_read(
     response_model=MessageResponse,
     summary="Mark a single received message as read",
 )
-def mark_single_message_read(
+async def mark_single_message_read(
     message_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -175,7 +198,19 @@ def mark_single_message_read(
     """
     Mark a specific received message as read.
     Sender cannot mark their own sent message as read.
+    Broadcasts read receipt event to any connected WebSocket clients.
     """
-    return MessagingService.mark_single_message_read(
+    msg_resp = MessagingService.mark_single_message_read(
         db, message_id=message_id, current_user=current_user
     )
+    await ws_manager.broadcast_to_conversation(
+        msg_resp.conversation_id,
+        {
+            "type": "message_read",
+            "conversation_id": msg_resp.conversation_id,
+            "message_id": msg_resp.id,
+            "reader_id": current_user.id,
+            "read_at": msg_resp.read_at.isoformat() if msg_resp.read_at else None,
+        },
+    )
+    return msg_resp

@@ -12,6 +12,7 @@ from app.routers.resume import router as resume_router
 from app.routers.saved_jobs import router as saved_jobs_router
 from app.routers.student_profile import router as student_profile_router
 from app.routers.users import router as users_router
+from app.routers.websocket_messaging import router as websocket_messaging_router
 
 __all__ = [
     "admin_router",
@@ -28,6 +29,7 @@ __all__ = [
     "notifications_router",
     "interviews_router",
     "messaging_router",
+    "websocket_messaging_router",
 ]
 
 

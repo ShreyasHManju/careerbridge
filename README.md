@@ -75,8 +75,8 @@ careerbridge/
 - [x] **Phase 17**: Backend Notifications & Background Jobs Foundation (In-app notifications, read/unread tracking, bulk read-all, unread counts, real event triggers, in-memory typed background jobs abstraction)
 - [x] **Phase 18**: Interviews & Interview Scheduling Foundation (Interview model, types & statuses, double-booking conflict protection, student notifications, chronological listings, soft-cancellation, RBAC & ownership)
 - [x] **Phase 19**: Messaging Foundation (One-to-one conversations, message delivery, participant authorization with no admin bypass, get-or-create deduplication, read/unread tracking, notification integration)
-- [ ] **Phase 20**: Email Notifications
-- [ ] **Phase 21**: Real-Time WebSockets Messaging
+- [x] **Phase 20**: Real-Time Messaging / WebSockets Foundation (WebSocket transport layer, WebSocketConnectionManager, query/header JWT auth, participant authorization without admin bypass, multi-tab support, real-time broadcast, read receipts, offline persistence, notification triggers)
+- [ ] **Phase 21**: Email Notifications
 - [ ] **Phase 22**: Aggregated Role Dashboards
 - [ ] **Phase 23**: Unified Error Handling & Frontend States
 - [ ] **Phase 24**: End-to-End & Unit Testing
@@ -1010,6 +1010,56 @@ Execute the 47-test suite covering authentication, conversation lifecycle, dupli
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_messaging.py
 ```
+
+---
+
+## 23. Phase 20: Real-Time Messaging / WebSockets Foundation
+
+The Real-Time Messaging transport layer provides instantaneous two-way event synchronization over WebSockets (`WS /api/v1/ws/conversations/{conversation_id}`). It builds directly upon the Phase 19 HTTP messaging foundation, preserving PostgreSQL persistence, participant authorization, and in-app notifications.
+
+### Architectural & Transport Highlights
+- **WebSocket Endpoint**:
+  - `WS /api/v1/ws/conversations/{conversation_id}`
+  - Accessible via query parameter authentication (`?token=<jwt_access_token>`) or headers (`Authorization: Bearer <jwt>` / `Sec-WebSocket-Protocol: <jwt>`).
+- **Connection Handshake Authentication & Authorization**:
+  - Validates token signature, expiration, and user active status.
+  - Checks conversation existence and verifies participant authorization (`user1_id` or `user2_id`).
+  - Strict participant rule: **No Admin bypass**. Admins attempting to connect to private conversations where they are not an explicit participant are rejected during handshake with `1008 Policy Violation`.
+  - Non-existent conversations, missing tokens, invalid tokens, or unauthorized users are rejected with `1008 Policy Violation`.
+- **In-Memory Connection Manager (`WebSocketConnectionManager`)**:
+  - Fast, thread-safe, and asynchronous socket tracking mapped by `conversation_id -> user_id -> set[WebSocket]`.
+  - **Multi-Tab Support**: A user can open multiple concurrent tabs or devices; all active sockets receive real-time events.
+  - **Dead Socket Pruning**: Stale or broken connections are automatically detected and pruned during broadcast without interrupting other clients.
+  - Automatic pruning of empty conversation and user entries prevents memory leaks.
+- **Bi-Directional JSON Message Protocol**:
+  - **Inbound Events**:
+    - `{"type": "message", "body": "..."}`: Validates message text (non-empty, max 5000 chars), derives `sender_id` strictly from authenticated JWT claims, persists to PostgreSQL via `MessagingService.send_message`, creates an in-app notification for the recipient, and broadcasts to active conversation sockets.
+    - `{"type": "read"}`: Marks all unread messages received by the user in this conversation as read in PostgreSQL and broadcasts a `messages_read` receipt.
+    - `{"type": "ping"}`: Lightweight heartbeat returning `{"type": "pong"}`.
+  - **Outbound Events**:
+    - `{"type": "new_message", "message": {...}}`: Sent to both participants (with ISO 8601 timestamps, sender email, and `is_read = false`).
+    - `{"type": "messages_read", "conversation_id": 1, "reader_id": 2, "read_at": "..."}`: Read receipts for bulk mark-read.
+    - `{"type": "message_read", "conversation_id": 1, "message_id": 5, "reader_id": 2, "read_at": "..."}`: Read receipt for single message read.
+    - `{"type": "error", "code": "...", "message": "..."}`: Structured error responses (`INVALID_MESSAGE`, `MESSAGE_TOO_LONG`, `MALFORMED_JSON`, `UNSUPPORTED_EVENT`).
+- **Offline Delivery & Notification Continuity**:
+  - Messages sent while the recipient is offline are safely committed to PostgreSQL with `is_read = false`.
+  - Recipient receives an in-app notification (`NotificationType.MESSAGE_RECEIVED`) and can retrieve full history via HTTP `GET /api/v1/conversations/{id}/messages` when logging back in.
+- **HTTP & WebSocket Synchronization**:
+  - Sending messages via HTTP `POST /api/v1/conversations/{id}/messages` automatically broadcasts to any active WebSocket listeners.
+  - Marking messages read via HTTP `PATCH /api/v1/conversations/{id}/read` or `PATCH /api/v1/messages/{id}/read` automatically broadcasts read receipts to active WebSocket listeners.
+
+### WebSocket Endpoints
+
+| Protocol | Endpoint | Auth Mechanism | Authorization | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `WS` | `/api/v1/ws/conversations/{conversation_id}` | `?token=<jwt>` / `Authorization` header | Participant Only (No Admin Bypass) | Real-time bi-directional conversation exchange, broadcast, and read receipts. |
+
+### Run Real-Time Messaging Test Suite
+Execute the 48-test suite covering authentication, authorization, multi-tab lifecycles, validation, persistence, real-time broadcasts, read states, notifications, and security:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_websocket_messaging.py
+```
+
 
 
 

@@ -205,6 +205,57 @@ The Messaging subsystem provides a secure, private communication pipeline betwee
 - **In-App Notification Trigger**:
   - Dispatches `NotificationType.MESSAGE_RECEIVED` notifications to the other participant upon message creation.
 
+---
+
+## 12. Real-Time Messaging & WebSocket Architecture (Phase 20)
+
+The Real-Time Messaging architecture extends the one-to-one messaging foundation with a lightweight, bidirectional WebSocket transport layer:
+
+```text
+               +----------------------------------+
+               |  Client (Tab 1 / Tab 2 / Device) |
+               +----------------+-----------------+
+                                |
+                                | WS /api/v1/ws/conversations/{id}?token=<jwt>
+                                v
+               +----------------------------------+
+               |    WebSocket Router & Auth       |
+               |  (Token verify, Participant auth)|
+               +----------------+-----------------+
+                                |
+                                v
+               +----------------------------------+
+               |   WebSocketConnectionManager     |
+               |  (In-Memory Registry & Broadcast)|
+               +--------+----------------+--------+
+                        |                |
+         Save Message   |                | Broadcast Event
+         & Notification v                v
+               +----------------+  +--------------------+
+               | MessagingSvc & |  | Connected Sockets  |
+               | PostgreSQL DB  |  | (All active tabs)  |
+               +----------------+  +--------------------+
+```
+
+### Key Architectural Pillars
+- **Real-Time Transport Layer**:
+  - `WS /api/v1/ws/conversations/{conversation_id}` provides full-duplex JSON streaming for conversation participants.
+  - Handshake authentication extracts JWT from query parameter `?token=<jwt>` or `Authorization` / `Sec-WebSocket-Protocol` headers.
+  - Handshake authorization verifies participant access (`user1_id` or `user2_id`). Unauthorized requests, missing tokens, invalid tokens, or non-participating administrators are rejected with `1008 Policy Violation`.
+- **In-Memory Connection Registry (`WebSocketConnectionManager`)**:
+  - Maintained as `_connections: dict[int, dict[int, set[WebSocket]]]` (`conversation_id -> user_id -> set[WebSocket]`).
+  - **Multi-Tab / Multi-Device Synchronization**: Allows multiple concurrent connections per user. Broadcasts reach all active sockets for each participant.
+  - **Asynchronous Concurrent Broadcast**: Uses `asyncio.gather` for parallel frame dispatch to all target sockets. Broken or disconnected sockets are caught and pruned cleanly.
+  - Automatic cleanup removes empty user and conversation dictionaries, preventing memory leaks.
+- **Single Source of Truth Persistence**:
+  - The WebSocket layer acts as an event distribution transport, never as a separate database.
+  - Incoming `message` events invoke `MessagingService.send_message()`, guaranteeing atomic PostgreSQL persistence, sender identity enforcement (`current_user.id`), and `NotificationService` dispatch.
+  - Delivered messages remain unread (`is_read = false`) until an explicit `read` event or HTTP read endpoint is invoked.
+- **Offline Delivery & Reconnection**:
+  - If a recipient is offline, the message is persisted to PostgreSQL and an in-app notification is queued. The recipient receives it immediately upon reconnecting or querying HTTP endpoints.
+- **Bi-Directional HTTP & WebSocket Sync**:
+  - HTTP actions (`POST /conversations/{id}/messages`, `PATCH /conversations/{id}/read`, `PATCH /messages/{id}/read`) broadcast real-time events to active WebSocket connections, ensuring unified platform state regardless of transport method.
+
 
 
 

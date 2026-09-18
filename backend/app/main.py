@@ -16,6 +16,7 @@ from app.routers import (
     saved_jobs_router,
     student_profile_router,
     users_router,
+    websocket_messaging_router,
 )
 
 app = FastAPI(
@@ -36,6 +37,7 @@ app.include_router(job_posting_router, prefix=settings.API_V1_STR)
 app.include_router(applications_router, prefix=settings.API_V1_STR)
 app.include_router(interviews_router, prefix=settings.API_V1_STR)
 app.include_router(messaging_router, prefix=settings.API_V1_STR)
+app.include_router(websocket_messaging_router, prefix=settings.API_V1_STR)
 app.include_router(resume_router, prefix=settings.API_V1_STR)
 app.include_router(profile_image_router, prefix=settings.API_V1_STR)
 app.include_router(saved_jobs_router, prefix=settings.API_V1_STR)
