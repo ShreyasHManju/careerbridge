@@ -222,7 +222,8 @@ def run_job_posting_tests():
         print("[Test 8/20] Student can list active postings (/jobs)...")
         r_browse = client.get("/api/v1/jobs", headers=headers_student)
         assert r_browse.status_code == 200
-        browse_list = r_browse.json()
+        browse_res = r_browse.json()
+        browse_list = browse_res["items"] if isinstance(browse_res, dict) and "items" in browse_res else browse_res
         assert any(p["id"] == job1_id for p in browse_list)
         print("  -> Passed: Active posting present in candidate discovery list.")
 

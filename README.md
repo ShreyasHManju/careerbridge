@@ -67,7 +67,7 @@ careerbridge/
 - [x] **Phase 9**: Recruiter Profile & API (RecruiterProfile model, 1-to-1 relationship, Alembic migration, recruiter-only RBAC, ownership enforcement)
 - [x] **Phase 10**: Job & Internship Posting Foundation (JobPosting model, 1-to-many relationship, Alembic migration, recruiter management, candidate discovery, RBAC)
 - [x] **Phase 11**: Student Applications & Status Pipeline (Application model, DB unique constraint, student submission, recruiter review & status transitions, ownership isolation)
-- [ ] **Phase 12**: Search, Filtering, and Pagination
+- [x] **Phase 12**: Search, Filtering, and Pagination (Full-text search, multi-faceted filtering, controlled sorting, offset/limit pagination)
 - [ ] **Phase 13**: Saved Internships
 - [ ] **Phase 14**: Skills & Matching
 - [ ] **Phase 15**: Secure File Uploads (Resumes, Photos)
@@ -560,6 +560,74 @@ Execute the 22-test suite covering submission, RBAC boundaries, inactive checks,
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_application.py
 ```
+
+---
+
+## 15. Job Search, Filtering, and Pagination (Phase 12)
+
+Phase 12 significantly expands the public/student-facing discovery endpoint (`GET /api/v1/jobs`) to support high-performance database-side search, multi-faceted filtering, controlled sorting, and paginated responses.
+
+### Query Parameters
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `q` | `string` | `None` | Case-insensitive search across `title`, `description`, `company_name`, `location`, and `skills`. |
+| `opportunity_type` | `OpportunityType` | `None` | Filter by opportunity category: `internship`, `job`. |
+| `employment_type` | `EmploymentType` | `None` | Filter by employment type: `full_time`, `part_time`, `contract`. |
+| `is_remote` | `boolean` | `None` | Filter by remote eligibility: `true`, `false`. |
+| `location` | `string` | `None` | Case-insensitive partial match on job location (e.g., `Bangalore`). |
+| `skills` | `string` | `None` | Case-insensitive partial match on required skills (e.g., `python`, `react`). |
+| `salary_min` | `integer` (>= 0) | `None` | Minimum compensation threshold. Matches opportunities whose upper salary reaches at least this value. |
+| `salary_max` | `integer` (>= 0) | `None` | Maximum compensation threshold. Matches opportunities whose starting salary is within this budget. |
+| `sort_by` | `JobSortBy` | `created_at` | Field to sort by: `created_at`, `application_deadline`, `salary_min`. |
+| `sort_order` | `SortOrder` | `desc` | Sort direction: `asc`, `desc`. |
+| `page` | `integer` (>= 1) | `1` | Page number (1-indexed). |
+| `page_size` | `integer` (1 to 100) | `10` | Number of items per page. |
+
+### Paginated Response Schema (`JobPostingPaginationResponse`)
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "recruiter_id": 2,
+      "title": "Senior Python Backend Engineer",
+      "description": "Develop distributed cloud services using FastAPI.",
+      "opportunity_type": "job",
+      "company_name": "PyTech Solutions",
+      "location": "Bangalore, India",
+      "is_remote": false,
+      "employment_type": "full_time",
+      "skills": "Python, FastAPI, PostgreSQL, Redis",
+      "salary_min": 60000,
+      "salary_max": 90000,
+      "application_deadline": "2026-11-01T00:00:00Z",
+      "is_active": true,
+      "created_at": "2026-09-18T10:00:00Z",
+      "updated_at": "2026-09-18T10:00:00Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 10,
+  "total": 37,
+  "total_pages": 4
+}
+```
+
+### Database & Performance Strategy
+- **Database-Side Execution**: All search matching (`ILIKE`), filtering (`AND`/`OR`), counting (`COUNT()`), sorting (`ORDER BY NULLS LAST`), and pagination (`LIMIT`/`OFFSET`) execute entirely within PostgreSQL.
+- **Salary Semantics**:
+  - `salary_min`: Postings satisfy this requirement if `COALESCE(salary_max, salary_min) >= salary_min`.
+  - `salary_max`: Postings satisfy this requirement if `COALESCE(salary_min, salary_max) <= salary_max`.
+  - Undisclosed/NULL salary postings are excluded from explicit numeric salary searches.
+  - Cross-validation enforces `salary_min <= salary_max` with `422 Unprocessable Entity` if violated.
+- **Strict Inactive Omission**: Inactive postings (`is_active == False`) are strictly filtered out of the discovery API under all query combinations.
+
+### Run Search & Pagination Test Suite
+Execute the 28-test suite covering full search, multi-faceted filtering, salary edge cases, pagination boundary limits, sorting orders, validation rules, and security isolation:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_job_search.py
+```
+
 
 
 

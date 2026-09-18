@@ -66,6 +66,7 @@ The system enforces three primary roles directly on the FastAPI backend:
 - **Phase 9**: `recruiter_profiles` (1-to-1 extension with cascading deletes, organization/contact metadata)
 - **Phase 10**: `job_postings` (1-to-many opportunities posted by recruiters with cascading deletes)
 - **Phase 11**: `applications` (many-to-1 with `job_postings` and `users`, unique constraint on `(job_posting_id, student_id)`, status lifecycle pipeline: applied -> reviewing -> shortlisted -> rejected / accepted)
+- **Phase 12**: Database-side search, multi-faceted filtering, controlled sorting, and offset/limit pagination on `job_postings`
 - **Phase 13-14**: `saved_internships`, `skills`, `student_skills`
 - **Phase 17-20**: `notifications`, `interviews`, `conversations`, `messages`, `audit_logs`
 

@@ -6,8 +6,11 @@ from app.schemas.application import (
 from app.schemas.auth import LoginRequest, TokenPayload, TokenResponse
 from app.schemas.job_posting import (
     JobPostingCreate,
+    JobPostingPaginationResponse,
     JobPostingResponse,
     JobPostingUpdate,
+    JobSortBy,
+    SortOrder,
 )
 from app.schemas.recruiter_profile import (
     RecruiterProfileCreate,
@@ -37,6 +40,9 @@ __all__ = [
     "JobPostingCreate",
     "JobPostingUpdate",
     "JobPostingResponse",
+    "JobPostingPaginationResponse",
+    "JobSortBy",
+    "SortOrder",
     "ApplicationCreate",
     "ApplicationUpdate",
     "ApplicationResponse",

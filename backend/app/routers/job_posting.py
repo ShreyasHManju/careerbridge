@@ -1,16 +1,20 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+import math
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_role
-from app.models.job_posting import JobPosting
+from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
 from app.models.user import User, UserRole
 from app.schemas.job_posting import (
     JobPostingCreate,
+    JobPostingPaginationResponse,
     JobPostingResponse,
     JobPostingUpdate,
+    JobSortBy,
+    SortOrder,
 )
 
 router = APIRouter(prefix="/jobs", tags=["Jobs & Internships"])
@@ -75,24 +79,170 @@ def get_my_job_postings(
 
 @router.get(
     "",
-    response_model=List[JobPostingResponse],
-    summary="Browse active job and internship postings",
-    description="Public candidate discovery endpoint. Returns all active postings ordered newest first. Inactive postings are strictly omitted.",
+    response_model=JobPostingPaginationResponse,
+    summary="Search, filter, and paginate active job and internship postings",
+    description=(
+        "Public candidate discovery endpoint. Returns active postings matching search, "
+        "filtering, sorting, and pagination parameters. Inactive postings are strictly omitted."
+    ),
 )
-@router.get("/", response_model=List[JobPostingResponse], include_in_schema=False)
+@router.get("/", response_model=JobPostingPaginationResponse, include_in_schema=False)
 def browse_active_job_postings(
+    q: Optional[str] = Query(
+        None,
+        description="Search term operating across title, description, company name, location, and skills (case-insensitive)",
+    ),
+    opportunity_type: Optional[OpportunityType] = Query(
+        None,
+        description="Filter by opportunity type ('internship' or 'job')",
+    ),
+    employment_type: Optional[EmploymentType] = Query(
+        None,
+        description="Filter by employment type ('full_time', 'part_time', 'contract')",
+    ),
+    is_remote: Optional[bool] = Query(
+        None,
+        description="Filter by remote work eligibility (true or false)",
+    ),
+    location: Optional[str] = Query(
+        None,
+        description="Filter by location (case-insensitive partial match)",
+    ),
+    skills: Optional[str] = Query(
+        None,
+        description="Filter by required skills (case-insensitive partial match on skills text)",
+    ),
+    salary_min: Optional[int] = Query(
+        None,
+        ge=0,
+        description="Filter opportunities satisfying a minimum compensation threshold",
+    ),
+    salary_max: Optional[int] = Query(
+        None,
+        ge=0,
+        description="Filter opportunities satisfying a maximum compensation threshold",
+    ),
+    sort_by: JobSortBy = Query(
+        JobSortBy.CREATED_AT,
+        description="Field to sort by ('created_at', 'application_deadline', 'salary_min')",
+    ),
+    sort_order: SortOrder = Query(
+        SortOrder.DESC,
+        description="Sort direction ('asc' or 'desc')",
+    ),
+    page: int = Query(
+        1,
+        ge=1,
+        description="Page number (1-indexed, minimum: 1)",
+    ),
+    page_size: int = Query(
+        10,
+        ge=1,
+        le=100,
+        description="Number of records per page (minimum: 1, maximum: 100)",
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Candidate discovery: Returns all active postings, ordered newest first.
+    Candidate discovery: Returns active postings matching search, filtering,
+    sorting, and pagination criteria. Evaluated entirely in PostgreSQL.
     """
-    postings = db.scalars(
+    # Salary range cross-validation
+    if salary_min is not None and salary_max is not None and salary_min > salary_max:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="salary_min cannot be greater than salary_max",
+        )
+
+    # Base filter: strictly active postings only
+    filters = [JobPosting.is_active == True]
+
+    # 1. Search (q) across title, description, company_name, location, skills
+    if q and q.strip():
+        term = f"%{q.strip()}%"
+        filters.append(
+            or_(
+                JobPosting.title.ilike(term),
+                JobPosting.description.ilike(term),
+                JobPosting.company_name.ilike(term),
+                JobPosting.location.ilike(term),
+                JobPosting.skills.ilike(term),
+            )
+        )
+
+    # 2. Opportunity Type filter
+    if opportunity_type is not None:
+        filters.append(JobPosting.opportunity_type == opportunity_type)
+
+    # 3. Employment Type filter
+    if employment_type is not None:
+        filters.append(JobPosting.employment_type == employment_type)
+
+    # 4. Remote status filter
+    if is_remote is not None:
+        filters.append(JobPosting.is_remote == is_remote)
+
+    # 5. Location filter (case-insensitive partial match)
+    if location and location.strip():
+        filters.append(JobPosting.location.ilike(f"%{location.strip()}%"))
+
+    # 6. Skills filter (case-insensitive partial match on Text column)
+    if skills and skills.strip():
+        filters.append(JobPosting.skills.ilike(f"%{skills.strip()}%"))
+
+    # 7. Salary filters (database-side numeric evaluation)
+    # Postings without disclosed salary are excluded from explicit numeric salary filters
+    if salary_min is not None:
+        filters.append(
+            and_(
+                or_(JobPosting.salary_min.isnot(None), JobPosting.salary_max.isnot(None)),
+                func.coalesce(JobPosting.salary_max, JobPosting.salary_min) >= salary_min,
+            )
+        )
+
+    if salary_max is not None:
+        filters.append(
+            and_(
+                or_(JobPosting.salary_min.isnot(None), JobPosting.salary_max.isnot(None)),
+                func.coalesce(JobPosting.salary_min, JobPosting.salary_max) <= salary_max,
+            )
+        )
+
+    # Total matching records count directly in database
+    total = db.scalar(select(func.count(JobPosting.id)).where(*filters)) or 0
+
+    # Sorting
+    sort_col_map = {
+        JobSortBy.CREATED_AT: JobPosting.created_at,
+        JobSortBy.APPLICATION_DEADLINE: JobPosting.application_deadline,
+        JobSortBy.SALARY_MIN: JobPosting.salary_min,
+    }
+    sort_column = sort_col_map[sort_by]
+    if sort_order == SortOrder.ASC:
+        order_clause = sort_column.asc().nulls_last()
+    else:
+        order_clause = sort_column.desc().nulls_last()
+
+    # Database-side pagination with OFFSET and LIMIT
+    offset = (page - 1) * page_size
+    items = db.scalars(
         select(JobPosting)
-        .where(JobPosting.is_active == True)
-        .order_by(JobPosting.created_at.desc())
+        .where(*filters)
+        .order_by(order_clause, JobPosting.id.desc())
+        .offset(offset)
+        .limit(page_size)
     ).all()
-    return postings
+
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+
+    return JobPostingPaginationResponse(
+        items=list(items),
+        page=page,
+        page_size=page_size,
+        total=total,
+        total_pages=total_pages,
+    )
 
 
 @router.get(

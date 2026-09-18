@@ -1,8 +1,22 @@
 from datetime import datetime
-from typing import Optional
+import enum
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.job_posting import EmploymentType, OpportunityType
+
+
+class JobSortBy(str, enum.Enum):
+    """Supported sort fields for job discovery."""
+    CREATED_AT = "created_at"
+    APPLICATION_DEADLINE = "application_deadline"
+    SALARY_MIN = "salary_min"
+
+
+class SortOrder(str, enum.Enum):
+    """Supported sort orders."""
+    ASC = "asc"
+    DESC = "desc"
 
 
 class JobPostingCreate(BaseModel):
@@ -84,5 +98,18 @@ class JobPostingResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class JobPostingPaginationResponse(BaseModel):
+    """
+    Paginated envelope response schema for JobPosting discovery.
+    """
+    items: List[JobPostingResponse]
+    page: int = Field(..., description="Current page number (1-indexed)")
+    page_size: int = Field(..., description="Number of items per page")
+    total: int = Field(..., description="Total count of active postings matching criteria")
+    total_pages: int = Field(..., description="Total pages available")
 
     model_config = ConfigDict(from_attributes=True)
