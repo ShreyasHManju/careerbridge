@@ -6,6 +6,7 @@ from app.routers import (
     applications_router,
     auth_router,
     job_posting_router,
+    notifications_router,
     profile_image_router,
     rbac_router,
     recruiter_profile_router,
@@ -34,6 +35,7 @@ app.include_router(applications_router, prefix=settings.API_V1_STR)
 app.include_router(resume_router, prefix=settings.API_V1_STR)
 app.include_router(profile_image_router, prefix=settings.API_V1_STR)
 app.include_router(saved_jobs_router, prefix=settings.API_V1_STR)
+app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)
 
 

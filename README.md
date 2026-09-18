@@ -72,7 +72,7 @@ careerbridge/
 - [x] **Phase 14**: Secure Student Profile Image Upload (JPEG/PNG/WebP validation, magic bytes, 2MB size limit, UUID filenames, atomic replacement, download, deletion, student isolation)
 - [x] **Phase 15**: Saved Jobs & Internships (SavedJob entity, DB unique constraint on student_id + job_posting_id, save/unsave/status/list endpoints, joined queries, cascade deletion, student-only RBAC)
 - [x] **Phase 16**: Admin User Management & Moderation Foundation (User search, role/status filtering, activation/deactivation, self-lockout protection, recruiter review & verification, job moderation, centralized admin RBAC)
-- [ ] **Phase 17**: Notifications
+- [x] **Phase 17**: Backend Notifications & Background Jobs Foundation (In-app notifications, read/unread tracking, bulk read-all, unread counts, real event triggers, in-memory typed background jobs abstraction)
 - [ ] **Phase 18**: Email Notifications
 - [ ] **Phase 19**: Interview Scheduling
 - [ ] **Phase 20**: Messaging (HTTP & WebSockets)
@@ -849,6 +849,51 @@ Execute the 37-test suite covering user listing, filtering, pagination, self-loc
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_admin.py
 ```
+
+---
+
+## 20. Phase 17: Backend Notifications & Background Jobs Foundation
+
+The Notifications and Background Jobs subsystem provides CareerBridge with real-time in-app lifecycle updates and an extensible background task execution framework.
+
+### Architectural & Security Highlights
+- **In-App Notification Model (`notifications` table)**:
+  - `user_id`: Foreign key linked to `users.id` with `ondelete="CASCADE"` and index.
+  - `notification_type`: String-backed enum (`NotificationType`):
+    - `application_submitted`: Triggered when an applicant submits an application.
+    - `application_status_changed`: Triggered when a recruiter updates an applicant's status.
+    - `recruiter_verification_changed`: Triggered when an administrator modifies recruiter verification.
+    - `job_moderation_changed`: Triggered when an administrator activates or deactivates a job posting.
+  - `is_read`: Boolean indicator with database index and server default `false`.
+  - Composite indexes `(user_id, is_read)` and `(user_id, created_at)` for high-throughput unread counting and fast ordered pagination.
+- **Strict User Ownership Isolation**:
+  - All notification listing, detail, unread counts, and mutations derive recipient identity strictly from `current_user.id` (`get_current_user` dependency).
+  - Attempting to mark another user's notification as read returns `404 Not Found`, eliminating horizontal privilege escalation and enumeration vectors.
+- **Atomic Event Integration**:
+  - Event hooks in `apply_to_job_posting`, `update_application_status`, `update_recruiter_verification`, and `update_job_status` register notification creation in the same database session, committing both state mutation and notification atomically.
+- **Single-Query Bulk Operations**:
+  - `PATCH /api/v1/notifications/read-all`: Updates all unread notifications for `current_user.id` in a single SQL `UPDATE` statement, preventing N+1 queries.
+  - `GET /api/v1/notifications/unread-count`: Returns unread count via an optimized SQL `COUNT` query.
+- **Extensible Background Job Runner (`background_jobs.py`)**:
+  - Clean abstraction supporting `register_job`, `dispatch_job`, and execution history tracking.
+  - Seamlessly integrates with FastAPI's `BackgroundTasks` while isolating execution errors so background failures never disrupt HTTP response pipelines.
+  - Acts as a clean bridge for future message brokers (e.g. Redis, Celery) without changing caller signatures.
+
+### Notification Endpoints
+
+| Method | Endpoint | Role | Status | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/notifications` | Any Authenticated | `200 OK` | Paginated notification listing, ordered newest first. Supports `unread_only=true`. |
+| `GET` | `/api/v1/notifications/unread-count` | Any Authenticated | `200 OK` | Returns `{"unread_count": int}` for the authenticated user. |
+| `PATCH` | `/api/v1/notifications/read-all` | Any Authenticated | `200 OK` | Marks all unread notifications read for the user in a single operation. |
+| `PATCH` | `/api/v1/notifications/{notification_id}/read` | Any Authenticated | `200 OK` | Marks a specific user-owned notification as read (404 if not found or unowned). |
+
+### Run Notification Test Suite
+Execute the 29-test suite covering authentication, empty states, pagination, ordering, unread filtering, read mutations, cross-user and cross-role isolation, real lifecycle event triggers, cascade deletion, and background job execution:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_notifications.py
+```
+
 
 
 

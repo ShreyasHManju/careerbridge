@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db
 from app.core.deps import require_role
 from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
+from app.models.notification import NotificationType
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.user import User, UserRole
+from app.services.notification_service import NotificationService
 from app.schemas.admin import (
     AdminJobStatusUpdate,
     AdminRecruiterPaginationResponse,
@@ -248,6 +250,17 @@ def update_recruiter_verification(
 
     profile.is_verified = payload.is_verified
     target_user.is_verified = payload.is_verified
+
+    # In-app notification for the recruiter
+    status_str = "verified" if payload.is_verified else "unverified"
+    NotificationService.create_notification(
+        db,
+        user_id=user_id,
+        notification_type=NotificationType.RECRUITER_VERIFICATION_CHANGED,
+        title="Recruiter Verification Updated",
+        message=f"Your recruiter profile verification status has been set to {status_str}.",
+    )
+
     db.commit()
     db.refresh(profile)
 
@@ -349,6 +362,17 @@ def update_job_status(
         )
 
     job.is_active = payload.is_active
+
+    # In-app notification for the job posting owner
+    status_str = "activated" if payload.is_active else "deactivated"
+    NotificationService.create_notification(
+        db,
+        user_id=job.recruiter_id,
+        notification_type=NotificationType.JOB_MODERATION_CHANGED,
+        title="Job Moderation Updated",
+        message=f"Your job posting '{job.title}' has been {status_str} by an administrator.",
+    )
+
     db.commit()
     db.refresh(job)
     return job

@@ -20,6 +20,12 @@ from app.schemas.job_posting import (
     JobSortBy,
     SortOrder,
 )
+from app.schemas.notification import (
+    NotificationMarkAllReadResponse,
+    NotificationPaginationResponse,
+    NotificationResponse,
+    NotificationUnreadCountResponse,
+)
 from app.schemas.profile_image import ProfileImageResponse
 from app.schemas.recruiter_profile import (
     RecruiterProfileCreate,
@@ -67,6 +73,10 @@ __all__ = [
     "AdminRecruiterVerificationUpdate",
     "AdminRecruiterPaginationResponse",
     "AdminJobStatusUpdate",
+    "NotificationResponse",
+    "NotificationPaginationResponse",
+    "NotificationUnreadCountResponse",
+    "NotificationMarkAllReadResponse",
 ]
 
 

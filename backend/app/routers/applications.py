@@ -7,12 +7,14 @@ from app.core.database import get_db
 from app.core.deps import get_current_user, require_role
 from app.models.application import Application, ApplicationStatus
 from app.models.job_posting import JobPosting
+from app.models.notification import NotificationType
 from app.models.user import User, UserRole
 from app.schemas.application import (
     ApplicationCreate,
     ApplicationResponse,
     ApplicationUpdate,
 )
+from app.services.notification_service import NotificationService
 
 router = APIRouter(tags=["Applications"])
 
@@ -74,6 +76,16 @@ def apply_to_job_posting(
         cover_message=payload.cover_message,
     )
     db.add(new_app)
+
+    # In-app notification for the recruiter
+    NotificationService.create_notification(
+        db,
+        user_id=job.recruiter_id,
+        notification_type=NotificationType.APPLICATION_SUBMITTED,
+        title="New Application Received",
+        message=f"A student has applied to your posting '{job.title}'.",
+    )
+
     db.commit()
     db.refresh(new_app)
     return new_app
@@ -238,6 +250,16 @@ def update_application_status(
         )
 
     application.status = payload.status
+
+    # In-app notification for the applicant student
+    NotificationService.create_notification(
+        db,
+        user_id=application.student_id,
+        notification_type=NotificationType.APPLICATION_STATUS_CHANGED,
+        title="Application Status Updated",
+        message=f"Your application for '{application.job_posting.title}' has been updated to {payload.status.value}.",
+    )
+
     db.commit()
     db.refresh(application)
     return application

@@ -70,9 +70,9 @@ The system enforces three primary roles directly on the FastAPI backend:
 - **Phase 13**: `resumes` (1-to-1 extension with `users`, unique constraint on `student_id`, document metadata persistence, physical file storage abstraction, secure MIME/magic-byte validation)
 - **Phase 14**: `profile_images` (1-to-1 extension with `users`, unique constraint on `student_id`, image metadata persistence, physical image storage abstraction, secure JPEG/PNG/WebP magic-byte validation, 2MB limit)
 - **Phase 15**: `saved_jobs` (many-to-1 with `job_postings` and `users`, unique constraint on `(student_id, job_posting_id)`, cascade delete on jobs and users, newest-saved ordering)
-- **Phase 16**: `recruiter_profiles.is_verified` (Boolean column added via Alembic migration `01b1d6a76f10` for admin recruiter verification)
-- **Phase 17**: `skills`, `student_skills`
-- **Phase 18-21**: `notifications`, `interviews`, `conversations`, `messages`, `audit_logs`
+-**Phase 16**: `recruiter_profiles.is_verified` (Boolean column added via Alembic migration `01b1d6a76f10` for admin recruiter verification)
+- **Phase 17**: `notifications` (many-to-1 with `users`, cascading delete, indexed on `(user_id, is_read)` and `(user_id, created_at)`, enum `notification_type`)
+- **Phase 18-21**: `interviews`, `conversations`, `messages`, `audit_logs`
 
 ---
 
@@ -128,6 +128,31 @@ The Administration and Moderation subsystem equips system administrators (`UserR
 - **Job Posting Moderation**:
   - `GET /api/v1/admin/jobs`: Comprehensive listing across all companies, exposing both active and inactive postings.
   - `PATCH /api/v1/admin/jobs/{job_id}/status`: Moderates opportunity visibility (`is_active: bool`) while keeping posting ownership and opportunity terms immutable.
+
+---
+
+## 9. In-App Notifications & Background Jobs Architecture (Phase 17)
+
+The Notifications and Background Jobs subsystem handles event-driven user updates and non-blocking asynchronous task execution:
+- **Relational Representation (`notifications`)**:
+  - Columns: `id`, `user_id` (FK to `users.id`, `ondelete="CASCADE"`), `notification_type` (Enum: `application_submitted`, `application_status_changed`, `recruiter_verification_changed`, `job_moderation_changed`), `title`, `message`, `is_read`, `created_at`, `read_at`.
+  - Indexes: individual indexes on `user_id`, `is_read`, `created_at` plus composite indexes `ix_notifications_user_id_is_read` and `ix_notifications_user_id_created_at`.
+- **Event-Driven Triggers**:
+  - Application Submission: Notifies the recruiter who owns the job posting.
+  - Application Status Update: Notifies the student applicant when a recruiter advances their candidacy.
+  - Recruiter Verification: Notifies the recruiter when an administrator verifies/unverifies their organization.
+  - Job Moderation: Notifies the recruiter when an administrator activates/deactivates their posting.
+- **Strict Ownership Isolation**:
+  - Recipients are strictly identified by `current_user.id`.
+  - Attempting to inspect or modify another user's notifications returns `404 Not Found`.
+- **Single-Query Bulk Mutations**:
+  - `PATCH /api/v1/notifications/read-all` executes a single SQL `UPDATE` statement to set `is_read=True` and `read_at=now()` for all unread items belonging to `current_user.id`.
+  - `GET /api/v1/notifications/unread-count` executes a direct `COUNT` query on `(user_id, is_read=False)`.
+- **Background Jobs Framework (`app.services.background_jobs`)**:
+  - In-memory execution abstraction compatible with FastAPI's `BackgroundTasks`.
+  - Encapsulates error handling and logging so background task failures never crash the active HTTP request.
+  - Provides a consistent callable contract ready for drop-in replacement with distributed task brokers (e.g. Redis / Celery) in future phases.
+
 
 
 

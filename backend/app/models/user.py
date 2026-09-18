@@ -8,6 +8,7 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from app.models.application import Application
     from app.models.job_posting import JobPosting
+    from app.models.notification import Notification
     from app.models.profile_image import ProfileImage
     from app.models.recruiter_profile import RecruiterProfile
     from app.models.resume import Resume
@@ -107,8 +108,12 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    # One-to-many relationship with Notification
+    notifications: Mapped[list["Notification"]] = relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
     def __repr__(self) -> str:
-
-
-
         return f'<User id={self.id} email={self.email} role={self.role}>'

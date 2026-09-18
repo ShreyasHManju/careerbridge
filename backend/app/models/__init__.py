@@ -1,6 +1,7 @@
 from app.models.application import Application, ApplicationStatus
 from app.models.base import Base
 from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
+from app.models.notification import Notification, NotificationType
 from app.models.profile_image import ProfileImage
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.resume import Resume
@@ -22,6 +23,8 @@ __all__ = [
     "Resume",
     "ProfileImage",
     "SavedJob",
+    "Notification",
+    "NotificationType",
 ]
 
 

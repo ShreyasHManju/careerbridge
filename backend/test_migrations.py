@@ -23,7 +23,8 @@ def test_migrations():
     print("[2/5] Verifying target metadata discovery")
     assert "users" in Base.metadata.tables, "Table 'users' missing from Base.metadata"
     assert "saved_jobs" in Base.metadata.tables, "Table 'saved_jobs' missing from Base.metadata"
-    print("  -> Base.metadata contains 'users' and 'saved_jobs' table definitions.")
+    assert "notifications" in Base.metadata.tables, "Table 'notifications' missing from Base.metadata"
+    print("  -> Base.metadata contains 'users', 'saved_jobs', and 'notifications' table definitions.")
 
     print("[3/11] Verifying database schema after migration")
     inspector = inspect(engine)
@@ -37,6 +38,7 @@ def test_migrations():
     assert "resumes" in tables, "Table 'resumes' not found in database!"
     assert "profile_images" in tables, "Table 'profile_images' not found in database!"
     assert "saved_jobs" in tables, "Table 'saved_jobs' not found in database!"
+    assert "notifications" in tables, "Table 'notifications' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
 
     print("[4/9] Verifying 'users' table columns and indexes")
@@ -267,7 +269,35 @@ def test_migrations():
     assert "student_id" in saved_idx_cols, "Index on 'student_id' missing on saved_jobs table!"
     assert "job_posting_id" in saved_idx_cols, "Index on 'job_posting_id' missing on saved_jobs table!"
 
-    print("[12/12] Verifying alembic_version table in PostgreSQL")
+    print("[12/13] Verifying 'notifications' table columns, indexes, and FKs")
+    notif_columns = {col["name"]: col for col in inspector.get_columns("notifications")}
+    expected_notif_cols = [
+        "id",
+        "user_id",
+        "notification_type",
+        "title",
+        "message",
+        "is_read",
+        "created_at",
+        "read_at",
+    ]
+    for col_name in expected_notif_cols:
+        assert col_name in notif_columns, f"Column '{col_name}' missing from 'notifications' table"
+        print(f"     - {col_name}: {notif_columns[col_name]['type']} (nullable={notif_columns[col_name]['nullable']})")
+
+    notif_fks = inspector.get_foreign_keys("notifications")
+    print(f"  -> Foreign keys on 'notifications': {notif_fks}")
+    notif_ref_tables = {fk.get("referred_table") for fk in notif_fks}
+    assert "users" in notif_ref_tables, "Foreign key to 'users' table missing on notifications!"
+
+    notif_indexes = inspector.get_indexes("notifications")
+    print(f"  -> Indexes on 'notifications': {notif_indexes}")
+    notif_idx_cols = [idx["column_names"] for idx in notif_indexes]
+    assert ["user_id"] in notif_idx_cols, "Index on 'user_id' missing on notifications table!"
+    assert ["is_read"] in notif_idx_cols, "Index on 'is_read' missing on notifications table!"
+    assert ["created_at"] in notif_idx_cols, "Index on 'created_at' missing on notifications table!"
+
+    print("[13/13] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")
