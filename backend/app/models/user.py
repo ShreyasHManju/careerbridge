@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from app.models.application import Application
     from app.models.job_posting import JobPosting
     from app.models.recruiter_profile import RecruiterProfile
+    from app.models.resume import Resume
     from app.models.student_profile import StudentProfile
 
 
@@ -78,6 +79,14 @@ class User(Base):
     applications: Mapped[list["Application"]] = relationship(
         "Application",
         back_populates="student",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-one relationship with Resume (as student)
+    resume: Mapped[Optional["Resume"]] = relationship(
+        "Resume",
+        back_populates="student",
+        uselist=False,
         cascade="all, delete-orphan",
     )
 

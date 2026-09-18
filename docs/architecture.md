@@ -67,7 +67,8 @@ The system enforces three primary roles directly on the FastAPI backend:
 - **Phase 10**: `job_postings` (1-to-many opportunities posted by recruiters with cascading deletes)
 - **Phase 11**: `applications` (many-to-1 with `job_postings` and `users`, unique constraint on `(job_posting_id, student_id)`, status lifecycle pipeline: applied -> reviewing -> shortlisted -> rejected / accepted)
 - **Phase 12**: Database-side search, multi-faceted filtering, controlled sorting, and offset/limit pagination on `job_postings`
-- **Phase 13-14**: `saved_internships`, `skills`, `student_skills`
+- **Phase 13**: `resumes` (1-to-1 extension with `users`, unique constraint on `student_id`, document metadata persistence, physical file storage abstraction, secure MIME/magic-byte validation)
+- **Phase 14**: `saved_internships`, `skills`, `student_skills`
 - **Phase 17-20**: `notifications`, `interviews`, `conversations`, `messages`, `audit_logs`
 
 ---
@@ -78,7 +79,21 @@ CareerBridge separates identity and access into three explicit tiers:
 
 1. **Authentication ("Who are you?")**: Verified cryptographically via `get_current_user` reading the JWT Bearer token and verifying the active account in PostgreSQL.
 2. **Role Authorization ("What group do you belong to?")**: Enforced via `require_role(allowed_roles)`. Protects routes from unauthorized roles (e.g. students attempting recruiter creation/modification return `403 Forbidden`).
-3. **Resource Ownership ("Do you own this specific record?")**: Strictly derived from `current_user.id`. Endpoints never accept `user_id`, `recruiter_id`, or `student_id` from client payloads. Queries filter by `Model.user_id == current_user.id` (for profiles), `JobPosting.recruiter_id == current_user.id` (for postings), `Application.student_id == current_user.id` (for student application tracking), or `application.job_posting.recruiter_id == current_user.id` (for recruiter application review), preventing horizontal privilege escalation (IDOR) and ownership spoofing.
+3. **Resource Ownership ("Do you own this specific record?")**: Strictly derived from `current_user.id`. Endpoints never accept `user_id`, `recruiter_id`, or `student_id` from client payloads. Queries filter by `Model.user_id == current_user.id` (for profiles), `JobPosting.recruiter_id == current_user.id` (for postings), `Application.student_id == current_user.id` (for student application tracking), or `Resume.student_id == current_user.id` (for student resume management), preventing horizontal privilege escalation (IDOR) and ownership spoofing.
+
+---
+
+## 6. Document & File Storage Architecture (Phase 13)
+
+CareerBridge utilizes a hybrid storage architecture for document management:
+- **Relational Metadata (PostgreSQL)**: The `resumes` table stores document provenance: `id`, `student_id`, `original_filename`, `stored_filename`, `file_path`, `content_type`, `file_size`, and timestamps.
+- **Physical Document Storage (Filesystem)**: Binary files are stored in `backend/uploads/resumes/` (or configured via `UPLOAD_DIR` in `backend/app/core/config.py`).
+- **UUID Filename Obfuscation**: Files are saved with non-guessable UUID names (e.g. `c9bf587f...docx`) to prevent predictable file enumeration, overwrites, and collision attacks.
+- **Path Traversal Protection**: All generated paths are verified via `dest_path.relative_to(base_dir)` to guarantee no upload or retrieval operations escape the uploads directory.
+- **Magic Byte Validation**: Rather than trusting user-provided file extensions or client headers, the file header is inspected against verified binary signatures (`%PDF` for PDF, `\xd0\xcf\x11\xe0` for DOC, `PK\x03\x04` for DOCX).
+- **Streamed Size Limiting**: Files are processed in 64KB chunks up to `MAX_RESUME_SIZE_MB` (5MB). Exceeding files are unlinked immediately without buffering into server RAM.
+- **Safe Atomic Replacement**: When a student uploads a new resume, the new file is saved and verified, the database metadata is updated within a transaction, and the old physical file is only unlinked after the transaction successfully commits.
+
 
 
 

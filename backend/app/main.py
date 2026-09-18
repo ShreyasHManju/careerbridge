@@ -7,6 +7,7 @@ from app.routers import (
     job_posting_router,
     rbac_router,
     recruiter_profile_router,
+    resume_router,
     student_profile_router,
     users_router,
 )
@@ -26,6 +27,7 @@ app.include_router(student_profile_router, prefix=settings.API_V1_STR)
 app.include_router(recruiter_profile_router, prefix=settings.API_V1_STR)
 app.include_router(job_posting_router, prefix=settings.API_V1_STR)
 app.include_router(applications_router, prefix=settings.API_V1_STR)
+app.include_router(resume_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)
 
 

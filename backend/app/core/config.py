@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Optional
 from pydantic import AliasChoices, Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,6 +36,21 @@ class Settings(BaseSettings):
         description="Algorithm used for signing JWT tokens",
     )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # Document & Resume Upload Configuration
+    UPLOAD_DIR: str = "uploads"
+    MAX_RESUME_SIZE_MB: int = Field(
+        default=5,
+        validation_alias=AliasChoices("MAX_RESUME_SIZE_MB", "MAX_UPLOAD_SIZE_MB"),
+        description="Maximum allowed resume file size in megabytes",
+    )
+
+    @property
+    def resume_upload_dir(self) -> Path:
+        base_dir = Path(__file__).resolve().parent.parent.parent
+        upload_path = base_dir / self.UPLOAD_DIR / "resumes"
+        upload_path.mkdir(parents=True, exist_ok=True)
+        return upload_path
 
     # Optional explicit DATABASE_URL
     DATABASE_URL: Optional[str] = None

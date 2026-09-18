@@ -67,10 +67,9 @@ careerbridge/
 - [x] **Phase 9**: Recruiter Profile & API (RecruiterProfile model, 1-to-1 relationship, Alembic migration, recruiter-only RBAC, ownership enforcement)
 - [x] **Phase 10**: Job & Internship Posting Foundation (JobPosting model, 1-to-many relationship, Alembic migration, recruiter management, candidate discovery, RBAC)
 - [x] **Phase 11**: Student Applications & Status Pipeline (Application model, DB unique constraint, student submission, recruiter review & status transitions, ownership isolation)
-- [x] **Phase 12**: Search, Filtering, and Pagination (Full-text search, multi-faceted filtering, controlled sorting, offset/limit pagination)
-- [ ] **Phase 13**: Saved Internships
-- [ ] **Phase 14**: Skills & Matching
-- [ ] **Phase 15**: Secure File Uploads (Resumes, Photos)
+- [x] **Phase 13**: Resume Upload & Student Document Foundation (Secure upload, PDF/DOC/DOCX validation, magic bytes, size bounds, safe replacement, download, deletion, student isolation)
+- [ ] **Phase 14**: Saved Internships
+- [ ] **Phase 15**: Skills & Matching
 - [ ] **Phase 16**: Admin Dashboard & Moderation
 - [ ] **Phase 17**: Notifications
 - [ ] **Phase 18**: Email Notifications
@@ -627,6 +626,57 @@ Execute the 28-test suite covering full search, multi-faceted filtering, salary 
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_job_search.py
 ```
+
+---
+
+## 16. Resume Upload & Student Document Foundation (Phase 13)
+
+Phase 13 introduces a secure, high-performance resume and document storage subsystem for students, storing physical files on the filesystem with randomized UUID filenames and storing metadata in PostgreSQL.
+
+### Core Architecture & Boundaries
+- **Storage Location**: Local filesystem storage at `backend/uploads/resumes/`. Files are referenced by server-internal UUID filenames (e.g. `d3b07384...pdf`).
+- **Database Metadata**: PostgreSQL `resumes` table records document metadata (`original_filename`, `stored_filename`, `file_path`, `content_type`, `file_size`, `created_at`, `updated_at`).
+- **Strict Ownership**: Single active resume per student enforced by a unique index on `student_id` (foreign key to `users.id` with `ON DELETE CASCADE`). All endpoints strictly derive `student_id = current_user.id` from the JWT Bearer token; client payloads cannot specify or spoof user IDs.
+- **Role Enforcement**: Only authenticated students (`UserRole.STUDENT`) can upload, view, download, or delete their resume. Recruiters, admins, and unauthenticated clients are blocked (401/403).
+
+### File Validation Pipeline
+1. **Extension Whitelist**: Only `.pdf`, `.doc`, and `.docx` are allowed. Executable and script extensions (`.exe`, `.bat`, `.sh`, `.py`, `.js`, etc.) trigger a 400 security violation.
+2. **MIME Type Whitelist**: Strict checking against `application/pdf`, `application/msword`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, and `application/octet-stream`. Invalid MIME types return `415 Unsupported Media Type`.
+3. **Magic Byte Verification**: Real file signatures are checked against initial chunks to prevent extension spoofing:
+   - PDF: `%PDF`
+   - DOC: `\xd0\xcf\x11\xe0` (OLE2 compound header)
+   - DOCX: `PK\x03\x04` (ZIP archive container header)
+4. **File Size Limit**: Configurable via `MAX_RESUME_SIZE_MB=5` (default 5MB). Files are streamed in 64KB chunks to prevent memory bloat; exceeding streams are unlinked and rejected with 400.
+5. **Path Traversal Guard**: Filenames are sanitized, and files are stored strictly inside the resolved `uploads/resumes/` folder using `dest_path.relative_to(base_dir)`.
+
+### Endpoints
+
+| Method | Endpoint | Role | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/resume` | Student | Uploads or replaces resume. Returns `201 Created` with `ResumeResponse`. Cleans up old physical file upon replacement. |
+| `GET` | `/api/v1/resume` | Student | Retrieves metadata for current student's resume. Returns `200 OK` (or `404 Not Found`). Excludes internal filesystem paths. |
+| `GET` | `/api/v1/resume/download` | Student | Downloads physical file as `FileResponse` with original filename. Returns `200 OK` (or `404 Not Found`). |
+| `DELETE` | `/api/v1/resume` | Student | Deletes resume database record and unlinks physical file. Returns `204 No Content` (or `404 Not Found`). |
+
+### Response Schema (`ResumeResponse`)
+```json
+{
+  "id": 1,
+  "original_filename": "Jane_Doe_Resume_2026.pdf",
+  "content_type": "application/pdf",
+  "file_size": 145892,
+  "created_at": "2026-09-18T10:00:00Z",
+  "updated_at": "2026-09-18T10:00:00Z"
+}
+```
+*Note: `file_path` and `stored_filename` are strictly hidden from public response schemas.*
+
+### Run Resume Test Suite
+Execute the 22-test suite covering valid formats, validation failures, security edge cases, replacement cleanup, download integrity, and RBAC boundaries:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_resume.py
+```
+
 
 
 

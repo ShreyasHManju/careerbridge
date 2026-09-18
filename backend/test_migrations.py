@@ -24,7 +24,7 @@ def test_migrations():
     assert "users" in Base.metadata.tables, "Table 'users' missing from Base.metadata"
     print("  -> Base.metadata contains 'users' table definition.")
 
-    print("[3/9] Verifying database schema after migration")
+    print("[3/10] Verifying database schema after migration")
     inspector = inspect(engine)
     tables = inspector.get_table_names()
     print(f"  -> Tables found in PostgreSQL: {tables}")
@@ -33,6 +33,7 @@ def test_migrations():
     assert "recruiter_profiles" in tables, "Table 'recruiter_profiles' not found in database!"
     assert "job_postings" in tables, "Table 'job_postings' not found in database!"
     assert "applications" in tables, "Table 'applications' not found in database!"
+    assert "resumes" in tables, "Table 'resumes' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
 
     print("[4/9] Verifying 'users' table columns and indexes")
@@ -171,7 +172,36 @@ def test_migrations():
         "Unique constraint 'uq_job_posting_student_application' missing on applications!"
     )
 
-    print("[9/9] Verifying alembic_version table in PostgreSQL")
+    print("[9/10] Verifying 'resumes' table columns, indexes, FKs, and constraints")
+    resume_columns = {col["name"]: col for col in inspector.get_columns("resumes")}
+    expected_resume_cols = [
+        "id",
+        "student_id",
+        "original_filename",
+        "stored_filename",
+        "file_path",
+        "content_type",
+        "file_size",
+        "created_at",
+        "updated_at",
+    ]
+    for col_name in expected_resume_cols:
+        assert col_name in resume_columns, f"Column '{col_name}' missing from 'resumes' table"
+        print(f"     - {col_name}: {resume_columns[col_name]['type']} (nullable={resume_columns[col_name]['nullable']})")
+
+    resume_fks = inspector.get_foreign_keys("resumes")
+    print(f"  -> Foreign keys on 'resumes': {resume_fks}")
+    referred_tables = {fk.get("referred_table") for fk in resume_fks}
+    assert "users" in referred_tables, "Foreign key to 'users' table missing on resumes!"
+
+    resume_indexes = inspector.get_indexes("resumes")
+    print(f"  -> Indexes on 'resumes': {resume_indexes}")
+    student_id_idx = [idx for idx in resume_indexes if "student_id" in idx["column_names"]]
+    assert any(idx.get("unique") is True for idx in student_id_idx), (
+        "Unique index on 'student_id' missing on resumes table!"
+    )
+
+    print("[10/10] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")
