@@ -74,13 +74,13 @@ careerbridge/
 - [x] **Phase 16**: Admin User Management & Moderation Foundation (User search, role/status filtering, activation/deactivation, self-lockout protection, recruiter review & verification, job moderation, centralized admin RBAC)
 - [x] **Phase 17**: Backend Notifications & Background Jobs Foundation (In-app notifications, read/unread tracking, bulk read-all, unread counts, real event triggers, in-memory typed background jobs abstraction)
 - [x] **Phase 18**: Interviews & Interview Scheduling Foundation (Interview model, types & statuses, double-booking conflict protection, student notifications, chronological listings, soft-cancellation, RBAC & ownership)
-- [ ] **Phase 19**: Email Notifications
-- [ ] **Phase 20**: Messaging (HTTP & WebSockets)
-- [ ] **Phase 21**: Aggregated Role Dashboards
-- [ ] **Phase 22**: Unified Error Handling & Frontend States
-- [ ] **Phase 23**: End-to-End & Unit Testing
-- [ ] **Phase 24**: Security Hardening & Audit
-- [ ] **Phase 25**: OpenAPI / Swagger Documentation Polish
+- [x] **Phase 19**: Messaging Foundation (One-to-one conversations, message delivery, participant authorization with no admin bypass, get-or-create deduplication, read/unread tracking, notification integration)
+- [ ] **Phase 20**: Email Notifications
+- [ ] **Phase 21**: Real-Time WebSockets Messaging
+- [ ] **Phase 22**: Aggregated Role Dashboards
+- [ ] **Phase 23**: Unified Error Handling & Frontend States
+- [ ] **Phase 24**: End-to-End & Unit Testing
+- [ ] **Phase 25**: Security Hardening & Audit
 - [ ] **Phase 26**: Docker & Docker Compose
 - [ ] **Phase 27**: CI/CD Pipelines
 - [ ] **Phase 28**: Production Deployment Prep
@@ -958,6 +958,59 @@ Execute the 43-test suite covering authentication, RBAC, schema validation, appl
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_interviews.py
 ```
+
+---
+
+## 22. Phase 19: Messaging Foundation
+
+The Messaging subsystem provides a secure, private one-to-one communication pipeline primarily supporting interaction between students and recruiters.
+
+### Architectural & Security Highlights
+- **Relational Messaging Architecture**:
+  - `conversations`: Stores one-to-one conversation sessions with normalized participant IDs (`user1_id < user2_id`).
+    - Constraints: `ck_conversation_user_order` ensures canonical ID ordering; `uq_conversation_user_pair` enforces engine-level deduplication so exactly one conversation can ever exist between any two users.
+    - Cascades: Deleting either user cleanly cascades to delete the conversation.
+  - `conversation_participants`: Association table associating `conversation_id` and `user_id` with `uq_conversation_participant` preventing duplicate participant rows.
+  - `messages`: Stores individual messages with `conversation_id`, `sender_id`, `body` (1–5000 characters), `is_read`, `created_at`, `read_at`, `updated_at`.
+    - Composite indexes: `(conversation_id, created_at)` and `(conversation_id, is_read)` for high-throughput chronological retrieval and unread tracking.
+- **Strict Participant Authorization (No Admin Bypass)**:
+  - Private messaging is strictly confidential between the two participants.
+  - Platform administrators (`UserRole.ADMIN`) cannot access conversations, read message history, send messages, or mutate read states for conversations they do not personally participate in (`403 Forbidden`).
+  - Identity is derived strictly from verified JWT tokens (`current_user.id`); client-supplied sender or participant IDs are ignored.
+- **Deterministic Get-or-Create Conversation**:
+  - `POST /api/v1/conversations`: Accepts `other_user_id` and optional `initial_message`.
+  - Validates target exists, is active, and is not the current user (self-conversations rejected with `400 Bad Request`).
+  - If a conversation between the two users already exists, reuses and returns it (`200 OK`) rather than generating duplicates. Handles concurrent creation races safely via `IntegrityError` rollback.
+- **Chronological Message History & Database-Side Pagination**:
+  - `GET /api/v1/conversations/{id}/messages`: Returns messages in stable chronological order (`created_at ASC, id ASC`) with `page` and `page_size` bounds enforced at the query level.
+- **Read / Unread State Tracking**:
+  - `PATCH /api/v1/conversations/{id}/read`: Bulk marks all unread messages received by the caller as read (`is_read = true`, `read_at = now()`) in a single query.
+  - Sender's own sent messages are never counted as unread for the sender.
+  - `PATCH /api/v1/messages/{id}/read`: Marks an individual message as read (rejects sender attempts with `400 Bad Request`).
+- **In-App Notification Integration**:
+  - Dispatches `NotificationType.MESSAGE_RECEIVED` notifications to the message recipient via `NotificationService`.
+  - Notification body contains a sanitized preview without exposing full message payload.
+- **Real-Time Note**:
+  - This phase implements the foundational HTTP REST API. Real-time WebSocket messaging is scheduled for a subsequent phase.
+
+### Messaging Endpoints
+
+| Method | Endpoint | Role | Status | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/conversations` | Any Authenticated | `201 Created` / `200 OK` | Start a new conversation or retrieve existing one (deduplicated). |
+| `GET` | `/api/v1/conversations` | Any Authenticated | `200 OK` | List user's conversations ordered by recent activity with unread counts. |
+| `GET` | `/api/v1/conversations/{conversation_id}` | Participant Only | `200 OK` | Retrieve single conversation details. |
+| `POST` | `/api/v1/conversations/{conversation_id}/messages` | Participant Only | `201 Created` | Send a message and dispatch notification to recipient. |
+| `GET` | `/api/v1/conversations/{conversation_id}/messages` | Participant Only | `200 OK` | List messages chronologically with database-side pagination. |
+| `PATCH` | `/api/v1/conversations/{conversation_id}/read` | Participant Only | `200 OK` | Mark all received messages in conversation as read. |
+| `PATCH` | `/api/v1/messages/{message_id}/read` | Recipient Only | `200 OK` | Mark single received message as read. |
+
+### Run Messaging Test Suite
+Execute the 47-test suite covering authentication, conversation lifecycle, duplicate reuse, participant authorization, message delivery, pagination, read states, notifications, security, and cascades:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_messaging.py
+```
+
 
 
 

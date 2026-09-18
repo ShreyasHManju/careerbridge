@@ -18,6 +18,7 @@ class NotificationType(str, enum.Enum):
     INTERVIEW_SCHEDULED = "interview_scheduled"
     INTERVIEW_RESCHEDULED = "interview_rescheduled"
     INTERVIEW_CANCELLED = "interview_cancelled"
+    MESSAGE_RECEIVED = "message_received"
 
 
 class Notification(Base):

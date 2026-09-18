@@ -25,7 +25,10 @@ def test_migrations():
     assert "saved_jobs" in Base.metadata.tables, "Table 'saved_jobs' missing from Base.metadata"
     assert "notifications" in Base.metadata.tables, "Table 'notifications' missing from Base.metadata"
     assert "interviews" in Base.metadata.tables, "Table 'interviews' missing from Base.metadata"
-    print("  -> Base.metadata contains 'users', 'saved_jobs', 'notifications', and 'interviews' table definitions.")
+    assert "conversations" in Base.metadata.tables, "Table 'conversations' missing from Base.metadata"
+    assert "conversation_participants" in Base.metadata.tables, "Table 'conversation_participants' missing from Base.metadata"
+    assert "messages" in Base.metadata.tables, "Table 'messages' missing from Base.metadata"
+    print("  -> Base.metadata contains messaging tables.")
 
     print("[3/11] Verifying database schema after migration")
     inspector = inspect(engine)
@@ -41,6 +44,9 @@ def test_migrations():
     assert "saved_jobs" in tables, "Table 'saved_jobs' not found in database!"
     assert "notifications" in tables, "Table 'notifications' not found in database!"
     assert "interviews" in tables, "Table 'interviews' not found in database!"
+    assert "conversations" in tables, "Table 'conversations' not found in database!"
+    assert "conversation_participants" in tables, "Table 'conversation_participants' not found in database!"
+    assert "messages" in tables, "Table 'messages' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
 
     print("[4/9] Verifying 'users' table columns and indexes")
@@ -334,7 +340,26 @@ def test_migrations():
     assert ["scheduled_at"] in interview_idx_cols, "Index on 'scheduled_at' missing on interviews table!"
     assert ["status"] in interview_idx_cols, "Index on 'status' missing on interviews table!"
 
-    print("[14/14] Verifying alembic_version table in PostgreSQL")
+    print("[14/15] Verifying 'conversations', 'conversation_participants', and 'messages' tables")
+    conv_columns = {col["name"]: col for col in inspector.get_columns("conversations")}
+    for c in ["id", "user1_id", "user2_id", "created_at", "updated_at"]:
+        assert c in conv_columns, f"Column '{c}' missing from 'conversations' table"
+    conv_fks = inspector.get_foreign_keys("conversations")
+    assert any(fk.get("referred_table") == "users" for fk in conv_fks)
+
+    cp_columns = {col["name"]: col for col in inspector.get_columns("conversation_participants")}
+    for c in ["id", "conversation_id", "user_id", "created_at"]:
+        assert c in cp_columns, f"Column '{c}' missing from 'conversation_participants' table"
+
+    msg_columns = {col["name"]: col for col in inspector.get_columns("messages")}
+    for c in ["id", "conversation_id", "sender_id", "body", "is_read", "created_at", "read_at", "updated_at"]:
+        assert c in msg_columns, f"Column '{c}' missing from 'messages' table"
+    msg_fks = inspector.get_foreign_keys("messages")
+    msg_ref_tables = {fk.get("referred_table") for fk in msg_fks}
+    assert "conversations" in msg_ref_tables, "FK to conversations missing on messages!"
+    assert "users" in msg_ref_tables, "FK to users missing on messages!"
+
+    print("[15/15] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")

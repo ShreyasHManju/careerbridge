@@ -25,6 +25,16 @@ from app.schemas.job_posting import (
     JobSortBy,
     SortOrder,
 )
+from app.schemas.messaging import (
+    ConversationCreate,
+    ConversationListResponse,
+    ConversationResponse,
+    MarkReadResponse,
+    MessageCreate,
+    MessageListResponse,
+    MessageResponse,
+    ParticipantSummary,
+)
 from app.schemas.notification import (
     NotificationMarkAllReadResponse,
     NotificationPaginationResponse,
@@ -85,6 +95,14 @@ __all__ = [
     "InterviewCreate",
     "InterviewUpdate",
     "InterviewResponse",
+    "ConversationCreate",
+    "ConversationResponse",
+    "ConversationListResponse",
+    "ParticipantSummary",
+    "MessageCreate",
+    "MessageResponse",
+    "MessageListResponse",
+    "MarkReadResponse",
 ]
 
 

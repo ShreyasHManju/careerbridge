@@ -179,6 +179,33 @@ The Interview Management & Scheduling subsystem provides recruiters and candidat
   - Emits in-app lifecycle notifications to the student (`INTERVIEW_SCHEDULED`, `INTERVIEW_RESCHEDULED`, `INTERVIEW_CANCELLED`).
   - Updating notes or meeting links only retains the existing status and suppresses redundant notifications.
 
+---
+
+## 11. One-to-One Messaging Architecture (Phase 19)
+
+The Messaging subsystem provides a secure, private communication pipeline between platform users:
+- **Relational Representation (`conversations`, `conversation_participants`, `messages`)**:
+  - `conversations`: Canonical ordering enforced by `CheckConstraint("user1_id < user2_id")` alongside a database unique constraint `UniqueConstraint("user1_id", "user2_id")` guaranteeing that exactly one conversation exists per user pair without duplication.
+  - `conversation_participants`: Association table with `(conversation_id, user_id)` uniqueness.
+  - `messages`: Message entity storing body (1–5000 chars), `sender_id`, `is_read`, `read_at`, `created_at`, `updated_at`.
+  - Composite indexes `(conversation_id, created_at)` and `(conversation_id, is_read)` optimize stable chronological ordering and unread calculation.
+- **Strict Participant Authorization (No Admin Bypass)**:
+  - Private messaging is strictly confidential between the two participants.
+  - Administrators cannot view conversations, list messages, or send messages unless they are a direct participant (`403 Forbidden`).
+  - Sender identity is derived strictly from verified JWT tokens (`current_user.id`).
+- **Deterministic Get-or-Create**:
+  - Handles concurrent creation attempts via PostgreSQL-level constraints and atomic `IntegrityError` recovery.
+  - Subsequent requests resolve to the existing conversation ID without creating duplicates.
+- **Database-Side Pagination & Stable Ordering**:
+  - Messages are retrieved in stable chronological ascending order (`ORDER BY created_at ASC, id ASC`) with offset/limit pagination at the SQL level.
+- **Read / Unread State Tracking**:
+  - `PATCH /api/v1/conversations/{id}/read` performs a bulk update for messages received by the caller, populating `read_at` timestamps.
+  - Senders' own messages are excluded from their own unread count.
+  - `PATCH /api/v1/messages/{id}/read` supports single message read marking with sender-modification protection.
+- **In-App Notification Trigger**:
+  - Dispatches `NotificationType.MESSAGE_RECEIVED` notifications to the other participant upon message creation.
+
+
 
 
 

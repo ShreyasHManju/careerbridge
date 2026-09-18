@@ -7,8 +7,10 @@ from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.application import Application
+    from app.models.conversation import ConversationParticipant
     from app.models.interview import Interview
     from app.models.job_posting import JobPosting
+    from app.models.message import Message
     from app.models.notification import Notification
     from app.models.profile_image import ProfileImage
     from app.models.recruiter_profile import RecruiterProfile
@@ -129,6 +131,20 @@ class User(Base):
         "Interview",
         foreign_keys="[Interview.student_id]",
         back_populates="student",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-many relationship with ConversationParticipant
+    conversation_participants: Mapped[list["ConversationParticipant"]] = relationship(
+        "ConversationParticipant",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-many relationship with Message (as sender)
+    sent_messages: Mapped[list["Message"]] = relationship(
+        "Message",
+        back_populates="sender",
         cascade="all, delete-orphan",
     )
 
