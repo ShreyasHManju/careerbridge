@@ -7,6 +7,7 @@ from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.application import Application
+    from app.models.interview import Interview
     from app.models.job_posting import JobPosting
     from app.models.notification import Notification
     from app.models.profile_image import ProfileImage
@@ -112,6 +113,22 @@ class User(Base):
     notifications: Mapped[list["Notification"]] = relationship(
         "Notification",
         back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-many relationship with Interview (as recruiter)
+    interviews_as_recruiter: Mapped[list["Interview"]] = relationship(
+        "Interview",
+        foreign_keys="[Interview.recruiter_id]",
+        back_populates="recruiter",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-many relationship with Interview (as student)
+    interviews_as_student: Mapped[list["Interview"]] = relationship(
+        "Interview",
+        foreign_keys="[Interview.student_id]",
+        back_populates="student",
         cascade="all, delete-orphan",
     )
 

@@ -15,6 +15,9 @@ class NotificationType(str, enum.Enum):
     APPLICATION_STATUS_CHANGED = "application_status_changed"
     RECRUITER_VERIFICATION_CHANGED = "recruiter_verification_changed"
     JOB_MODERATION_CHANGED = "job_moderation_changed"
+    INTERVIEW_SCHEDULED = "interview_scheduled"
+    INTERVIEW_RESCHEDULED = "interview_rescheduled"
+    INTERVIEW_CANCELLED = "interview_cancelled"
 
 
 class Notification(Base):

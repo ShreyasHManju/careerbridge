@@ -24,7 +24,8 @@ def test_migrations():
     assert "users" in Base.metadata.tables, "Table 'users' missing from Base.metadata"
     assert "saved_jobs" in Base.metadata.tables, "Table 'saved_jobs' missing from Base.metadata"
     assert "notifications" in Base.metadata.tables, "Table 'notifications' missing from Base.metadata"
-    print("  -> Base.metadata contains 'users', 'saved_jobs', and 'notifications' table definitions.")
+    assert "interviews" in Base.metadata.tables, "Table 'interviews' missing from Base.metadata"
+    print("  -> Base.metadata contains 'users', 'saved_jobs', 'notifications', and 'interviews' table definitions.")
 
     print("[3/11] Verifying database schema after migration")
     inspector = inspect(engine)
@@ -39,6 +40,7 @@ def test_migrations():
     assert "profile_images" in tables, "Table 'profile_images' not found in database!"
     assert "saved_jobs" in tables, "Table 'saved_jobs' not found in database!"
     assert "notifications" in tables, "Table 'notifications' not found in database!"
+    assert "interviews" in tables, "Table 'interviews' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
 
     print("[4/9] Verifying 'users' table columns and indexes")
@@ -297,7 +299,42 @@ def test_migrations():
     assert ["is_read"] in notif_idx_cols, "Index on 'is_read' missing on notifications table!"
     assert ["created_at"] in notif_idx_cols, "Index on 'created_at' missing on notifications table!"
 
-    print("[13/13] Verifying alembic_version table in PostgreSQL")
+    print("[13/14] Verifying 'interviews' table columns, indexes, and FKs")
+    interview_columns = {col["name"]: col for col in inspector.get_columns("interviews")}
+    expected_interview_cols = [
+        "id",
+        "application_id",
+        "recruiter_id",
+        "student_id",
+        "scheduled_at",
+        "duration_minutes",
+        "interview_type",
+        "location_or_link",
+        "notes",
+        "status",
+        "created_at",
+        "updated_at",
+    ]
+    for col_name in expected_interview_cols:
+        assert col_name in interview_columns, f"Column '{col_name}' missing from 'interviews' table"
+        print(f"     - {col_name}: {interview_columns[col_name]['type']} (nullable={interview_columns[col_name]['nullable']})")
+
+    interview_fks = inspector.get_foreign_keys("interviews")
+    print(f"  -> Foreign keys on 'interviews': {interview_fks}")
+    interview_ref_tables = {fk.get("referred_table") for fk in interview_fks}
+    assert "applications" in interview_ref_tables, "Foreign key to 'applications' table missing on interviews!"
+    assert "users" in interview_ref_tables, "Foreign key to 'users' table missing on interviews!"
+
+    interview_indexes = inspector.get_indexes("interviews")
+    print(f"  -> Indexes on 'interviews': {interview_indexes}")
+    interview_idx_cols = [idx["column_names"] for idx in interview_indexes]
+    assert ["application_id"] in interview_idx_cols, "Index on 'application_id' missing on interviews table!"
+    assert ["recruiter_id"] in interview_idx_cols, "Index on 'recruiter_id' missing on interviews table!"
+    assert ["student_id"] in interview_idx_cols, "Index on 'student_id' missing on interviews table!"
+    assert ["scheduled_at"] in interview_idx_cols, "Index on 'scheduled_at' missing on interviews table!"
+    assert ["status"] in interview_idx_cols, "Index on 'status' missing on interviews table!"
+
+    print("[14/14] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")

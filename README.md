@@ -73,8 +73,8 @@ careerbridge/
 - [x] **Phase 15**: Saved Jobs & Internships (SavedJob entity, DB unique constraint on student_id + job_posting_id, save/unsave/status/list endpoints, joined queries, cascade deletion, student-only RBAC)
 - [x] **Phase 16**: Admin User Management & Moderation Foundation (User search, role/status filtering, activation/deactivation, self-lockout protection, recruiter review & verification, job moderation, centralized admin RBAC)
 - [x] **Phase 17**: Backend Notifications & Background Jobs Foundation (In-app notifications, read/unread tracking, bulk read-all, unread counts, real event triggers, in-memory typed background jobs abstraction)
-- [ ] **Phase 18**: Email Notifications
-- [ ] **Phase 19**: Interview Scheduling
+- [x] **Phase 18**: Interviews & Interview Scheduling Foundation (Interview model, types & statuses, double-booking conflict protection, student notifications, chronological listings, soft-cancellation, RBAC & ownership)
+- [ ] **Phase 19**: Email Notifications
 - [ ] **Phase 20**: Messaging (HTTP & WebSockets)
 - [ ] **Phase 21**: Aggregated Role Dashboards
 - [ ] **Phase 22**: Unified Error Handling & Frontend States
@@ -893,6 +893,72 @@ Execute the 29-test suite covering authentication, empty states, pagination, ord
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_notifications.py
 ```
+
+---
+
+## 21. Phase 18: Interviews & Interview Scheduling Foundation
+
+The Interview Management & Scheduling subsystem provides recruiters and candidate students with a complete, collision-safe interview coordination pipeline.
+
+### Architectural & Security Highlights
+- **Relational Interview Model (`interviews` table)**:
+  - `application_id`: Foreign key linked to `applications.id` (`ondelete="CASCADE"`).
+  - `recruiter_id`: Foreign key linked to `users.id` (`ondelete="CASCADE"`).
+  - `student_id`: Foreign key linked to `users.id` (`ondelete="CASCADE"`).
+  - `scheduled_at`: Timezone-aware timestamp (`DateTime(timezone=True)`).
+  - `duration_minutes`: Integer duration bounded between 15 and 480 minutes (8 hours).
+  - `interview_type`: String-backed enum (`InterviewType`):
+    - `online`: Virtual video meeting (e.g. Google Meet, Zoom).
+    - `in_person`: Onsite interview at physical office/boardroom.
+    - `phone`: Audio/phone screening call.
+  - `location_or_link`: Optional meeting URL or physical location string (max 500 characters).
+  - `notes`: Optional recruiter agenda or candidate instructions (max 2,000 characters).
+  - `status`: String-backed enum (`InterviewStatus`):
+    - `scheduled`: Active scheduled session.
+    - `rescheduled`: Active session modified to a new timeslot.
+    - `completed`: Completed interview session.
+    - `cancelled`: Soft-cancelled session.
+  - Indexes: individual indexes on `application_id`, `recruiter_id`, `student_id`, `scheduled_at`, `status`, plus composite indexes `(recruiter_id, scheduled_at)` and `(student_id, scheduled_at)` for high-performance conflict detection and chronological queries.
+- **Double-Booking Conflict Protection**:
+  - Overlap algorithm evaluates interval intersection:
+    $$\text{Start}_{\text{new}} < \text{End}_{\text{existing}} \quad \text{and} \quad \text{End}_{\text{new}} > \text{Start}_{\text{existing}}$$
+  - Protects **both** the recruiter and the student against conflicting simultaneous bookings across all active interviews (`scheduled`, `rescheduled`).
+  - Self-exclusion logic allows updating notes or location on an existing session without triggering false positive conflicts against itself.
+  - Cancelled interviews (`cancelled`) are excluded from conflict detection, immediately freeing the slot for future bookings.
+- **Application Lifecycle Gatekeeping**:
+  - Interviews may only be scheduled for candidates with applications in `applied`, `reviewing`, or `shortlisted` status.
+  - Applications in terminal or offer states (`rejected`, `accepted`) are rejected with `400 Bad Request`.
+- **Granular RBAC & Ownership Enforcement**:
+  - Scheduling (`POST /applications/{id}/interviews`), updating (`PATCH /interviews/{id}`), and cancelling (`DELETE /interviews/{id}`) are strictly restricted to the authenticated recruiter who created the associated job posting (`403 Forbidden` for other recruiters or roles).
+  - Interview retrieval (`GET /interviews/{id}`) is accessible only by the assigned recruiter, the candidate student, or a platform administrator.
+  - Client attempts to mutate immutable relational fields (`application_id`, `recruiter_id`, `student_id`) on update are ignored.
+- **Soft Cancellation Semantics**:
+  - `DELETE /api/v1/interviews/{interview_id}` does not delete the database row; it transitions `status` to `cancelled`, dispatches an in-app notification to the candidate student, and releases the time slot for future scheduling.
+- **Automated Lifecycle Notifications**:
+  - Creating an interview emits `interview_scheduled` to the candidate student.
+  - Rescheduling times/duration emits `interview_rescheduled` to the candidate student.
+  - Updating notes or meeting links only preserves status and suppresses redundant notifications.
+  - Cancelling an interview emits `interview_cancelled` to the candidate student.
+- **Credential Hygiene**:
+  - All interview responses utilize `InterviewResponse` schemas that completely exclude authentication secrets and password hashes.
+
+### Interview Endpoints
+
+| Method | Endpoint | Role | Status | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/applications/{application_id}/interviews` | Recruiter | `201 Created` | Schedule an interview for an eligible candidate application with conflict checking. |
+| `GET` | `/api/v1/interviews/me` | Student | `200 OK` | List candidate's scheduled interviews in chronological ascending order (`scheduled_at ASC`). |
+| `GET` | `/api/v1/recruiter/interviews` | Recruiter | `200 OK` | List recruiter's scheduled interviews in chronological ascending order (`scheduled_at ASC`). |
+| `GET` | `/api/v1/interviews/{interview_id}` | Recruiter / Student / Admin | `200 OK` | Retrieve detailed interview session (ownership-verified). |
+| `PATCH` | `/api/v1/interviews/{interview_id}` | Recruiter | `200 OK` | Reschedule or update interview notes/link (ownership & conflict checked). |
+| `DELETE` | `/api/v1/interviews/{interview_id}` | Recruiter | `200 OK` | Soft-cancel interview, releasing time slot and notifying candidate. |
+
+### Run Interview Test Suite
+Execute the 43-test suite covering authentication, RBAC, schema validation, application eligibility rules, cross-recruiter isolation, double-booking detection, soft-cancellation, chronological sorting, credential filtering, and database cascades:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_interviews.py
+```
+
 
 
 

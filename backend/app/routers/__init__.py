@@ -1,6 +1,7 @@
 from app.routers.admin import router as admin_router
 from app.routers.applications import router as applications_router
 from app.routers.auth import router as auth_router
+from app.routers.interviews import router as interviews_router
 from app.routers.job_posting import router as job_posting_router
 from app.routers.rbac import router as rbac_router
 from app.routers.notifications import router as notifications_router
@@ -24,6 +25,7 @@ __all__ = [
     "profile_image_router",
     "saved_jobs_router",
     "notifications_router",
+    "interviews_router",
 ]
 
 

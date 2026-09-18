@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.interview import Interview
     from app.models.job_posting import JobPosting
     from app.models.user import User
 
@@ -74,6 +75,9 @@ class Application(Base):
     )
     student: Mapped["User"] = relationship(
         "User", back_populates="applications"
+    )
+    interviews: Mapped[list["Interview"]] = relationship(
+        "Interview", back_populates="application", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

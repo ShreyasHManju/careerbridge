@@ -153,6 +153,33 @@ The Notifications and Background Jobs subsystem handles event-driven user update
   - Encapsulates error handling and logging so background task failures never crash the active HTTP request.
   - Provides a consistent callable contract ready for drop-in replacement with distributed task brokers (e.g. Redis / Celery) in future phases.
 
+---
+
+## 10. Interview Scheduling & Lifecycle Architecture (Phase 18)
+
+The Interview Management & Scheduling subsystem provides recruiters and candidate students with a complete, collision-safe interview coordination framework:
+- **Relational Representation (`interviews`)**:
+  - Stored in `interviews` table with foreign keys `application_id`, `recruiter_id`, `student_id` linked with `ondelete="CASCADE"`.
+  - Composite indexes `(recruiter_id, scheduled_at)` and `(student_id, scheduled_at)` optimize interval conflict scans and chronological retrieval.
+  - Supported enums: `InterviewType` (`online`, `in_person`, `phone`) and `InterviewStatus` (`scheduled`, `completed`, `cancelled`, `rescheduled`).
+- **Collision Protection Algorithm**:
+  - Overlap is defined by standard interval intersection:
+    $$\text{Start}_{\text{new}} < \text{End}_{\text{existing}} \quad \land \quad \text{End}_{\text{new}} > \text{Start}_{\text{existing}}$$
+  - Conflict detection verifies both the recruiter and candidate schedules across active sessions (`SCHEDULED`, `RESCHEDULED`).
+  - Cancelled sessions (`CANCELLED`) are omitted from conflict evaluation, releasing calendar availability immediately.
+- **Application Eligibility Gatekeeping**:
+  - Scheduling is restricted to applications in candidate progression states: `APPLIED`, `REVIEWING`, `SHORTLISTED`.
+  - Terminal or completed statuses (`REJECTED`, `ACCEPTED`) return `400 Bad Request`.
+- **Ownership & Authorization**:
+  - Scheduling, updating, and cancelling are restricted strictly to the recruiter who created the associated job posting (`403 Forbidden` for other recruiters or roles).
+  - Single interview inspection (`GET /api/v1/interviews/{interview_id}`) is permitted for the recruiter owner, the candidate student, or a platform administrator.
+- **Soft Cancellation & Slot Release**:
+  - Cancelling an interview (`DELETE /api/v1/interviews/{interview_id}`) updates `status = CANCELLED`, dispatches an in-app notification to the candidate, and releases the timeslot without purging historical audit logs.
+- **Notification Integration**:
+  - Emits in-app lifecycle notifications to the student (`INTERVIEW_SCHEDULED`, `INTERVIEW_RESCHEDULED`, `INTERVIEW_CANCELLED`).
+  - Updating notes or meeting links only retains the existing status and suppresses redundant notifications.
+
+
 
 
 

@@ -12,6 +12,11 @@ from app.schemas.application import (
     ApplicationUpdate,
 )
 from app.schemas.auth import LoginRequest, TokenPayload, TokenResponse
+from app.schemas.interview import (
+    InterviewCreate,
+    InterviewResponse,
+    InterviewUpdate,
+)
 from app.schemas.job_posting import (
     JobPostingCreate,
     JobPostingPaginationResponse,
@@ -77,6 +82,9 @@ __all__ = [
     "NotificationPaginationResponse",
     "NotificationUnreadCountResponse",
     "NotificationMarkAllReadResponse",
+    "InterviewCreate",
+    "InterviewUpdate",
+    "InterviewResponse",
 ]
 
 
