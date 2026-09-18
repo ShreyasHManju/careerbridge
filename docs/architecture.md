@@ -329,6 +329,58 @@ The Transactional Email Notification architecture provides decoupled, asynchrono
   - Plaintext passwords, password hashes, JWT secrets, and database credentials are strictly excluded from emails and logs.
   - Chat messages and WebSocket communications strictly do NOT dispatch emails, preventing inbox flooding.
 
+---
+
+## 14. Aggregated Role Dashboards Architecture (Phase 22)
+
+CareerBridge provides role-specific, aggregated dashboard metrics engineered specifically to avoid loading raw relational records into client browsers. All calculations are executed directly in PostgreSQL via high-performance SQL aggregation queries and returned as structured summary objects.
+
+```text
+                  +-------------------------------------------------------------+
+                  |                 HTTP Client (React / Mobile)                |
+                  +------------------------------+------------------------------+
+                                                 |
+                       GET /api/v1/dashboard/{student | recruiter | admin}
+                                                 |
+                                                 v
+                  +-------------------------------------------------------------+
+                  |               FastAPI Dashboards Router                     |
+                  |  (Role-Based Access Control: STUDENT / RECRUITER / ADMIN)   |
+                  +------------------------------+------------------------------+
+                                                 |
+                                                 v
+                  +-------------------------------------------------------------+
+                  |                    DashboardService                         |
+                  |  (Single-Query Conditional SQL Aggregations & Scoping)     |
+                  +------------------------------+------------------------------+
+                                                 |
+                       SQL Aggregation: COUNT(), SUM(CASE...), COALESCE()
+                                                 |
+                                                 v
+                  +-------------------------------------------------------------+
+                  |                     PostgreSQL Database                     |
+                  |  (applications, job_postings, saved_jobs, interviews, users)|
+                  +-------------------------------------------------------------+
+```
+
+### Architectural Principles & Design Decisions
+- **Database-Side Computation**:
+  - Eliminates client-side data bloat and high network payloads by executing aggregation logic (`COUNT`, `SUM(CASE ...)`, `COALESCE`, `TO_CHAR`) directly inside PostgreSQL.
+  - No entity instances or large collections are instantiated or hydrated in Python ORM memory.
+- **Strict Role Boundaries & Isolation**:
+  - `GET /api/v1/dashboard/student`: Requires `UserRole.STUDENT`. Data is strictly filtered by `student_id == current_user.id`.
+  - `GET /api/v1/dashboard/recruiter`: Requires `UserRole.RECRUITER`. Metrics are strictly filtered by `JobPosting.recruiter_id == current_user.id`.
+  - `GET /api/v1/dashboard/admin`: Requires `UserRole.ADMIN`. Provides platform-wide KPIs, growth indicators, and application success rates.
+  - Cross-role requests return `403 Forbidden`. Unauthenticated requests return `401 Unauthorized`.
+  - **No Admin Bypass**: Administrators cannot query private student or recruiter dashboard endpoints, upholding absolute privacy separation.
+- **Optimized Query Formulations**:
+  - **Student Application Breakdown**: Uses a single SQL query with conditional summation (`SUM(CASE WHEN status = 'reviewing' THEN 1 ELSE 0 END)`) across `applications` to fetch `total_applications`, `applications_under_review`, `shortlisted_applications`, and `accepted_applications` in one round trip.
+  - **Upcoming Interviews**: Scoped to the authenticated student where `status IN ('scheduled', 'rescheduled')` and `scheduled_at >= NOW()`. Past, completed, and cancelled interviews are strictly excluded.
+  - **Recruiter Pipeline**: Aggregates `active_internships` (`is_active = true`), `total_applications`, `applications_awaiting_review` (`status = 'applied'`), `shortlisted_candidates` (`status = 'shortlisted'`), and `scheduled_interviews` across all postings owned by the recruiter.
+  - **Admin Application Success Rate**: Safely calculates `(accepted / total) * 100` with graceful zero-division handling (`0.0` if no applications exist).
+  - **Monthly Account Registrations**: Groups account creations by `TO_CHAR(User.created_at, 'YYYY-MM')` for the target year (defaulting to the current UTC calendar year), returning structured `[{"month": "YYYY-MM", "count": N}]` items.
+
+
 
 
 

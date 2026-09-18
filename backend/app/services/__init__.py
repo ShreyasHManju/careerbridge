@@ -5,6 +5,7 @@ from app.services.background_jobs import (
     get_job,
     register_job,
 )
+from app.services.dashboard_service import DashboardService
 from app.services.email_providers import (
     BaseEmailProvider,
     LocalEmailProvider,
@@ -25,6 +26,7 @@ __all__ = [
     "ws_manager",
     "EmailService",
     "EmailEventType",
+    "DashboardService",
     "BaseEmailProvider",
     "LocalEmailProvider",
     "SMTPEmailProvider",

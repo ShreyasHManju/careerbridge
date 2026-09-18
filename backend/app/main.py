@@ -5,6 +5,7 @@ from app.routers import (
     admin_router,
     applications_router,
     auth_router,
+    dashboards_router,
     interviews_router,
     job_posting_router,
     messaging_router,
@@ -43,6 +44,7 @@ app.include_router(profile_image_router, prefix=settings.API_V1_STR)
 app.include_router(saved_jobs_router, prefix=settings.API_V1_STR)
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)
+app.include_router(dashboards_router, prefix=settings.API_V1_STR)
 
 
 

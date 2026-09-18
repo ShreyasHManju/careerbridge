@@ -77,7 +77,7 @@ careerbridge/
 - [x] **Phase 19**: Messaging Foundation (One-to-one conversations, message delivery, participant authorization with no admin bypass, get-or-create deduplication, read/unread tracking, notification integration)
 - [x] **Phase 20**: Real-Time Messaging / WebSockets Foundation (WebSocket transport layer, WebSocketConnectionManager, query/header JWT auth, participant authorization without admin bypass, multi-tab support, real-time broadcast, read receipts, offline persistence, notification triggers)
 - [x] **Phase 21**: Email Notification Foundation (Decoupled transactional email architecture, Local & SMTP providers, background jobs integration, HTML/text templates, injection escaping, failure isolation)
-- [ ] **Phase 22**: Aggregated Role Dashboards
+- [x] **Phase 22**: Aggregated Role Dashboards (High-performance database-side SQL aggregations, student/recruiter/admin summary endpoints, strict role isolation, zero frontend overhead)
 - [ ] **Phase 23**: Unified Error Handling & Frontend States
 - [ ] **Phase 24**: End-to-End & Unit Testing
 - [ ] **Phase 25**: Security Hardening & Audit
@@ -1108,3 +1108,57 @@ Execute the 43-test suite covering providers, templates, background jobs, HTML e
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_email_notifications.py
 ```
+
+---
+
+## 25. Phase 22: Aggregated Role Dashboards
+
+CareerBridge provides production-grade, database-aggregated summary dashboards tailored for each platform role: **Student**, **Recruiter / Company**, and **Administrator**. Engineered to eliminate the need for loading, parsing, and aggregating raw tabular data in the browser or mobile application, all metrics are computed server-side in PostgreSQL using optimized conditional SQL aggregations.
+
+### Key Capabilities & Architectural Highlights
+- **Server-Side SQL Aggregation**:
+  - Leverages PostgreSQL's `COUNT()`, `SUM(CASE WHEN ... THEN 1 ELSE 0 END)`, and `COALESCE()` to compute multi-metric breakdowns in a single query pass.
+  - Zero heavy records or raw lists sent to the frontend; response payloads are tiny, constant-time JSON objects.
+- **Strict Role Boundaries & Ownership Isolation**:
+  - `GET /api/v1/dashboard/student`: Requires `UserRole.STUDENT`. Data is strictly restricted to records where `student_id == current_user.id`.
+  - `GET /api/v1/dashboard/recruiter`: Requires `UserRole.RECRUITER`. Postings, application reviews, and scheduled interviews are strictly restricted to opportunities owned by `JobPosting.recruiter_id == current_user.id`.
+  - `GET /api/v1/dashboard/admin`: Requires `UserRole.ADMIN`. Aggregates platform-wide ecosystem metrics, active listings, verified partner counts, and growth analytics.
+  - Cross-role requests return `403 Forbidden`. Unauthenticated requests return `401 Unauthorized`.
+  - **No Admin Bypass**: Administrators cannot spy on private student or recruiter dashboards via these endpoints, ensuring absolute privacy boundaries.
+- **Aggregated Metric Definitions**:
+  - **Student Dashboard (`StudentDashboardResponse`)**:
+    - `total_applications`: Count of all applications submitted by this student.
+    - `applications_under_review`: Applications currently in `reviewing` status.
+    - `shortlisted_applications`: Applications advanced to `shortlisted` status.
+    - `accepted_applications`: Applications that have been marked `accepted`.
+    - `saved_internships`: Number of bookmarked opportunities currently saved by this student.
+    - `upcoming_interviews`: Scheduled or rescheduled interviews where `scheduled_at >= NOW()` (excludes past, completed, and cancelled interviews).
+  - **Recruiter Dashboard (`RecruiterDashboardResponse`)**:
+    - `active_internships`: Number of currently published/active opportunities owned by this recruiter (`is_active = true`).
+    - `total_applications`: Total candidate applications received across all postings owned by this recruiter.
+    - `applications_awaiting_review`: Applications pending initial review (`status = 'applied'`).
+    - `shortlisted_candidates`: Candidates advanced to `shortlisted` status across recruiter's listings.
+    - `scheduled_interviews`: Scheduled or rescheduled interviews associated with the recruiter's listings.
+  - **Admin Dashboard (`AdminDashboardResponse`)**:
+    - `total_students`: Total user accounts with the student role.
+    - `total_companies`: Total user accounts with the recruiter role.
+    - `verified_companies`: Number of recruiter organizations verified by administrators.
+    - `published_internships`: Total active/published opportunities currently open across the platform.
+    - `total_applications`: Total application submissions across all platform postings.
+    - `application_success_rate`: Percentage of total applications that achieved acceptance (`(accepted / total) * 100`), safely handling zero total submissions without division errors.
+    - `monthly_registrations`: List of `{"month": "YYYY-MM", "count": N}` objects for the current calendar year (or filtered by optional `period_year` query parameter).
+
+### Dashboard Endpoints
+
+| Method | Endpoint | Allowed Role | Response Model | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/dashboard/student` | `student` | `StudentDashboardResponse` | Aggregated application, bookmark, and upcoming interview counts for authenticated student. |
+| `GET` | `/api/v1/dashboard/recruiter` | `recruiter` | `RecruiterDashboardResponse` | Active postings, incoming application breakdown, and scheduled interviews for recruiter's jobs. |
+| `GET` | `/api/v1/dashboard/admin` | `admin` | `AdminDashboardResponse` | Platform-wide KPIs, company verification counts, application success rate, and monthly registrations. |
+
+### Run Dashboard Test Suite
+Execute the 31-test suite covering security, RBAC enforcement, SQL aggregation accuracy, data isolation, empty states, and performance SLAs:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_dashboards.py
+```
+
