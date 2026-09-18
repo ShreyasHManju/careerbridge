@@ -67,9 +67,11 @@ careerbridge/
 - [x] **Phase 9**: Recruiter Profile & API (RecruiterProfile model, 1-to-1 relationship, Alembic migration, recruiter-only RBAC, ownership enforcement)
 - [x] **Phase 10**: Job & Internship Posting Foundation (JobPosting model, 1-to-many relationship, Alembic migration, recruiter management, candidate discovery, RBAC)
 - [x] **Phase 11**: Student Applications & Status Pipeline (Application model, DB unique constraint, student submission, recruiter review & status transitions, ownership isolation)
+- [x] **Phase 12**: Search, Filtering, and Pagination (Full-text search, multi-faceted filtering, controlled sorting, offset/limit pagination)
 - [x] **Phase 13**: Resume Upload & Student Document Foundation (Secure upload, PDF/DOC/DOCX validation, magic bytes, size bounds, safe replacement, download, deletion, student isolation)
-- [ ] **Phase 14**: Saved Internships
-- [ ] **Phase 15**: Skills & Matching
+- [x] **Phase 14**: Secure Student Profile Image Upload (JPEG/PNG/WebP validation, magic bytes, 2MB size limit, UUID filenames, atomic replacement, download, deletion, student isolation)
+- [ ] **Phase 15**: Saved Internships
+- [ ] **Phase 16**: Skills & Matching
 - [ ] **Phase 16**: Admin Dashboard & Moderation
 - [ ] **Phase 17**: Notifications
 - [ ] **Phase 18**: Email Notifications
@@ -676,6 +678,59 @@ Execute the 22-test suite covering valid formats, validation failures, security 
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_resume.py
 ```
+
+---
+
+## 17. Secure Student Profile Image Upload (Phase 14)
+
+Phase 14 introduces a secure, isolated profile image upload subsystem for students, storing physical images on the filesystem with randomized UUID filenames and persisting image metadata in PostgreSQL.
+
+### Core Architecture & Boundaries
+- **Storage Location**: Dedicated filesystem storage at `backend/uploads/profile_images/` (configurable via `UPLOAD_DIR` in `backend/app/core/config.py`).
+- **Database Metadata**: PostgreSQL `profile_images` table records document metadata (`id`, `student_id`, `original_filename`, `stored_filename`, `file_path`, `content_type`, `file_size`, `created_at`, `updated_at`).
+- **Strict Ownership**: Single active profile image per student enforced by a unique index on `student_id` (foreign key to `users.id` with `ON DELETE CASCADE`). All endpoints strictly derive `student_id = current_user.id` from the JWT Bearer token; client payloads cannot specify or spoof user IDs.
+- **Role Enforcement**: Only authenticated students (`UserRole.STUDENT`) can upload, view metadata for, download, or delete their profile image. Recruiters and admins receive `403 Forbidden`. Unauthenticated requests receive `401 Unauthorized`.
+
+### Image Validation Pipeline
+1. **Allowed Extensions**: Only `.jpg`, `.jpeg`, `.png`, and `.webp` are permitted. All other formats (GIF, SVG, BMP, TIFF, ICO, PDF, DOC/DOCX, ZIP, etc.) are rejected with `400 Bad Request`.
+2. **Dangerous Extensions Denylist**: Executable and script extensions (`.exe`, `.bat`, `.sh`, `.py`, `.js`, etc.) trigger a 400 security violation.
+3. **MIME Type Whitelist**: Validated against `image/jpeg`, `image/png`, and `image/webp`. Other MIME types return `415 Unsupported Media Type`.
+4. **Magic Byte Verification**: Real binary signatures are checked against initial bytes to prevent extension spoofing:
+   - **JPEG**: Starts with `FF D8 FF` (`\xff\xd8\xff`)
+   - **PNG**: Starts with `89 50 4E 47 0D 0A 1A 0A` (`\x89PNG\r\n\x1a\n`)
+   - **WebP**: RIFF container with WEBP signature (`RIFF....WEBP`)
+5. **File Size Limit**: Configurable via `MAX_PROFILE_IMAGE_SIZE_MB=2` (default 2MB). Images are streamed in 64KB chunks; exceeding streams are immediately unlinked from disk and rejected with 400.
+6. **Path Traversal Guard**: Filenames are sanitized, server-side UUID filenames are generated (`<uuid4>.<ext>`), and storage paths are verified with `dest_path.relative_to(base_dir)`.
+7. **Atomic Replacement**: On re-upload, the new image is streamed, validated, and committed to PostgreSQL before the old physical file is unlinked.
+
+### Endpoints
+
+| Method | Endpoint | Role | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/profile-image` | Student | Uploads or replaces profile image. Returns `201 Created` with `ProfileImageResponse`. Cleans up old physical image upon replacement. |
+| `GET` | `/api/v1/profile-image` | Student | Retrieves metadata for current student's profile image. Returns `200 OK` (or `404 Not Found`). Excludes internal filesystem paths. |
+| `GET` | `/api/v1/profile-image/download` | Student | Downloads physical profile image file as `FileResponse`. Returns `200 OK` (or `404 Not Found`). |
+| `DELETE` | `/api/v1/profile-image` | Student | Deletes profile image database record and unlinks physical file. Returns `204 No Content` (or `404 Not Found`). |
+
+### Response Schema (`ProfileImageResponse`)
+```json
+{
+  "id": 1,
+  "original_filename": "avatar.png",
+  "content_type": "image/png",
+  "file_size": 84210,
+  "created_at": "2026-09-18T10:00:00Z",
+  "updated_at": "2026-09-18T10:00:00Z"
+}
+```
+*Note: `file_path` and `stored_filename` are strictly hidden from public response schemas.*
+
+### Run Profile Image Test Suite
+Execute the 22-test suite covering valid formats, validation failures, security edge cases, replacement cleanup, download integrity, and RBAC boundaries:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_profile_image.py
+```
+
 
 
 

@@ -68,7 +68,9 @@ The system enforces three primary roles directly on the FastAPI backend:
 - **Phase 11**: `applications` (many-to-1 with `job_postings` and `users`, unique constraint on `(job_posting_id, student_id)`, status lifecycle pipeline: applied -> reviewing -> shortlisted -> rejected / accepted)
 - **Phase 12**: Database-side search, multi-faceted filtering, controlled sorting, and offset/limit pagination on `job_postings`
 - **Phase 13**: `resumes` (1-to-1 extension with `users`, unique constraint on `student_id`, document metadata persistence, physical file storage abstraction, secure MIME/magic-byte validation)
-- **Phase 14**: `saved_internships`, `skills`, `student_skills`
+- **Phase 14**: `profile_images` (1-to-1 extension with `users`, unique constraint on `student_id`, image metadata persistence, physical image storage abstraction, secure JPEG/PNG/WebP magic-byte validation, 2MB limit)
+- **Phase 15**: `saved_internships`
+- **Phase 16**: `skills`, `student_skills`
 - **Phase 17-20**: `notifications`, `interviews`, `conversations`, `messages`, `audit_logs`
 
 ---
@@ -79,20 +81,22 @@ CareerBridge separates identity and access into three explicit tiers:
 
 1. **Authentication ("Who are you?")**: Verified cryptographically via `get_current_user` reading the JWT Bearer token and verifying the active account in PostgreSQL.
 2. **Role Authorization ("What group do you belong to?")**: Enforced via `require_role(allowed_roles)`. Protects routes from unauthorized roles (e.g. students attempting recruiter creation/modification return `403 Forbidden`).
-3. **Resource Ownership ("Do you own this specific record?")**: Strictly derived from `current_user.id`. Endpoints never accept `user_id`, `recruiter_id`, or `student_id` from client payloads. Queries filter by `Model.user_id == current_user.id` (for profiles), `JobPosting.recruiter_id == current_user.id` (for postings), `Application.student_id == current_user.id` (for student application tracking), or `Resume.student_id == current_user.id` (for student resume management), preventing horizontal privilege escalation (IDOR) and ownership spoofing.
+3. **Resource Ownership ("Do you own this specific record?")**: Strictly derived from `current_user.id`. Endpoints never accept `user_id`, `recruiter_id`, or `student_id` from client payloads. Queries filter by `Model.user_id == current_user.id` (for profiles), `JobPosting.recruiter_id == current_user.id` (for postings), `Application.student_id == current_user.id` (for student application tracking), `Resume.student_id == current_user.id` (for student resume management), or `ProfileImage.student_id == current_user.id` (for student profile image management), preventing horizontal privilege escalation (IDOR) and ownership spoofing.
 
 ---
 
-## 6. Document & File Storage Architecture (Phase 13)
+## 6. Document & Image File Storage Architecture (Phases 13 & 14)
 
-CareerBridge utilizes a hybrid storage architecture for document management:
-- **Relational Metadata (PostgreSQL)**: The `resumes` table stores document provenance: `id`, `student_id`, `original_filename`, `stored_filename`, `file_path`, `content_type`, `file_size`, and timestamps.
-- **Physical Document Storage (Filesystem)**: Binary files are stored in `backend/uploads/resumes/` (or configured via `UPLOAD_DIR` in `backend/app/core/config.py`).
-- **UUID Filename Obfuscation**: Files are saved with non-guessable UUID names (e.g. `c9bf587f...docx`) to prevent predictable file enumeration, overwrites, and collision attacks.
-- **Path Traversal Protection**: All generated paths are verified via `dest_path.relative_to(base_dir)` to guarantee no upload or retrieval operations escape the uploads directory.
-- **Magic Byte Validation**: Rather than trusting user-provided file extensions or client headers, the file header is inspected against verified binary signatures (`%PDF` for PDF, `\xd0\xcf\x11\xe0` for DOC, `PK\x03\x04` for DOCX).
-- **Streamed Size Limiting**: Files are processed in 64KB chunks up to `MAX_RESUME_SIZE_MB` (5MB). Exceeding files are unlinked immediately without buffering into server RAM.
-- **Safe Atomic Replacement**: When a student uploads a new resume, the new file is saved and verified, the database metadata is updated within a transaction, and the old physical file is only unlinked after the transaction successfully commits.
+CareerBridge utilizes a hybrid storage architecture for user uploads and binary documents:
+- **Relational Metadata (PostgreSQL)**: The `resumes` and `profile_images` tables store document/image provenance: `id`, `student_id`, `original_filename`, `stored_filename`, `file_path`, `content_type`, `file_size`, and timestamps.
+- **Physical Document & Image Storage (Filesystem)**: Binary files are stored in dedicated subdirectories under `backend/uploads/` (`backend/uploads/resumes/` for resumes and `backend/uploads/profile_images/` for student photos, configurable via `UPLOAD_DIR` in `backend/app/core/config.py`).
+- **UUID Filename Obfuscation**: Files are saved with non-guessable UUID names (e.g. `c9bf587f...docx` or `e4a19b22...png`) to prevent predictable file enumeration, overwrites, and collision attacks.
+- **Path Traversal Protection**: All generated paths are verified via `dest_path.relative_to(base_dir)` to guarantee no upload or retrieval operations escape their respective storage directory.
+- **Magic Byte Validation**: Rather than trusting user-provided file extensions or client headers, file headers are inspected against verified binary signatures:
+  - Resumes: `%PDF` for PDF, `\xd0\xcf\x11\xe0` for DOC, `PK\x03\x04` for DOCX.
+  - Profile Images: `FF D8 FF` for JPEG, `89 50 4E 47 0D 0A 1A 0A` for PNG, `RIFF....WEBP` for WebP.
+- **Streamed Size Limiting**: Files are processed in 64KB chunks up to configured limits (`MAX_RESUME_SIZE_MB=5` for resumes, `MAX_PROFILE_IMAGE_SIZE_MB=2` for profile images). Exceeding files are unlinked immediately without buffering into server RAM.
+- **Safe Atomic Replacement**: When a student uploads a replacement document or image, the new file is saved and verified, the database metadata is updated within a transaction, and the old physical file is only unlinked after the transaction successfully commits.
 
 
 

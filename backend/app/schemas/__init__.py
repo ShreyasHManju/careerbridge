@@ -12,6 +12,7 @@ from app.schemas.job_posting import (
     JobSortBy,
     SortOrder,
 )
+from app.schemas.profile_image import ProfileImageResponse
 from app.schemas.recruiter_profile import (
     RecruiterProfileCreate,
     RecruiterProfileResponse,
@@ -48,6 +49,7 @@ __all__ = [
     "ApplicationUpdate",
     "ApplicationResponse",
     "ResumeResponse",
+    "ProfileImageResponse",
 ]
 
 

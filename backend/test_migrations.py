@@ -24,7 +24,7 @@ def test_migrations():
     assert "users" in Base.metadata.tables, "Table 'users' missing from Base.metadata"
     print("  -> Base.metadata contains 'users' table definition.")
 
-    print("[3/10] Verifying database schema after migration")
+    print("[3/11] Verifying database schema after migration")
     inspector = inspect(engine)
     tables = inspector.get_table_names()
     print(f"  -> Tables found in PostgreSQL: {tables}")
@@ -34,6 +34,7 @@ def test_migrations():
     assert "job_postings" in tables, "Table 'job_postings' not found in database!"
     assert "applications" in tables, "Table 'applications' not found in database!"
     assert "resumes" in tables, "Table 'resumes' not found in database!"
+    assert "profile_images" in tables, "Table 'profile_images' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
 
     print("[4/9] Verifying 'users' table columns and indexes")
@@ -201,7 +202,36 @@ def test_migrations():
         "Unique index on 'student_id' missing on resumes table!"
     )
 
-    print("[10/10] Verifying alembic_version table in PostgreSQL")
+    print("[10/11] Verifying 'profile_images' table columns, indexes, FKs, and constraints")
+    image_columns = {col["name"]: col for col in inspector.get_columns("profile_images")}
+    expected_image_cols = [
+        "id",
+        "student_id",
+        "original_filename",
+        "stored_filename",
+        "file_path",
+        "content_type",
+        "file_size",
+        "created_at",
+        "updated_at",
+    ]
+    for col_name in expected_image_cols:
+        assert col_name in image_columns, f"Column '{col_name}' missing from 'profile_images' table"
+        print(f"     - {col_name}: {image_columns[col_name]['type']} (nullable={image_columns[col_name]['nullable']})")
+
+    image_fks = inspector.get_foreign_keys("profile_images")
+    print(f"  -> Foreign keys on 'profile_images': {image_fks}")
+    referred_tables = {fk.get("referred_table") for fk in image_fks}
+    assert "users" in referred_tables, "Foreign key to 'users' table missing on profile_images!"
+
+    image_indexes = inspector.get_indexes("profile_images")
+    print(f"  -> Indexes on 'profile_images': {image_indexes}")
+    img_student_id_idx = [idx for idx in image_indexes if "student_id" in idx["column_names"]]
+    assert any(idx.get("unique") is True for idx in img_student_id_idx), (
+        "Unique index on 'student_id' missing on profile_images table!"
+    )
+
+    print("[11/11] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")

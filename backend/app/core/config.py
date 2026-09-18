@@ -44,11 +44,23 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("MAX_RESUME_SIZE_MB", "MAX_UPLOAD_SIZE_MB"),
         description="Maximum allowed resume file size in megabytes",
     )
+    MAX_PROFILE_IMAGE_SIZE_MB: int = Field(
+        default=2,
+        validation_alias=AliasChoices("MAX_PROFILE_IMAGE_SIZE_MB", "MAX_IMAGE_SIZE_MB"),
+        description="Maximum allowed profile image file size in megabytes",
+    )
 
     @property
     def resume_upload_dir(self) -> Path:
         base_dir = Path(__file__).resolve().parent.parent.parent
         upload_path = base_dir / self.UPLOAD_DIR / "resumes"
+        upload_path.mkdir(parents=True, exist_ok=True)
+        return upload_path
+
+    @property
+    def profile_image_upload_dir(self) -> Path:
+        base_dir = Path(__file__).resolve().parent.parent.parent
+        upload_path = base_dir / self.UPLOAD_DIR / "profile_images"
         upload_path.mkdir(parents=True, exist_ok=True)
         return upload_path
 
