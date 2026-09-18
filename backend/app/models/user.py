@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.models.profile_image import ProfileImage
     from app.models.recruiter_profile import RecruiterProfile
     from app.models.resume import Resume
+    from app.models.saved_job import SavedJob
     from app.models.student_profile import StudentProfile
 
 
@@ -96,6 +97,13 @@ class User(Base):
         "ProfileImage",
         back_populates="student",
         uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-many relationship with SavedJob (as student)
+    saved_jobs: Mapped[list["SavedJob"]] = relationship(
+        "SavedJob",
+        back_populates="student",
         cascade="all, delete-orphan",
     )
 

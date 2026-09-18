@@ -22,7 +22,8 @@ def test_migrations():
 
     print("[2/5] Verifying target metadata discovery")
     assert "users" in Base.metadata.tables, "Table 'users' missing from Base.metadata"
-    print("  -> Base.metadata contains 'users' table definition.")
+    assert "saved_jobs" in Base.metadata.tables, "Table 'saved_jobs' missing from Base.metadata"
+    print("  -> Base.metadata contains 'users' and 'saved_jobs' table definitions.")
 
     print("[3/11] Verifying database schema after migration")
     inspector = inspect(engine)
@@ -35,6 +36,7 @@ def test_migrations():
     assert "applications" in tables, "Table 'applications' not found in database!"
     assert "resumes" in tables, "Table 'resumes' not found in database!"
     assert "profile_images" in tables, "Table 'profile_images' not found in database!"
+    assert "saved_jobs" in tables, "Table 'saved_jobs' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
 
     print("[4/9] Verifying 'users' table columns and indexes")
@@ -231,7 +233,40 @@ def test_migrations():
         "Unique index on 'student_id' missing on profile_images table!"
     )
 
-    print("[11/11] Verifying alembic_version table in PostgreSQL")
+    print("[11/12] Verifying 'saved_jobs' table columns, indexes, FKs, and constraints")
+    saved_columns = {col["name"]: col for col in inspector.get_columns("saved_jobs")}
+    expected_saved_cols = [
+        "id",
+        "student_id",
+        "job_posting_id",
+        "created_at",
+    ]
+    for col_name in expected_saved_cols:
+        assert col_name in saved_columns, f"Column '{col_name}' missing from 'saved_jobs' table"
+        print(f"     - {col_name}: {saved_columns[col_name]['type']} (nullable={saved_columns[col_name]['nullable']})")
+
+    saved_fks = inspector.get_foreign_keys("saved_jobs")
+    print(f"  -> Foreign keys on 'saved_jobs': {saved_fks}")
+    saved_ref_tables = {fk.get("referred_table") for fk in saved_fks}
+    assert "users" in saved_ref_tables, "Foreign key to 'users' table missing on saved_jobs!"
+    assert "job_postings" in saved_ref_tables, "Foreign key to 'job_postings' table missing on saved_jobs!"
+
+    # Check unique constraint
+    unique_constraints = inspector.get_unique_constraints("saved_jobs")
+    print(f"  -> Unique constraints on 'saved_jobs': {unique_constraints}")
+    has_unique = any(
+        set(uc.get("column_names", [])) == {"student_id", "job_posting_id"}
+        for uc in unique_constraints
+    )
+    assert has_unique, "Unique constraint on ('student_id', 'job_posting_id') missing on saved_jobs table!"
+
+    saved_indexes = inspector.get_indexes("saved_jobs")
+    print(f"  -> Indexes on 'saved_jobs': {saved_indexes}")
+    saved_idx_cols = [idx["column_names"][0] for idx in saved_indexes if len(idx["column_names"]) == 1]
+    assert "student_id" in saved_idx_cols, "Index on 'student_id' missing on saved_jobs table!"
+    assert "job_posting_id" in saved_idx_cols, "Index on 'job_posting_id' missing on saved_jobs table!"
+
+    print("[12/12] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")

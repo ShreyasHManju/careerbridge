@@ -8,6 +8,7 @@ from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.application import Application
+    from app.models.saved_job import SavedJob
     from app.models.user import User
 
 
@@ -88,6 +89,13 @@ class JobPosting(Base):
     # One-to-many relationship with Application
     applications: Mapped[list["Application"]] = relationship(
         "Application",
+        back_populates="job_posting",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-many relationship with SavedJob
+    saved_jobs: Mapped[list["SavedJob"]] = relationship(
+        "SavedJob",
         back_populates="job_posting",
         cascade="all, delete-orphan",
     )

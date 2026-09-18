@@ -4,6 +4,7 @@ from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
 from app.models.profile_image import ProfileImage
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.resume import Resume
+from app.models.saved_job import SavedJob
 from app.models.student_profile import StudentProfile
 from app.models.user import User, UserRole
 
@@ -20,6 +21,7 @@ __all__ = [
     "ApplicationStatus",
     "Resume",
     "ProfileImage",
+    "SavedJob",
 ]
 
 

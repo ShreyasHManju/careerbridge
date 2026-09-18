@@ -70,7 +70,7 @@ careerbridge/
 - [x] **Phase 12**: Search, Filtering, and Pagination (Full-text search, multi-faceted filtering, controlled sorting, offset/limit pagination)
 - [x] **Phase 13**: Resume Upload & Student Document Foundation (Secure upload, PDF/DOC/DOCX validation, magic bytes, size bounds, safe replacement, download, deletion, student isolation)
 - [x] **Phase 14**: Secure Student Profile Image Upload (JPEG/PNG/WebP validation, magic bytes, 2MB size limit, UUID filenames, atomic replacement, download, deletion, student isolation)
-- [ ] **Phase 15**: Saved Internships
+- [x] **Phase 15**: Saved Jobs & Internships (SavedJob entity, DB unique constraint on student_id + job_posting_id, save/unsave/status/list endpoints, joined queries, cascade deletion, student-only RBAC)
 - [ ] **Phase 16**: Skills & Matching
 - [ ] **Phase 16**: Admin Dashboard & Moderation
 - [ ] **Phase 17**: Notifications
@@ -730,6 +730,87 @@ Execute the 22-test suite covering valid formats, validation failures, security 
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_profile_image.py
 ```
+
+---
+
+## 18. Phase 15: Saved Jobs / Saved Internships Subsystem
+
+The Saved Jobs subsystem allows authenticated students to bookmark active job and internship postings, check whether an individual opportunity is saved, list their saved opportunities ordered newest-first, and remove bookmarks.
+
+### Architectural & Security Highlights
+- **Entity**: `SavedJob` mapped to PostgreSQL table `saved_jobs`.
+- **Database Integrity**:
+  - Unique constraint `uq_saved_job_student_job` on `(student_id, job_posting_id)` prevents duplicate bookmarks at the engine level.
+  - Foreign keys to `users.id` and `job_postings.id` configured with `ondelete="CASCADE"` ensure clean cascading deletions without orphaned bookmark records.
+  - Independent database indexes on `student_id` and `job_posting_id` optimize retrieval performance.
+- **Strict Ownership**:
+  - `student_id` is derived strictly from `current_user.id` extracted from the verified JWT Bearer token.
+  - Any client-supplied `student_id` in query parameters or request bodies is discarded.
+- **Role Enforcement**:
+  - Restricted strictly to students (`UserRole.STUDENT`).
+  - Recruiters and Admins are rejected with `403 Forbidden`.
+  - Unauthenticated requests receive `401 Unauthorized`.
+  - Inactive user accounts receive `401 Unauthorized`.
+- **Business Logic & Validation**:
+  - Only active job postings (`is_active=True`) can be saved. Attempting to save an inactive job returns `400 Bad Request`.
+  - Saving a nonexistent job returns `404 Not Found`.
+  - Attempting to save an already bookmarked job returns `409 Conflict`.
+  - Checking save status of a nonexistent job returns `404 Not Found`.
+  - Removing a bookmark that does not exist returns `404 Not Found`.
+  - If a saved job is subsequently deactivated by its recruiter, it is retained in the student's saved jobs list with `is_active: false`.
+- **N+1 Avoidance**: Listing saved jobs utilizes SQLAlchemy `joinedload(SavedJob.job_posting)` to fetch all required opportunity details in a single query.
+
+### Endpoints
+
+| Method | Endpoint | Role | Status | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/jobs/{job_id}/save` | Student | `201 Created` | Saves/bookmarks active job. Returns `SavedJobStatusResponse`. Rejects duplicates with `409`, inactive jobs with `400`. |
+| `GET` | `/api/v1/jobs/{job_id}/saved` | Student | `200 OK` | Checks if job is saved by current student. Returns `SavedJobStatusResponse`. Returns `404` if job missing. |
+| `DELETE` | `/api/v1/jobs/{job_id}/save` | Student | `204 No Content` | Removes saved job bookmark. Returns `404` if bookmark not found. |
+| `GET` | `/api/v1/saved-jobs` | Student | `200 OK` | Lists all saved jobs for current student, ordered newest saved first. Returns `List[SavedJobResponse]`. |
+
+### Response Schemas
+
+#### `SavedJobStatusResponse`
+```json
+{
+  "job_id": 10,
+  "is_saved": true,
+  "saved_at": "2026-09-18T12:00:00Z"
+}
+```
+
+#### `SavedJobResponse`
+```json
+{
+  "id": 10,
+  "saved_id": 1,
+  "title": "Backend Engineering Intern",
+  "description": "FastAPI, PostgreSQL, and distributed architecture development.",
+  "opportunity_type": "internship",
+  "company_name": "TechFlow Systems",
+  "location": "Bengaluru, India",
+  "is_remote": false,
+  "employment_type": "full_time",
+  "skills": "Python, FastAPI, SQL",
+  "minimum_qualification": "B.Tech / B.E.",
+  "experience_required": "Fresher",
+  "salary_min": 30000,
+  "salary_max": 45000,
+  "application_deadline": "2026-10-15T00:00:00Z",
+  "is_active": true,
+  "created_at": "2026-09-15T10:00:00Z",
+  "updated_at": "2026-09-15T10:00:00Z",
+  "saved_at": "2026-09-18T12:00:00Z"
+}
+```
+
+### Run Saved Jobs Test Suite
+Execute the 20-test suite covering active/inactive validation, duplicate prevention, status checks, listing ordering, ownership isolation, unsave logic, RBAC, spoofing protection, and cascade deletion:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_saved_jobs.py
+```
+
 
 
 

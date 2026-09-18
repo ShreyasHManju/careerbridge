@@ -19,6 +19,7 @@ from app.schemas.recruiter_profile import (
     RecruiterProfileUpdate,
 )
 from app.schemas.resume import ResumeResponse
+from app.schemas.saved_job import SavedJobResponse, SavedJobStatusResponse
 from app.schemas.student_profile import (
     StudentProfileCreate,
     StudentProfileResponse,
@@ -50,6 +51,8 @@ __all__ = [
     "ApplicationResponse",
     "ResumeResponse",
     "ProfileImageResponse",
+    "SavedJobResponse",
+    "SavedJobStatusResponse",
 ]
 
 
