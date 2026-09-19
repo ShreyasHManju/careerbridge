@@ -66,6 +66,9 @@ def _derive_error_code(status_code: int, message: str) -> str:
     elif status_code == 422:
         return ErrorCode.VALIDATION_ERROR.value
 
+    elif status_code == 429:
+        return ErrorCode.RATE_LIMIT_EXCEEDED.value
+
     elif status_code >= 500:
         return ErrorCode.INTERNAL_SERVER_ERROR.value
 

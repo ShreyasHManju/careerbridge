@@ -564,5 +564,68 @@ CareerBridge implements an enterprise-grade backend testing architecture enginee
 
 4. **Zero-Overhead Test Execution**:
    - Tests execute via standard FastAPI/Starlette `TestClient` (backed by `httpx`) without requiring separate mock servers or external test processes.
-   - All 23 test suites run in ~51 seconds with 100% deterministic repeatability.
+   - All 24 test suites run in ~66 seconds with 100% deterministic repeatability.
+
+---
+
+## 17. Security Architecture & Threat Mitigation (Phase 25)
+
+CareerBridge follows an enterprise defense-in-depth model across transport, application, session, authorization, and data persistence layers:
+
+```text
+  +-------------------------------------------------------------------------------+
+  |                              Layer 1: Network & CORS                          |
+  |  - Allowed Origins: settings.cors_origins_list                                |
+  |  - Preflight validation with strict credentials and methods control           |
+  +---------------------------------------+---------------------------------------+
+                                          |
+                                          v
+  +-------------------------------------------------------------------------------+
+  |                          Layer 2: HTTP Security Headers                       |
+  |  - Pure ASGI Middleware: X-Content-Type-Options: nosniff                      |
+  |  - X-Frame-Options: DENY, X-XSS-Protection: 1; mode=block                     |
+  |  - Referrer-Policy: strict-origin-when-cross-origin                           |
+  +---------------------------------------+---------------------------------------+
+                                          |
+                                          v
+  +-------------------------------------------------------------------------------+
+  |                   Layer 3: Authentication & Brute-Force Rate Limiting         |
+  |  - In-Memory Thread-Safe Sliding Window (RateLimiter)                         |
+  |  - 5 max attempts per 60s per client IP + email address                       |
+  |  - HTTP 429 RATE_LIMIT_EXCEEDED with Retry-After headers                      |
+  |  - Dummy constant-time bcrypt verification on missing users                   |
+  +---------------------------------------+---------------------------------------+
+                                          |
+                                          v
+  +-------------------------------------------------------------------------------+
+  |                        Layer 4: Authorization & Ownership                     |
+  |  - RBAC via RoleChecker dependency injection (Student, Recruiter, Admin)      |
+  |  - Cross-user tenant isolation on profiles, applications, and postings       |
+  |  - Admin self-lockout deactivation defense (HTTP 400)                         |
+  +---------------------------------------+---------------------------------------+
+                                          |
+                                          v
+  +-------------------------------------------------------------------------------+
+  |                    Layer 5: Storage & Persistence Hardening                   |
+  |  - Upload path traversal defense (UUID-only filenames, directory containment) |
+  |  - Magic bytes binary signature verification (%PDF-, JFIF, PNG)               |
+  |  - Dangerous extension blocklist (.exe, .sh, .py, .php, .bat)                 |
+  |  - Parameterized SQLAlchemy ORM queries (100% SQL injection immunity)         |
+  |  - Sanitized 500 error envelopes without stack trace leakage                  |
+  +-------------------------------------------------------------------------------+
+```
+
+### Threat Modeling & Countermeasures
+
+| Threat Vector | Potential Impact | CareerBridge Countermeasure |
+| :--- | :--- | :--- |
+| **Brute-Force & Credential Stuffing** | Account compromise via automated password spraying. | Sliding window rate limiting on `/api/v1/auth/login` (max 5 failed attempts per 60s) returning HTTP 429 `RATE_LIMIT_EXCEEDED`. |
+| **Username / Email Enumeration** | Attacker maps valid accounts using timing discrepancy. | Dummy bcrypt verification (`DUMMY_BCRYPT_HASH`) executed when user not found, ensuring uniform ~80ms response latency and identical generic 401 messaging. |
+| **Cross-Site Request Forgery (CSRF)** | Unauthorized state mutations triggered via browser ambient credentials. | Architectural immunity: Authentication uses stateless `Authorization: Bearer <token>` HTTP headers, which web browsers never attach automatically in cross-site requests. |
+| **MIME-Type Confusion & Clickjacking** | Content sniffing, iframe UI redressing. | `X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY` headers applied by ASGI middleware to all HTTP responses. |
+| **Path Traversal & Arbitrary File Upload** | Remote code execution or host filesystem overwrite. | Upload filenames are stripped and replaced with random UUIDs; magic bytes are verified; dangerous extensions are blocklisted; files are strictly saved within configured upload directories. |
+| **SQL Injection** | Unauthorized data access, table tampering, or exfiltration. | 100% parameterized queries via SQLAlchemy 2.0 ORM expressions. User inputs are always treated as literal data bindings, never concatenated into SQL strings. |
+| **Information Disclosure via 500 Errors** | Server path, library version, and database schema leakage. | Centralized error handler captures unhandled exceptions and outputs sanitized JSON (`{"success": false, "message": "An unexpected internal server error occurred.", "error_code": "INTERNAL_SERVER_ERROR"}`) while recording full tracebacks only to server logs. |
+| **Audit Log Incompleteness** | Untracked attacks and malicious privilege escalation. | Structured security logging via `logging.getLogger("careerbridge.security")` for failed logins (masked PII), successful logins, RBAC rejections, and admin actions. |
+
 

@@ -1,6 +1,6 @@
 from pathlib import Path
-from typing import Optional
-from pydantic import AliasChoices, Field, computed_field
+from typing import List, Optional, Union
+from pydantic import AliasChoices, Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +16,35 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     API_V1_STR: str = "/api/v1"
+
+    # CORS Configuration
+    BACKEND_CORS_ORIGINS: Union[List[str], str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            if not v.strip():
+                return []
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [i.strip() for i in v.split(",") if i.strip()]
+        elif isinstance(v, (list, tuple)):
+            return [str(i) for i in v]
+        return []
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        if isinstance(self.BACKEND_CORS_ORIGINS, list):
+            return self.BACKEND_CORS_ORIGINS
+        return [str(self.BACKEND_CORS_ORIGINS)]
 
     # Database Configuration (PostgreSQL 16)
     POSTGRES_USER: str
@@ -74,6 +103,11 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
     SMTP_USE_TLS: bool = True
     FRONTEND_URL: str = "http://localhost:5173"
+
+    # Rate Limiting Configuration
+    RATE_LIMIT_LOGIN_ENABLED: bool = True
+    RATE_LIMIT_LOGIN_MAX_ATTEMPTS: int = 5
+    RATE_LIMIT_LOGIN_WINDOW_SECONDS: int = 60
 
     # Optional explicit DATABASE_URL
     DATABASE_URL: Optional[str] = None

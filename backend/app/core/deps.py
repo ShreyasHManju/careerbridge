@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, Set
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -8,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.user import User, UserRole
+
+security_logger = logging.getLogger("careerbridge.security")
 
 # Standard HTTP Bearer scheme for OpenAPI/Swagger documentation
 security_bearer = HTTPBearer(
@@ -101,6 +104,13 @@ class RoleChecker:
 
     def __call__(self, current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in self.allowed_roles:
+            allowed_role_names = [r.value for r in self.allowed_roles]
+            security_logger.warning(
+                "RBAC Access Denied: User ID %s with role '%s' attempted to access endpoint requiring %s",
+                current_user.id,
+                current_user.role.value,
+                allowed_role_names,
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not enough permissions",

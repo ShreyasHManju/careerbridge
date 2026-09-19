@@ -19,6 +19,7 @@ class ErrorCode(str, Enum):
     FILE_TOO_LARGE = "FILE_TOO_LARGE"
     INVALID_FILE_TYPE = "INVALID_FILE_TYPE"
     RESOURCE_OWNERSHIP_ERROR = "RESOURCE_OWNERSHIP_ERROR"
+    RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
     INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR"
     BAD_REQUEST = "BAD_REQUEST"
 
@@ -290,3 +291,27 @@ class InternalServerException(AppException):
             detail=detail,
             headers=headers,
         )
+
+
+class RateLimitExceededException(AppException):
+    """Client has sent too many requests in a given amount of time."""
+    def __init__(
+        self,
+        message: str = "Too many requests. Please try again later.",
+        detail: Optional[Any] = None,
+        retry_after: Optional[int] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ):
+        rate_headers = {}
+        if retry_after is not None:
+            rate_headers["Retry-After"] = str(retry_after)
+        if headers:
+            rate_headers.update(headers)
+        super().__init__(
+            status_code=429,
+            message=message,
+            error_code=ErrorCode.RATE_LIMIT_EXCEEDED.value,
+            detail=detail if detail is not None else message,
+            headers=rate_headers if rate_headers else None,
+        )
+

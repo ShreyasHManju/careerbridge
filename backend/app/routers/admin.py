@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
@@ -22,6 +23,7 @@ from app.schemas.job_posting import JobPostingPaginationResponse, JobPostingResp
 from app.schemas.user import UserResponse
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+security_logger = logging.getLogger("careerbridge.security")
 
 
 # --------------------------------------------------------------------------
@@ -126,6 +128,13 @@ def update_user_status(
     user.is_active = payload.is_active
     db.commit()
     db.refresh(user)
+
+    security_logger.info(
+        "Admin audit: Admin ID %s updated User ID %s active status to %s",
+        current_user.id,
+        user.id,
+        payload.is_active,
+    )
     return user
 
 
@@ -264,6 +273,13 @@ def update_recruiter_verification(
     db.commit()
     db.refresh(profile)
 
+    security_logger.info(
+        "Admin audit: Admin ID %s updated Recruiter User ID %s verification status to %s",
+        current_user.id,
+        user_id,
+        payload.is_verified,
+    )
+
     return AdminRecruiterResponse(
         id=profile.id,
         user_id=profile.user_id,
@@ -375,4 +391,12 @@ def update_job_status(
 
     db.commit()
     db.refresh(job)
+
+    security_logger.info(
+        "Admin audit: Admin ID %s updated Job ID %s active status to %s",
+        current_user.id,
+        job_id,
+        payload.is_active,
+    )
+
     return job

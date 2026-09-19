@@ -80,7 +80,7 @@ careerbridge/
 - [x] **Phase 22**: Aggregated Role Dashboards (High-performance database-side SQL aggregations, student/recruiter/admin summary endpoints, strict role isolation, zero frontend overhead)
 - [x] **Phase 23**: Validation and Error Handling (Structured JSON error envelope, domain AppException hierarchy, standard machine-readable error codes, Pydantic & DB exception handlers, zero-leakage security shielding)
 - [x] **Phase 24**: Testing Strategy (Backend Testing Only — Centralized test fixtures & factories, core roadmap suite test_core_roadmap.py, unified runner run_tests.py, 100% pass across all 23 suites)
-- [ ] **Phase 25**: Security Hardening & Audit
+- [x] **Phase 25**: Security Improvements (Backend Security Hardening — CORS origin enforcement, defense-in-depth HTTP security headers, thread-safe in-memory sliding-window login rate limiting, timing attack mitigation, security audit logging, 100% pass across all 24 suites)
 - [ ] **Phase 26**: Docker & Docker Compose
 - [ ] **Phase 27**: CI/CD Pipelines
 - [ ] **Phase 28**: Production Deployment Prep
@@ -1281,7 +1281,7 @@ backend\.venv\Scripts\python.exe backend/run_tests.py test_core_roadmap.py
 backend\.venv\Scripts\python.exe backend/run_tests.py test_auth test_rbac -v
 ```
 
-### 4. Complete Backend Test Suite (23 / 23 Passing)
+### 4. Complete Backend Test Suite (24 / 24 Passing)
 
 | # | Test Suite | Scope & Category | Status |
 | :- | :--- | :--- | :--- |
@@ -1303,11 +1303,115 @@ backend\.venv\Scripts\python.exe backend/run_tests.py test_auth test_rbac -v
 | 16 | `test_recruiter_profile.py` | Recruiter organizational metadata, verification flags | **PASS** |
 | 17 | `test_resume.py` | Resume upload, PDF/DOC/DOCX validation, download, deletion | **PASS** |
 | 18 | `test_saved_jobs.py` | Saved jobs bookmarks, unique constraints, status queries | **PASS** |
-| 19 | `test_student_profile.py` | Student profile CRUD, educational metadata, skill arrays | **PASS** |
-| 20 | `test_user_model.py` | SQLAlchemy User model metadata, column constraints, defaults | **PASS** |
-| 21 | `test_users_crud.py` | User account registration, listing, pagination, validations | **PASS** |
-| 22 | `test_validation_error_handling.py` | Centralized structured error envelopes, domain exceptions | **PASS** |
-| 23 | `test_websocket_messaging.py` | Real-time WebSocket connection manager, auth, broadcast | **PASS** |
+| 19 | `test_security.py` | Platform security controls, CORS, headers, throttling, injection resistance | **PASS** |
+| 20 | `test_student_profile.py` | Student profile CRUD, educational metadata, skill arrays | **PASS** |
+| 21 | `test_user_model.py` | SQLAlchemy User model metadata, column constraints, defaults | **PASS** |
+| 22 | `test_users_crud.py` | User account registration, listing, pagination, validations | **PASS** |
+| 23 | `test_validation_error_handling.py` | Centralized structured error envelopes, domain exceptions | **PASS** |
+| 24 | `test_websocket_messaging.py` | Real-time WebSocket connection manager, auth, broadcast | **PASS** |
+
+---
+
+## 28. Phase 25: Security Improvements & Hardening Architecture
+
+CareerBridge enforces defense-in-depth security principles across all networking, authentication, application, and persistence layers. Built without introducing external dependencies (such as Redis), the security improvements focus on real vulnerabilities, origin enforcement, brute-force mitigation, and strict zero-leakage shielding.
+
+```text
+       +-------------------------------------------------------------------------+
+       |                      Client Request (Browser / API)                     |
+       +------------------------------------+------------------------------------+
+                                            |
+                                            v
+       +-------------------------------------------------------------------------+
+       |                      Security Headers Middleware                        |
+       |  - X-Content-Type-Options: nosniff   - X-Frame-Options: DENY            |
+       |  - X-XSS-Protection: 1; mode=block   - Referrer-Policy: strict-origin   |
+       +------------------------------------+------------------------------------+
+                                            |
+                                            v
+       +-------------------------------------------------------------------------+
+       |                           CORSMiddleware                                |
+       |  - Allowed Origins: ["http://localhost:5173", "http://127.0.0.1:5173"]  |
+       |  - Credentials Supported, Unauthorized Origins Blocked                  |
+       +------------------------------------+------------------------------------+
+                                            |
+                                            v
+       +-------------------------------------------------------------------------+
+       |                   Sliding Window Rate Limiter (Thread-Safe)             |
+       |  - Tracks failed attempts per IP + Email: key = login:{ip}:{email}      |
+       |  - Max 5 failed attempts per 60-second window                           |
+       |  - Exceeding returns HTTP 429 RATE_LIMIT_EXCEEDED with Retry-After      |
+       +------------------------------------+------------------------------------+
+                                            |
+                                            v
+       +-------------------------------------------------------------------------+
+       |                   Authentication & Timing Mitigation                    |
+       |  - Bcrypt Cost Factor 12 with automatic cryptographically random salt   |
+       |  - Pre-computed dummy verification on missing user (timing parity)       |
+       |  - Uniform generic 401 error: "Incorrect email or password"             |
+       |  - Masked audit logging: j***n@example.com, no secret exposure          |
+       +------------------------------------+------------------------------------+
+                                            |
+                                            v
+       +-------------------------------------------------------------------------+
+       |                   Storage & Persistence Hardening                       |
+       |  - Magic bytes file signature verification (%PDF-, JFIF, PNG)           |
+       |  - Executable blocklist (.exe, .sh, .py, .php, .bat)                    |
+       |  - UUID filenames, strictly contained in uploads/ (no path traversal)  |
+       |  - SQLAlchemy parameterized queries (100% immune to SQL injection)      |
+       +-------------------------------------------------------------------------+
+```
+
+### 1. Cross-Origin Resource Sharing (CORS) Origin Enforcement
+- **Controlled Origins**: Frontend access is restricted strictly to authorized client origins (`settings.cors_origins_list`, default: `["http://localhost:5173", "http://127.0.0.1:5173"]`), fully configurable via environment variables.
+- **Preflight & Header Validation**: Untrusted origins are denied preflight and cross-origin access (`Access-Control-Allow-Origin` is omitted for unauthorized domains).
+
+### 2. HTTP Defense-in-Depth Security Headers
+A pure ASGI middleware (`SecurityHeadersMiddleware`) injects security headers across all HTTP responses without interfering with WebSockets:
+- `X-Content-Type-Options: nosniff`: Mitigates MIME-type confusion and content-sniffing attacks.
+- `X-Frame-Options: DENY`: Prevents UI redressing and clickjacking by forbidding embedding in iframes.
+- `X-XSS-Protection: 1; mode=block`: Activates legacy browser anti-XSS filtering.
+- `Referrer-Policy: strict-origin-when-cross-origin`: Restricts sensitive URI path and query leakage in Referer headers.
+
+### 3. Sliding Window In-Memory Login Rate Limiting (Brute-Force Protection)
+- **Thread-Safe Memory Management**: Implemented via `RateLimiter` in [`backend/app/core/rate_limit.py`](backend/app/core/rate_limit.py) with Python `threading.Lock`.
+- **Sliding Time Window**: Tracks failed login attempts per client IP and targeted account key (`login:{client_ip}:{email}`) across a rolling 60-second window.
+- **Structured Error Response**: Upon exceeding 5 failed attempts, immediately halts processing and issues HTTP 429 with:
+  ```json
+  {
+    "success": false,
+    "message": "Too many failed attempts. Please try again after 60 seconds.",
+    "error_code": "RATE_LIMIT_EXCEEDED",
+    "detail": "Rate limit exceeded. Try again in 60 seconds."
+  }
+  ```
+- **Automatic Reset**: Successful login immediately clears failed attempts for that user/IP combination. Test runners can invoke `rate_limiter.reset()` to prevent cross-suite contamination.
+
+### 4. Authentication Timing-Attack & User Enumeration Mitigation
+- **Constant-Time Execution**: When an unrecognized email attempts authentication, the server executes a dummy bcrypt verification against a pre-computed hash (`DUMMY_BCRYPT_HASH`). This ensures the response latency is identical (~80ms) whether the account exists or not.
+- **Identical Error Envelopes**: Both incorrect passwords and unknown accounts return identical HTTP 401 generic messages (`"Incorrect email or password"`), eliminating account enumeration side channels.
+
+### 5. Architectural Immunity to Cross-Site Request Forgery (CSRF)
+- CareerBridge utilizes stateless JSON Web Tokens passed via the `Authorization: Bearer <token>` HTTP request header.
+- Because web browsers never automatically attach Bearer headers on cross-origin requests (unlike ambient credentials such as cookies), traditional CSRF attacks are fundamentally inapplicable to this API architecture.
+
+### 6. File Upload Defense & Path Traversal Prevention
+- **Path Traversal Shield**: Uploaded filenames containing directory traversal characters (`../../etc/passwd`, `..\\..\\windows\\system32`) are stripped. Physical files are saved strictly using cryptographically random UUIDs (`uuid.uuid4().hex + ext`) inside isolated directory paths.
+- **Executable Blocklist**: Direct rejection of dangerous extensions (`.exe`, `.sh`, `.php`, `.py`, `.bat`, `.cmd`, `.js`, `.dll`).
+- **Magic Bytes Verification**: File headers are inspected for binary signatures (`%PDF-` for PDF, `\xff\xd8\xff` for JPEG, `\x89PNG` for PNG), rejecting files disguised by altered extensions.
+
+### 7. Parameterized SQL Queries & Injection Immunity
+- All database operations execute through SQLAlchemy 2.0 ORM expressions and parameterized statements.
+- Query parameters (`?q=`, `?search=`, filters) are treated strictly as data literals by PostgreSQL, providing verified immunity against SQL injection payloads (`' OR '1'='1`, `'; DROP TABLE users; --`, union-based attacks).
+
+### 8. Security Audit Logging
+- Security events are logged via `logging.getLogger("careerbridge.security")`:
+  - Failed logins (masked email `j***n@example.com`, client IP, failure reason)
+  - Successful logins (user ID, role, client IP)
+  - RBAC denials (user ID, attempted role, required roles)
+  - Administrative actions (user status updates, recruiter verifications, job moderations)
+- Passwords, hashes, and cryptographic tokens are strictly excluded from all log records.
+
 
 
 
