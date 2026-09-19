@@ -84,6 +84,7 @@ The `error_code` field contains one of the following enumerated constants:
 | **422 Unprocessable** | Pydantic schema validation failure. | Map `detail` array directly to inline form field errors. |
 | **429 Too Many Req** | Login brute-force rate limit active. | Disable login button for duration specified in `Retry-After`. |
 | **500 Server Error** | Unexpected backend failure. | Display friendly fallback toast ("Server error, please try again later"). |
+| **503 Service Unavailable** | Database or upstream service connectivity failure (e.g. `GET /health`). | Display service degradation warning or maintenance banner. |
 
 #### Pydantic 422 Detail Format
 When status is `422 Unprocessable Entity`, the `detail` property contains an array of field errors:
@@ -96,7 +97,7 @@ When status is `422 Unprocessable Entity`, the `detail` property contains an arr
     {
       "type": "string_too_short",
       "loc": ["body", "password"],
-      "msg": "String should have at least 8 characters",
+      "msg": "String should have at least 6 characters",
       "input": "short"
     }
   ]
@@ -133,20 +134,51 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
        │                                      │                                     │
 ```
 
-### 3.1 Session Specifications
-1. **Access Token Lifetime:** 30 minutes (`settings.ACCESS_TOKEN_EXPIRE_MINUTES = 30`).
-2. **Cryptographic Algorithm:** HMAC-SHA256 (`HS256`).
-3. **Subject Claim:** Token payload contains `sub: str(user_id)`.
-4. **Current Refresh Token Implementation Note:** The current backend **does not** implement a `/refresh` token endpoint. Session extension requires user re-login once the access token expires. The frontend client must treat `401 Unauthorized` (`error_code: TOKEN_EXPIRED`) as a prompt to transition to the login view.
-5. **Logout:** Because tokens are stateless JWTs, logout is purely a client-side operation: the frontend purges the stored access token and resets user state in client cache/store.
+### 3.1 Session Specifications & Authentication Architecture
 
-### 3.2 User Roles & Access Control Matrix
+> [!IMPORTANT]
+> **CURRENT BACKEND AUTHENTICATION: ACCESS-TOKEN-ONLY JWT AUTHENTICATION**
+>
+> The CareerBridge backend currently operates an access-token-only security model:
+> - **No refresh-token endpoint:** There is no `POST /auth/refresh` endpoint in the backend.
+> - **No refresh-token generation:** The server does not issue refresh tokens or store refresh tokens in the database.
+> - **No refresh-token validation:** No refresh token handling exists in the codebase.
+> - **No server-side logout endpoint:** There is no `POST /auth/logout` route; tokens are completely stateless.
+>
+> **Access Token Specification:**
+> - Format: JSON Web Token (JWT)
+> - Cryptographic Algorithm: HMAC-SHA256 (`HS256`)
+> - Subject Claim: `sub` contains `str(user_id)`
+> - Token Lifespan: Exactly 30 minutes (`settings.ACCESS_TOKEN_EXPIRE_MINUTES = 30`)
+> - Transmission: HTTP Request Header `Authorization: Bearer <access_token>`
+>
+> **Expired or Invalid Token Handling:**
+> - Status Code: `HTTP 401 Unauthorized`
+> - Error Code: `TOKEN_EXPIRED` (for expired tokens) or `INVALID_TOKEN` (for corrupted/tampered tokens)
+> - Detail Message: `"Authentication token has expired"`
+>
+> **Required Frontend Client Behavior:**
+> When receiving a `401 Unauthorized` response with `error_code: TOKEN_EXPIRED`:
+> 1. **Preserve Unsaved State:** Serialize and store in-progress form data where practical (e.g. in `sessionStorage`) so user input is not lost.
+> 2. **Clear Auth State:** Completely purge the expired JWT from client memory and persistent storage (`localStorage` / `sessionStorage`).
+> 3. **Redirect to Login:** Immediately navigate the user to `/login` with an optional `redirect` return path parameter.
+> 4. **Require Fresh Login:** Prompt the user to re-enter credentials to acquire a new 30-minute access token.
+>
+> *Frontend developers must NOT design or attempt to call a refresh-token interceptor or loop because the backend does not support refresh tokens.*
 
-| Role | Intended User Persona | Allowed Areas |
+### 3.2 User Roles, Verification & Access Control Matrix
+
+| Role | Intended User Persona | Allowed Areas & Constraints |
 | :--- | :--- | :--- |
-| `student` | Internship candidates & students | Student profile, resumes, profile photos, job search, job applications, saved jobs, student interviews, student dashboard, direct messaging. |
-| `recruiter` | Employer representatives | Recruiter profile, company info, job creation & management, candidate review, applicant status updating, interview scheduling, recruiter dashboard, direct messaging. |
-| `admin` | Institutional platform moderators | User status moderation, recruiter verification, job moderation, admin dashboard, all user inspection. *(Note: Admins cannot eavesdrop on private student-recruiter conversations).* |
+| `student` | Internship candidates & students | Student profile, resume uploads, profile photos, job discovery, job applications, saved jobs, student interviews, student dashboard, direct messaging. |
+| `recruiter` | Employer representatives | Recruiter profile, company info, job creation & management, candidate review, applicant status updates, interview scheduling, recruiter dashboard, direct messaging. |
+| `admin` | Institutional platform moderators | User status moderation, recruiter verification, job moderation, admin dashboard, platform user inspection. *(Note: Admins cannot eavesdrop on private student-recruiter conversations).* |
+
+#### Recruiter Administrative Verification
+- **Verification Flag:** Recruiter accounts include a boolean field `is_verified` (defaults to `false` upon registration).
+- **Administrative Endpoint:** Moderated exclusively by platform administrators via `PATCH /api/v1/admin/recruiters/{user_id}/verification`.
+- **Backend Posting Behavior:** According to the current backend implementation, an unverified recruiter (`is_verified == false`) **can still create and publish job postings**. The `is_verified` flag functions as a platform trust badge displayed to candidates.
+- **Frontend Guidance:** The frontend should display a "Verified Company" badge or "Pending Verification" label in recruiter profiles and job details, but must **not** artificially block unverified recruiters from posting opportunities unless their account is deactivated by an administrator (`is_active == false`).
 
 ---
 
@@ -188,6 +220,7 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
     "email": "student@example.com",
     "role": "student",
     "is_active": true,
+    "is_verified": false,
     "created_at": "2026-09-19T10:00:00Z",
     "updated_at": "2026-09-19T10:00:00Z"
   }
@@ -213,14 +246,28 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 - **Success Response (201 Created):** Returns `UserResponse` (excluding password).
 - **Error Responses:**
   - `409 Conflict` (`RESOURCE_CONFLICT`): "A user with email '...' already exists."
-  - `422 Unprocessable Entity` (`VALIDATION_ERROR`): Password < 8 characters, invalid email, or invalid role.
+  - `422 Unprocessable Entity` (`VALIDATION_ERROR`): Password < 6 characters (backend schema enforces `min_length=6`), invalid email, or invalid role. *(Note: The frontend registration UI may recommend 8+ characters for UX password strength, but backend validation threshold is 6).*
 
 #### `GET /api/v1/users`
 - **Purpose:** List users across the platform (administrative inspection).
 - **Authentication:** Required (`Bearer <token>`).
 - **Required Role:** `admin`.
 - **Query Parameters:** `skip` (default 0), `limit` (default 100, max 100).
-- **Success Response (200 OK):** Array of `UserResponse` objects.
+- **Response Shape:** **Raw JSON Array** (`List[UserResponse]`). Uses offset/limit pagination, NOT a paginated envelope (`items`, `page`, etc.).
+- **Success Response (200 OK):**
+  ```json
+  [
+    {
+      "id": 1,
+      "email": "student@example.com",
+      "role": "student",
+      "is_active": true,
+      "is_verified": false,
+      "created_at": "2026-09-19T10:00:00Z",
+      "updated_at": "2026-09-19T10:00:00Z"
+    }
+  ]
+  ```
 
 #### `GET /api/v1/users/{user_id}`
 - **Purpose:** Fetch details of a single user.
@@ -230,14 +277,16 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 - **Error Responses:** `403 Forbidden`, `404 Not Found`.
 
 #### `PATCH /api/v1/users/{user_id}`
-- **Purpose:** Update user credentials (email or password).
+- **Purpose:** Update user attributes (email, role, activation status, verification).
 - **Authentication:** Required.
 - **Permissions:** Admin or self.
 - **Request Body:**
   ```json
   {
     "email": "updated@example.com", // optional
-    "password": "NewSecurePassword123!" // optional
+    "role": "student", // optional
+    "is_active": true, // optional
+    "is_verified": true // optional
   }
   ```
 - **Success Response (200 OK):** Updated `UserResponse`.
@@ -255,40 +304,69 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 #### `POST /api/v1/student/profile`
 - **Purpose:** Create initial student profile details.
 - **Authentication:** Required (`student` role only).
+- **Field Constraints & Schema Alignment:**
+  - `full_name`: string (Required on create, min 2, max 100 characters).
+  - `phone`: optional string (max 20 characters).
+  - `college`: optional string (max 150 characters).
+  - `degree`: optional string (max 100 characters).
+  - `branch`: optional string (max 100 characters).
+  - `graduation_year`: optional integer (between 1900 and 2100).
+  - `bio`: optional string (max 1000 characters).
+  - `skills`: optional string (max 1000 characters).
+  - `github_url`: optional string (max 255 characters).
+  - `linkedin_url`: optional string (max 255 characters).
+  - `portfolio_url`: optional string (max 255 characters).
+  *(Important: Fields `first_name`, `last_name`, `headline`, `education_level`, `institution_name`, `field_of_study`, `cgpa`, and `date_of_birth` do NOT exist in the backend schema and must NOT be sent by the frontend).*
 - **Request Body:**
   ```json
   {
-    "first_name": "Jane",
-    "last_name": "Doe",
-    "headline": "Computer Science Undergraduate | Aspiring Full-Stack Developer",
+    "full_name": "Jane Doe",
     "phone": "+91 9876543210",
-    "date_of_birth": "2003-05-15",
-    "education_level": "Undergraduate",
-    "institution_name": "National Institute of Technology",
-    "field_of_study": "Computer Science and Engineering",
+    "college": "National Institute of Technology",
+    "degree": "B.Tech",
+    "branch": "Computer Science and Engineering",
     "graduation_year": 2025,
-    "cgpa": 8.75,
-    "skills": "Python, TypeScript, React, PostgreSQL, Docker",
     "bio": "Passionate software engineer building web applications.",
-    "linkedin_url": "https://linkedin.com/in/janedoe",
+    "skills": "Python, TypeScript, React, PostgreSQL, Docker",
     "github_url": "https://github.com/janedoe",
+    "linkedin_url": "https://linkedin.com/in/janedoe",
     "portfolio_url": "https://janedoe.dev"
   }
   ```
-- **Success Response (201 Created):** `StudentProfileResponse`.
+- **Success Response (201 Created):**
+  ```json
+  {
+    "id": 1,
+    "user_id": 5,
+    "full_name": "Jane Doe",
+    "phone": "+91 9876543210",
+    "college": "National Institute of Technology",
+    "degree": "B.Tech",
+    "branch": "Computer Science and Engineering",
+    "graduation_year": 2025,
+    "bio": "Passionate software engineer building web applications.",
+    "skills": "Python, TypeScript, React, PostgreSQL, Docker",
+    "github_url": "https://github.com/janedoe",
+    "linkedin_url": "https://linkedin.com/in/janedoe",
+    "portfolio_url": "https://janedoe.dev",
+    "created_at": "2026-09-19T10:00:00Z",
+    "updated_at": "2026-09-19T10:00:00Z"
+  }
+  ```
 - **Error Responses:**
   - `409 Conflict` (`RESOURCE_CONFLICT`): Student profile already exists.
+  - `422 Unprocessable Entity` (`VALIDATION_ERROR`): Missing `full_name` or validation failure.
 
 #### `GET /api/v1/student/profile`
 - **Purpose:** Retrieve the authenticated student's profile.
 - **Authentication:** Required (`student` role only).
-- **Success Response (200 OK):** `StudentProfileResponse`.
+- **Success Response (200 OK):** `StudentProfileResponse` (same shape as above).
 - **Error Responses:** `404 Not Found` (if profile not yet created).
 
 #### `PATCH /api/v1/student/profile`
 - **Purpose:** Partially update student profile fields.
 - **Authentication:** Required (`student` role only).
-- **Request Body:** Any subset of `StudentProfileCreate` fields.
+- **Request Body:** Any subset of `StudentProfileUpdate` fields (`full_name`, `phone`, `college`, `degree`, `branch`, `graduation_year`, `bio`, `skills`, `github_url`, `linkedin_url`, `portfolio_url`).
 - **Success Response (200 OK):** Updated `StudentProfileResponse`.
 
 ---
@@ -311,7 +389,24 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
     "company_size": "50-200"
   }
   ```
-- **Success Response (201 Created):** `RecruiterProfileResponse` (`is_verified` defaults to `false`).
+- **Success Response (201 Created):**
+  ```json
+  {
+    "id": 1,
+    "user_id": 2,
+    "company_name": "Acme Innovations Ltd",
+    "company_description": "Next-generation cloud robotics and automation.",
+    "contact_name": "John Smith",
+    "phone": "+91 9876500000",
+    "company_website": "https://acme.example.com",
+    "company_location": "Bengaluru, India",
+    "industry": "Software & Robotics",
+    "company_size": "50-200",
+    "is_verified": false,
+    "created_at": "2026-09-19T10:00:00Z",
+    "updated_at": "2026-09-19T10:00:00Z"
+  }
+  ```
 - **Error Responses:** `409 Conflict` (profile already exists).
 
 #### `GET /api/v1/recruiter/profile`
@@ -320,9 +415,10 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 - **Success Response (200 OK):** `RecruiterProfileResponse`.
 
 #### `PATCH /api/v1/recruiter/profile`
-- **Purpose:** Update company profile details. Note: `is_verified` cannot be modified by recruiters.
+- **Purpose:** Update company profile details.
 - **Authentication:** Required (`recruiter` role only).
-- **Request Body:** Any subset of company profile fields.
+- **Permissions & Behavior:** Note that `is_verified` is an administrative badge and cannot be modified by recruiters via this endpoint (only admins can change verification status via `PATCH /api/v1/admin/recruiters/{user_id}/verification`). Note also that in the current backend, unverified recruiters can still post jobs without restriction.
+- **Request Body:** Any subset of company profile fields (`company_name`, `company_description`, `contact_name`, `phone`, `company_website`, `company_location`, `industry`, `company_size`).
 - **Success Response (200 OK):** Updated `RecruiterProfileResponse`.
 
 ---
@@ -403,6 +499,7 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 #### `GET /api/v1/jobs/my`
 - **Purpose:** Retrieve all opportunities (active and inactive) owned by the current recruiter.
 - **Authentication:** Required (`recruiter` role only).
+- **Response Shape:** **Raw JSON Array** (`List[JobPostingResponse]`). Does NOT use a paginated envelope.
 - **Success Response (200 OK):** Array of `JobPostingResponse` objects.
 
 #### `GET /api/v1/jobs/{job_id}`
@@ -430,34 +527,37 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 #### `POST /api/v1/jobs/{job_id}/applications`
 - **Purpose:** Student submits an application for an active internship/job.
 - **Authentication:** Required (`student` role only).
+- **Resume Handling Architecture:** Resume submission is **not** passed per application request. In the CareerBridge backend, candidate resumes are stored globally in the student's profile account (`Resume.student_id == student.id`). The application payload accepts only `cover_message`. When recruiters review candidate applications, the student's attached resume is accessed directly from their profile account.
 - **Request Body:**
   ```json
   {
-    "cover_letter": "I am eager to contribute my React and FastAPI skills to Acme...",
-    "resume_id": 1 // Optional: references an uploaded Resume record
+    "cover_message": "I am eager to contribute my React and FastAPI skills to Acme Innovations."
   }
   ```
+- **Field Constraints:** `cover_message`: optional string (max 2000 characters). *(Note: Do NOT send `cover_letter` or `resume_id` — those fields are not part of the backend schema).*
 - **Success Response (201 Created):**
   ```json
   {
     "id": 1,
-    "job_id": 1,
+    "job_posting_id": 1,
     "student_id": 5,
+    "cover_message": "I am eager to contribute my React and FastAPI skills to Acme Innovations.",
     "status": "applied",
-    "cover_letter": "I am eager to contribute...",
-    "resume_id": 1,
     "created_at": "2026-09-19T14:00:00Z",
     "updated_at": "2026-09-19T14:00:00Z"
   }
   ```
+  *(Note: Response schema contains `job_posting_id`, `student_id`, `cover_message`, and `status`. It does not contain `job_id` or `resume_id`).*
 - **Error Responses:**
   - `400 Bad Request` (`BAD_REQUEST`): Job is inactive or closed.
+  - `404 Not Found` (`NOT_FOUND`): Job posting not found.
   - `409 Conflict` (`DUPLICATE_APPLICATION`): "You have already applied for this job posting."
 
 #### `GET /api/v1/applications/me`
 - **Purpose:** List all applications submitted by the current student.
 - **Authentication:** Required (`student` role only).
-- **Success Response (200 OK):** Array of `ApplicationResponse` objects with nested job summary.
+- **Response Shape:** **Raw JSON Array** (`List[ApplicationResponse]`). Does NOT use a paginated envelope.
+- **Success Response (200 OK):** Array of `ApplicationResponse` objects.
 
 #### `GET /api/v1/applications/{application_id}`
 - **Purpose:** Student inspects a specific application they submitted.
@@ -467,10 +567,11 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 #### `GET /api/v1/recruiter/applications`
 - **Purpose:** List all applications submitted to jobs owned by the current recruiter.
 - **Authentication:** Required (`recruiter` role only).
-- **Success Response (200 OK):** Array of candidate applications with student details.
+- **Response Shape:** **Raw JSON Array** (`List[ApplicationResponse]`). Does NOT use a paginated envelope.
+- **Success Response (200 OK):** Array of candidate `ApplicationResponse` objects.
 
 #### `GET /api/v1/recruiter/applications/{application_id}`
-- **Purpose:** Recruiter inspects candidate details, cover letter, and resume for a specific applicant.
+- **Purpose:** Recruiter inspects candidate details and application status for a specific applicant.
 - **Authentication:** Required (`recruiter` role only; must own the associated job).
 - **Success Response (200 OK):** `ApplicationResponse`.
 
@@ -480,10 +581,10 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 - **Request Body:**
   ```json
   {
-    "status": "shortlisted" // "reviewing", "shortlisted", "accepted", "rejected"
+    "status": "shortlisted" // "applied", "reviewing", "shortlisted", "rejected", "accepted"
   }
   ```
-- **Success Response (200 OK):** Updated `ApplicationResponse`. Automatically triggers student notification and email.
+- **Success Response (200 OK):** Updated `ApplicationResponse`. Automatically triggers student notification and transactional email.
 
 ---
 
@@ -492,23 +593,39 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 #### `POST /api/v1/jobs/{job_id}/save`
 - **Purpose:** Bookmark an active job posting for later review.
 - **Authentication:** Required (`student` role only).
-- **Success Response (201 Created):** `{"message": "Job saved successfully", "job_id": 1}`.
-- **Error Responses:** `409 Conflict` (already bookmarked), `404 Not Found`.
+- **Success Response (201 Created):**
+  ```json
+  {
+    "job_id": 1,
+    "is_saved": true,
+    "saved_at": "2026-09-19T14:30:00Z"
+  }
+  ```
+- **Error Responses:** `400 Bad Request` (cannot save inactive job), `404 Not Found` (job not found), `409 Conflict` (already bookmarked).
 
 #### `DELETE /api/v1/jobs/{job_id}/save`
 - **Purpose:** Remove an opportunity from bookmarked jobs.
 - **Authentication:** Required (`student` role only).
-- **Success Response (200 OK):** `{"message": "Job removed from saved jobs", "job_id": 1}`.
+- **Success Response (204 No Content):** Empty response body.
+- **Error Responses:** `404 Not Found` (saved job record not found).
 
 #### `GET /api/v1/jobs/{job_id}/saved`
-- **Purpose:** Check bookmark status of a specific job (used to toggle UI heart icon).
+- **Purpose:** Check bookmark status of a specific job (used to toggle UI bookmark heart icon).
 - **Authentication:** Required (`student` role only).
-- **Success Response (200 OK):** `{"saved": true}` or `{"saved": false}`.
+- **Success Response (200 OK):**
+  ```json
+  {
+    "job_id": 1,
+    "is_saved": true,
+    "saved_at": "2026-09-19T14:30:00Z"
+  }
+  ```
 
 #### `GET /api/v1/saved-jobs`
 - **Purpose:** List all opportunities bookmarked by the student.
 - **Authentication:** Required (`student` role only).
-- **Success Response (200 OK):** Array of `JobPostingResponse` objects.
+- **Response Shape:** **Raw JSON Array** (`List[SavedJobResponse]`). Does NOT use a paginated envelope.
+- **Success Response (200 OK):** Array of `SavedJobResponse` objects.
 
 ---
 
@@ -517,24 +634,56 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 #### `POST /api/v1/applications/{application_id}/interviews`
 - **Purpose:** Recruiter schedules an interview for a candidate application.
 - **Authentication:** Required (`recruiter` role only; must own the job).
+- **Field Constraints & Schema Alignment:**
+  - `scheduled_at`: datetime in ISO 8601 (Required)
+  - `duration_minutes`: integer, 1 to 480 (Required — omitting this triggers an HTTP 422 error)
+  - `interview_type`: string enum: `'online'`, `'in_person'`, `'phone'` (Optional, defaults to `'online'`)
+  - `location_or_link`: optional string, max 500 characters (Meeting URL or physical location — DO NOT use `meeting_link`)
+  - `notes`: optional string, max 2000 characters
 - **Request Body:**
   ```json
   {
     "scheduled_at": "2026-10-15T10:00:00Z",
-    "meeting_link": "https://meet.google.com/abc-defg-hij",
+    "duration_minutes": 45,
+    "interview_type": "online",
+    "location_or_link": "https://meet.google.com/abc-defg-hij",
     "notes": "Technical screening focusing on Python and React."
   }
   ```
-- **Success Response (201 Created):** `InterviewResponse`. Automatically dispatches in-app notification and email to student.
+- **Success Response (201 Created):**
+  ```json
+  {
+    "id": 1,
+    "application_id": 1,
+    "recruiter_id": 2,
+    "student_id": 5,
+    "job_id": 1,
+    "job_title": "Full-Stack Software Engineering Intern",
+    "company_name": "Acme Innovations Ltd",
+    "candidate_email": "student@example.com",
+    "recruiter_email": "recruiter@acme.com",
+    "scheduled_at": "2026-10-15T10:00:00Z",
+    "duration_minutes": 45,
+    "interview_type": "online",
+    "location_or_link": "https://meet.google.com/abc-defg-hij",
+    "notes": "Technical screening focusing on Python and React.",
+    "status": "scheduled",
+    "created_at": "2026-09-19T15:00:00Z",
+    "updated_at": "2026-09-19T15:00:00Z"
+  }
+  ```
+  *(Automatically dispatches in-app notification and email to candidate).*
 
 #### `GET /api/v1/interviews/me`
 - **Purpose:** List upcoming and past interviews scheduled for the authenticated student.
 - **Authentication:** Required (`student` role only).
+- **Response Shape:** **Raw JSON Array** (`List[InterviewResponse]`). Does NOT use a paginated envelope.
 - **Success Response (200 OK):** Array of `InterviewResponse` objects ordered by date.
 
 #### `GET /api/v1/recruiter/interviews`
 - **Purpose:** List all interviews scheduled by the current recruiter across their candidate pipeline.
 - **Authentication:** Required (`recruiter` role only).
+- **Response Shape:** **Raw JSON Array** (`List[InterviewResponse]`). Does NOT use a paginated envelope.
 - **Success Response (200 OK):** Array of `InterviewResponse` objects.
 
 #### `GET /api/v1/interviews/{interview_id}`
@@ -543,9 +692,9 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 - **Success Response (200 OK):** `InterviewResponse`.
 
 #### `PATCH /api/v1/interviews/{interview_id}`
-- **Purpose:** Reschedule interview time, meeting link, or recruiter notes.
+- **Purpose:** Reschedule interview time, duration, meeting link, or recruiter notes.
 - **Authentication:** Required (`recruiter` role only).
-- **Request Body:** Partial interview fields. Status updates to `'rescheduled'`.
+- **Request Body:** Any subset of `InterviewUpdate` fields (`scheduled_at`, `duration_minutes`, `interview_type`, `location_or_link`, `notes`, `status`). Status updates to `'rescheduled'`. Note: field is `location_or_link`, NOT `meeting_link`.
 - **Success Response (200 OK):** Updated `InterviewResponse`.
 
 #### `DELETE /api/v1/interviews/{interview_id}`
@@ -607,6 +756,7 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 #### `GET /api/v1/conversations`
 - **Purpose:** List all active conversations for the authenticated user, newest message first.
 - **Authentication:** Required.
+- **Response Shape:** **Conversation Summary Envelope** (`{ "items": [...], "total": int }`). Does NOT include `page` or `page_size`.
 - **Success Response (200 OK):**
   ```json
   {
@@ -618,12 +768,15 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
         "other_participant": {
           "id": 2,
           "email": "recruiter@acme.com",
-          "role": "recruiter"
+          "role": "recruiter",
+          "full_name": "John Smith",
+          "company_name": "Acme Innovations Ltd"
         },
         "last_message": {
           "id": 45,
           "conversation_id": 1,
           "sender_id": 2,
+          "sender_email": "recruiter@acme.com",
           "body": "Hi Jane, we would like to schedule a technical chat.",
           "is_read": false,
           "created_at": "2026-09-19T16:00:00Z"
@@ -638,8 +791,17 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 #### `POST /api/v1/conversations`
 - **Purpose:** Initiate or retrieve an existing one-to-one conversation with another user.
 - **Authentication:** Required.
-- **Request Body:** `{"recipient_id": 2}`.
-- **Success Response (201 Created or 200 OK):** `ConversationResponse`.
+- **Field Constraints & Schema Alignment:**
+  - `other_user_id`: integer, required (must be > 0). *(Important: DO NOT send `recipient_id` — the backend schema requires `other_user_id` and will reject `recipient_id` with an HTTP 422 error).*
+  - `initial_message`: optional string (1 to 5000 characters).
+- **Request Body:**
+  ```json
+  {
+    "other_user_id": 2,
+    "initial_message": "Hi, I have a question about the software engineering internship."
+  }
+  ```
+- **Success Response (201 Created or 200 OK):** `ConversationResponse` (returns 201 if newly created, or 200 if existing conversation reused).
 
 #### `GET /api/v1/conversations/{conversation_id}`
 - **Purpose:** Get single conversation metadata and participants.
@@ -650,6 +812,7 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 - **Purpose:** Paginated list of message history in a conversation.
 - **Authentication:** Required (participant only).
 - **Query Parameters:** `page` (default 1), `page_size` (default 20, max 100).
+- **Response Shape:** **Message History Envelope** (`{ "items": [...], "total": int, "page": int, "page_size": int, "total_pages": int }`).
 - **Success Response (200 OK):**
   ```json
   {
@@ -682,7 +845,13 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 #### `PATCH /api/v1/conversations/{conversation_id}/read`
 - **Purpose:** Mark all incoming messages in a conversation as read.
 - **Authentication:** Required (participant only).
-- **Success Response (200 OK):** `{"marked_read_count": 2}`.
+- **Success Response (200 OK):**
+  ```json
+  {
+    "conversation_id": 1,
+    "marked_read_count": 2
+  }
+  ```
 
 #### `PATCH /api/v1/messages/{message_id}/read`
 - **Purpose:** Mark a specific received message as read.
@@ -749,8 +918,9 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 #### `GET /api/v1/admin/users`
 - **Purpose:** List users with filtering, search, and pagination.
 - **Authentication:** Required (`admin` role only).
-- **Query Parameters:** `search`, `role`, `is_active`, `page` (default 1), `page_size` (default 10).
-- **Success Response (200 OK):** `AdminUserPaginationResponse` (`items`, `page`, `page_size`, `total`, `total_pages`).
+- **Query Parameters:** `search` (string partial match across email, NOT `q`), `role` (`student`, `recruiter`, `admin`), `is_active` (boolean), `page` (default 1), `page_size` (default 10).
+- **Response Shape:** **Paginated Envelope** (`items`, `page`, `page_size`, `total`, `total_pages`).
+- **Success Response (200 OK):** `AdminUserPaginationResponse`.
 
 #### `GET /api/v1/admin/users/{user_id}`
 - **Purpose:** Inspect detailed user account data.
@@ -764,21 +934,24 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
 - **Success Response (200 OK):** Updated `UserResponse`.
 
 #### `GET /api/v1/admin/recruiters`
-- **Purpose:** Review company profiles awaiting verification.
+- **Purpose:** Review company profiles awaiting verification or moderation.
 - **Authentication:** Required (`admin` role only).
-- **Query Parameters:** `search`, `is_verified` (boolean), `page`, `page_size`.
+- **Query Parameters:** `search` (string partial match on company name, contact, phone, NOT `q`), `is_verified` (boolean), `page`, `page_size`.
+- **Response Shape:** **Paginated Envelope** (`items`, `page`, `page_size`, `total`, `total_pages`).
 - **Success Response (200 OK):** `AdminRecruiterPaginationResponse`.
 
 #### `PATCH /api/v1/admin/recruiters/{user_id}/verification`
 - **Purpose:** Grant or revoke verified company status.
 - **Authentication:** Required (`admin` role only).
+- **Behavior:** Moderates the company verification badge. In the current backend, unverified recruiters can still post jobs; this verification badge is a platform trust indicator displayed to students.
 - **Request Body:** `{"is_verified": true}`.
 - **Success Response (200 OK):** Updated `AdminRecruiterResponse`.
 
 #### `GET /api/v1/admin/jobs`
 - **Purpose:** Platform-wide job moderation listing.
 - **Authentication:** Required (`admin` role only).
-- **Query Parameters:** `search`, `opportunity_type`, `employment_type`, `is_active`, `page`, `page_size`.
+- **Query Parameters:** `search` (string partial match on title, description, company name, NOT `q`), `opportunity_type`, `employment_type`, `is_active`, `page`, `page_size`.
+- **Response Shape:** **Paginated Envelope** (`items`, `page`, `page_size`, `total`, `total_pages`).
 - **Success Response (200 OK):** `JobPostingPaginationResponse`.
 
 #### `PATCH /api/v1/admin/jobs/{job_id}/status`
@@ -885,6 +1058,59 @@ CareerBridge uses stateless JSON Web Token (JWT) Bearer authentication.
     "detail": "Database connection failed"
   }
   ```
+
+---
+
+### 4.15 Role-Based Access Control (RBAC) Diagnostic Endpoints
+
+The backend provides four dedicated diagnostic endpoints under `/api/v1/rbac` for verifying role authorization and permission enforcement:
+
+#### `GET /api/v1/rbac/student`
+- **Purpose:** Diagnostic endpoint accessible strictly to users with the `student` role.
+- **Authentication:** Required (`student` role only).
+- **Success Response (200 OK):** `{"message": "Student access granted", "role": "student"}`.
+- **Error Response:** `403 Forbidden` (`FORBIDDEN`) for non-student roles.
+
+#### `GET /api/v1/rbac/recruiter`
+- **Purpose:** Diagnostic endpoint accessible strictly to users with the `recruiter` role.
+- **Authentication:** Required (`recruiter` role only).
+- **Success Response (200 OK):** `{"message": "Recruiter access granted", "role": "recruiter"}`.
+- **Error Response:** `403 Forbidden` (`FORBIDDEN`) for non-recruiter roles.
+
+#### `GET /api/v1/rbac/admin`
+- **Purpose:** Diagnostic endpoint accessible strictly to users with the `admin` role.
+- **Authentication:** Required (`admin` role only).
+- **Success Response (200 OK):** `{"message": "Admin access granted", "role": "admin"}`.
+- **Error Response:** `403 Forbidden` (`FORBIDDEN`) for non-admin roles.
+
+#### `GET /api/v1/rbac/student-or-recruiter`
+- **Purpose:** Diagnostic endpoint accessible to either `student` or `recruiter` roles. Rejected for `admin`.
+- **Authentication:** Required (`student` or `recruiter`).
+- **Success Response (200 OK):** `{"message": "Student or recruiter access granted", "role": "<role>"}`.
+- **Error Response:** `403 Forbidden` (`FORBIDDEN`) for admin users.
+
+---
+
+### 4.16 Collection Response Taxonomy & Envelopes Overview
+
+To prevent frontend client parsing errors (such as attempting to read `.items` on a raw array), all collection endpoints are classified according to their exact JSON response structure:
+
+| Endpoint Path | HTTP Method | Response Shape Type | Structure Summary |
+| :--- | :---: | :--- | :--- |
+| `/api/v1/jobs` | `GET` | **Paginated Envelope** | `{ items: JobPostingResponse[], page, page_size, total, total_pages }` |
+| `/api/v1/admin/jobs` | `GET` | **Paginated Envelope** | `{ items: JobPostingResponse[], page, page_size, total, total_pages }` |
+| `/api/v1/admin/users` | `GET` | **Paginated Envelope** | `{ items: UserResponse[], page, page_size, total, total_pages }` |
+| `/api/v1/admin/recruiters` | `GET` | **Paginated Envelope** | `{ items: AdminRecruiterResponse[], page, page_size, total, total_pages }` |
+| `/api/v1/notifications` | `GET` | **Paginated Envelope** | `{ items: NotificationResponse[], page, page_size, total, total_pages }` |
+| `/api/v1/conversations/{id}/messages` | `GET` | **Message History Envelope** | `{ items: MessageResponse[], total, page, page_size, total_pages }` |
+| `/api/v1/conversations` | `GET` | **Summary Envelope** | `{ items: ConversationResponse[], total }` *(No page/page_size)* |
+| `/api/v1/applications/me` | `GET` | **Raw JSON Array** | `ApplicationResponse[]` *(Direct array; do not access .items)* |
+| `/api/v1/recruiter/applications` | `GET` | **Raw JSON Array** | `ApplicationResponse[]` *(Direct array; do not access .items)* |
+| `/api/v1/jobs/my` | `GET` | **Raw JSON Array** | `JobPostingResponse[]` *(Direct array; do not access .items)* |
+| `/api/v1/saved-jobs` | `GET` | **Raw JSON Array** | `SavedJobResponse[]` *(Direct array; do not access .items)* |
+| `/api/v1/interviews/me` | `GET` | **Raw JSON Array** | `InterviewResponse[]` *(Direct array; do not access .items)* |
+| `/api/v1/recruiter/interviews` | `GET` | **Raw JSON Array** | `InterviewResponse[]` *(Direct array; do not access .items)* |
+| `/api/v1/users` | `GET` | **Raw JSON Array** | `UserResponse[]` *(Direct array; uses skip/limit query params)* |
 
 ---
 

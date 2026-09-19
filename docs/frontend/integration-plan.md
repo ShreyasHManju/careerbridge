@@ -115,12 +115,17 @@ apiClient.interceptors.request.use((config) => {
 });
 
 // Response Interceptor: Normalize Structured Backend Errors
+// NOTE: The current backend uses ACCESS-TOKEN-ONLY authentication (zero refresh tokens).
+// Do NOT implement a refresh-token interceptor or retry queue.
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<any>) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid: dispatch global logout event
-      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+      // Token expired or invalid: clear local auth state and redirect to login
+      tokenStorage.clearToken();
+      window.dispatchEvent(new CustomEvent('auth:unauthorized', {
+        detail: error.response.data
+      }));
     }
     // Unwrap structured error envelope { success, message, error_code, detail }
     return Promise.reject(error.response?.data || error);
@@ -153,9 +158,15 @@ export function ProtectedRoute({ allowedRoles }: { allowedRoles?: UserRole[] }) 
 
 ### 3.4 Form Management & Validation
 Forms are bound using React Hook Form with Zod schemas matching backend constraints:
-- **Registration Form:** Validates email, password complexity (min 8 chars), and role selection.
-- **Job Creation Form:** Cross-validates `salary_min <= salary_max` on client-side before sending to prevent 422 errors.
-- **Backend Error Translation:** 422 field errors from FastAPI (`exc.errors()`) are automatically set into React Hook Form via `setError(field, { message })`.
+- **Registration Form:** Validates email, password (`min_length=6` matching backend `UserCreate`, with optional client-side UX recommendation for 8+ characters), and role selection (`student`, `recruiter`, `admin`).
+- **Student Profile Form:** Strictly adheres to backend `StudentProfileCreate`/`Update` schemas:
+  - Validates `full_name` (required, 2-100 chars), `phone` (max 20), `college` (max 150), `degree` (max 100), `branch` (max 100), `graduation_year` (1900-2100), `bio` (max 1000), `skills` (max 1000), `github_url` (max 255), `linkedin_url` (max 255), `portfolio_url` (max 255).
+  - Does *not* include fictional fields (`first_name`, `last_name`, `headline`, `education_level`, `institution_name`, `field_of_study`, `cgpa`).
+- **Application Submission Form:** Accepts `cover_message: Optional[str]` (max 2000 chars). Does *not* include a `resume_id` field; the student's active resume is linked automatically from their account profile.
+- **Interview Scheduling Form:** Recruiter modal requires `scheduled_at` (ISO 8601 datetime) and `duration_minutes` (integer, 1 to 480); selects `interview_type` (`online`, `in_person`, `phone`); optional `location_or_link` (max 500 chars — NOT `meeting_link`) and `notes` (max 2000 chars).
+- **Conversation Initiation Form:** Initiates chat using `other_user_id` (integer > 0 — NOT `recipient_id`) and optional `initial_message` (1-5000 chars).
+- **Job Creation Form:** Cross-validates `salary_min <= salary_max` on client-side before sending to prevent 422 errors. Note: Unverified recruiters can still publish jobs according to backend rules.
+- **Backend Error Translation:** 422 field errors from FastAPI (`detail` list) are automatically set into React Hook Form via `setError(loc[1], { message: msg })`.
 
 ### 3.5 File Upload Subsystem
 - Upload components utilize `multipart/form-data` with drag-and-drop support.
@@ -186,10 +197,11 @@ A custom hook encapsulates real-time conversation synchronization:
 
 | Integration Vector | Technical Risk | Mitigation Strategy |
 | :--- | :--- | :--- |
-| **Token Expiry (401)** | User is in the middle of filling a lengthy application or job form when the 30-min JWT expires. | Axios response interceptor catches 401 `TOKEN_EXPIRED`, serializes form state to `sessionStorage`, redirects to login, and restores draft state on return. |
+| **Token Expiry (401)** | User is in the middle of filling a form when the 30-min JWT expires. Backend is access-token-only with zero refresh tokens. | Axios response interceptor catches 401 `TOKEN_EXPIRED`, serializes in-progress form state to `sessionStorage`, purges credentials via `tokenStorage.clearToken()`, and redirects user to `/login` requiring a fresh login. Form drafts are restored upon re-login. |
 | **Login Rate Limiting (429)** | User triggers 5 failed attempts and gets locked out without clear UI guidance. | Interceptor inspects HTTP 429 and `Retry-After` response header; displays a live countdown timer disabling the submit button until expiry. |
+| **Recruiter Verification Scope** | Frontend prematurely blocking unverified recruiters from creating jobs. | Backend permits unverified recruiters (`is_verified: false`) to publish jobs; verification is an administrative trust mark. Frontend presents trust badge to candidates while preserving full posting capabilities for all active recruiters. |
 | **In-Memory WebSocket Disconnects** | Network blips or container restarts terminate real-time chat sockets. | `useWebSocket` hook auto-reconnects with exponential backoff and automatically falls back to HTTP endpoints (`POST /conversations/{id}/messages`) if socket is unavailable. |
-| **Multipart Upload Validation** | User uploads an unsupported format or >5 MB file, receiving an abrupt error. | Immediate client-side validation via HTML5 File API before network transmission; checks exact file size and MIME type. |
+| **Multipart Upload Validation** | User uploads an unsupported format or >5 MB file, receiving an abrupt error. | Immediate client-side validation via HTML5 File API before network transmission; checks exact file size and magic-byte-compatible extensions. |
 | **Cross-Role Route Access** | Student accidentally navigates to `/admin` or `/recruiter` routes. | Declarative `<RoleRoute allowedRoles={['admin']}>` immediately redirects unauthorized roles to their designated home dashboard with a toast notification. |
 | **Pagination Out-of-Bounds** | Applying tight search filters reduces total pages while client remains on a higher page number. | `usePagination` automatically resets `page: 1` whenever search query `q` or filter state changes. |
 | **CORS / Proxy Configuration** | Development requests fail due to missing cross-origin headers. | Vite dev server configured with `server.proxy` pointing `/api/v1` to `http://localhost:8000`, eliminating dev-time CORS issues. |
@@ -209,32 +221,32 @@ The frontend must **NOT** be developed monolithically. Development must follow t
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │ Phase F-02: Authentication & Session Management                        │
-│ Login, Registration, JWT storage, /auth/me, Protected & Role Routes   │
+│ Login, Registration (min 6), 30-min JWT, /auth/me, 401 login redirect │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │ Phase F-03: User & Student Profile Management                          │
-│ Profile forms, Resume upload/view (PDF), Avatar upload, Validation    │
+│ Profile forms (full_name, college, degree, skills), Resume, Avatar    │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │ Phase F-04: Candidate Opportunity Discovery                            │
-│ Job browsing, search (debounced), filtering, sorting, pagination cards │
+│ Job browsing, search (q query), filtering, sorting, pagination cards   │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │ Phase F-05: Application Submission & Bookmarks                         │
-│ Apply modal (cover letter + resume select), Saved jobs toggle, Status  │
+│ Apply modal (cover_message + profile resume), Saved jobs, Status       │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │ Phase F-06: Recruiter Pipeline & Job Management                        │
-│ Job posting creation/edit, Applicant review, Candidate status updates  │
+│ Job posting (unverified permitted), Applicant review, Status updates   │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │ Phase F-07: Interview Scheduling Workflows                             │
-│ Recruiter interview modal, Student interview agenda, meeting links     │
+│ Recruiter modal (duration_minutes, type, location_or_link), Agenda     │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -244,7 +256,7 @@ The frontend must **NOT** be developed monolithically. Development must follow t
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │ Phase F-09: Direct & Real-Time WebSocket Messaging                     │
-│ Conversation list, chat window, WebSocket hook, read receipts, fallback│
+│ Conversation list, chat (other_user_id), WebSocket hook, fallback      │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
