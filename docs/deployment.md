@@ -391,3 +391,158 @@ When deploying to free-tier cloud platforms (e.g., Render, Railway, Fly.io, Neon
    Free compute tiers spin down containers after 15 minutes of inactivity. The initial incoming request will experience a 30–60 second cold start delay.
 4. **Permanent Zero-Cost Fallacy**:
    No high-availability production application can operate indefinitely on purely free tiers. For durable production workloads, provision at least a dedicated persistent storage volume and a non-sleeping database tier.
+
+---
+
+## 15. Future AWS EC2 Deployment
+
+> [!IMPORTANT]
+> **STATUS: NOT YET DEPLOYED (LOCAL CONFIGURATION ONLY)**
+> No AWS resources (EC2, RDS, S3, VPC, Security Groups, IAM, or Elastic IPs) have been created or provisioned. This section serves as the technical and operational blueprint for a future, cost-conscious deployment when cloud resources are explicitly authorized.
+
+### 15.1 Architecture Overview
+
+The recommended production architecture for AWS is a single EC2 instance (e.g., `t2.micro` or `t3.micro` under the AWS Free Tier) running Docker Compose behind an EC2 host-level Nginx reverse proxy:
+
+```
+                          ┌──────────────────────────┐
+                          │     Internet Users       │
+                          └─────────────┬────────────┘
+                                        │ HTTPS: 443 / HTTP: 80
+                                        ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│ Amazon EC2 Host (Ubuntu 22.04 / 24.04 LTS)                                │
+│                                                                           │
+│   ┌──────────────────────────────────────────────────────────────────┐    │
+│   │ Nginx Reverse Proxy (Host)                                       │    │
+│   │ - SSL Termination (Let's Encrypt / Certbot)                      │    │
+│   │ - WebSocket Upgrade Header Forwarding                            │    │
+│   │ - X-Forwarded-For Client IP Sanitization                         │    │
+│   └───────────────────────────┬──────────────────────────────────────┘    │
+│                               │ HTTP: 127.0.0.1:8000                      │
+│                               ▼                                           │
+│   ┌──────────────────────────────────────────────────────────────────┐    │
+│   │ Docker: careerbridge-backend-production (FastAPI + Uvicorn)      │    │
+│   │ - Unprivileged appuser (UID 10001)                               │    │
+│   │ - Bound strictly to 127.0.0.1:8000:8000                          │    │
+│   │ - Named Volume: careerbridge_uploads_production -> /app/uploads │    │
+│   └───────────────────────────┬──────────────────────────────────────┘    │
+│                               │ PostgreSQL: 5432 (Internal Docker net)   │
+│                               ▼                                           │
+│   ┌──────────────────────────────────────────────────────────────────┐    │
+│   │ Docker: careerbridge-db-production (PostgreSQL 16 Alpine)        │    │
+│   │ - Named Volume: careerbridge_postgres_production_data            │    │
+│   └──────────────────────────────────────────────────────────────────┘    │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+### 15.2 Required Host Packages
+A minimal Ubuntu LTS installation requires:
+- `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-compose-plugin` (Docker Engine and Compose V2)
+- `nginx` (Host-level reverse proxy)
+- `certbot`, `python3-certbot-nginx` (Automated Let's Encrypt SSL management)
+- `ufw` or AWS Security Groups for packet filtering
+- System utilities: `curl`, `wget`, `git`
+
+### 15.3 Docker Setup & Container Isolation
+- Docker services run isolated within `careerbridge_production_net` bridge network.
+- The backend container runs under unprivileged user `appuser` (UID `10001`, GID `10001`).
+- Root filesystem is read/write only where necessary; uploaded files are confined to `/app/uploads`.
+
+### 15.4 Nginx Role & Reverse Proxying
+Host-level Nginx (`deploy/nginx/careerbridge.conf.example`) handles:
+1. Public SSL termination on port 443.
+2. HTTP to HTTPS automatic redirection on port 80.
+3. Proxying REST traffic to `http://127.0.0.1:8000`.
+4. WebSocket protocol upgrading for `/api/v1/ws/` connections with 24-hour read/send timeouts.
+5. Client identity forwarding via `X-Forwarded-For` and `X-Forwarded-Proto`.
+
+### 15.5 HTTPS & Let's Encrypt Concept
+- Domain name points via DNS A-Record to the EC2 public Elastic IP.
+- Certbot provisions and auto-renews free TLS certificates:
+  ```bash
+  sudo certbot --nginx -d api.yourdomain.example.com
+  ```
+- Certbot installs a systemd timer that automatically checks and renews certificates prior to expiry.
+
+### 15.6 Port Exposure & Network Security
+- **Strict Host Port Binding**: `backend/docker-compose.production.yml` specifies `127.0.0.1:8000:8000`.
+- Uvicorn is **never** exposed on `0.0.0.0:8000`. External traffic cannot bypass Nginx.
+- PostgreSQL port `5432` is internal to the Docker network and not published to any host interface.
+- **AWS Security Group Inbound Rules**:
+  - `TCP 80` (HTTP): `0.0.0.0/0`
+  - `TCP 443` (HTTPS): `0.0.0.0/0`
+  - `TCP 22` (SSH): Restricted strictly to administrator's personal IP (`your.ip.address/32`).
+
+### 15.7 Proxy Header Security Justification
+- In `backend/Dockerfile`, Uvicorn runs with `--proxy-headers --forwarded-allow-ips=*`.
+- **Security Assessment**: This wildcard setting is secure **because and only because** the backend container port is bound strictly to `127.0.0.1:8000` and external requests can only enter through Nginx. Nginx overwrites/appends client IPs using `$proxy_add_x_forwarded_for`, eliminating client-side header spoofing.
+
+### 15.8 Environment Variables & Secrets
+- Store production variables in `/opt/careerbridge/backend/.env` with strict file permissions:
+  ```bash
+  chmod 600 /opt/careerbridge/backend/.env
+  ```
+- Generate cryptographically secure keys:
+  ```bash
+  openssl rand -hex 32
+  ```
+- Set `ENVIRONMENT=production`, `DEBUG=False`, and explicit `BACKEND_CORS_ORIGINS`.
+
+### 15.9 PostgreSQL Storage & Persistence
+- Database storage is managed via the Docker named volume `careerbridge_postgres_production_data`.
+- In an EC2 deployment, Docker volumes reside on the instance's EBS root volume (`/var/lib/docker/volumes/`).
+- Data persists across container restarts, image updates, and host reboots.
+
+### 15.10 Upload Storage & Future S3 Migration
+- Resumes and profile images persist in `careerbridge_uploads_production` (`/app/uploads`).
+- **Object Storage (S3)** is **NOT required** for the initial single-instance EC2 deployment. S3 introduces additional IAM configurations, bucket policies, and potential egress charges. Retaining local EBS storage satisfies all current roadmap requirements safely.
+
+### 15.11 Controlled Alembic Migrations
+- Migrations must never be automated on container startup.
+- Run migrations explicitly during deployment:
+  ```bash
+  docker compose -f docker-compose.production.yml exec backend alembic upgrade head
+  ```
+
+### 15.12 Health Checks & Monitoring
+- Host-level and load-balancer probes monitor `GET /health`.
+- Returns HTTP 200 when backend and database are healthy (`SELECT 1` ping).
+- Returns HTTP 503 if PostgreSQL connectivity fails.
+
+### 15.13 WebSocket Requirements
+- CareerBridge's `WebSocketConnectionManager` operates in-memory.
+- This design requires a **single backend process** (`workers=1` on a single container).
+- Multi-instance scaling would require an external Pub/Sub message broker (e.g., Redis).
+
+### 15.14 Backup Considerations
+- **EBS Snapshots**: Schedule daily automated snapshots using AWS Data Lifecycle Manager (DLM).
+- **Logical Backups**: Run automated daily cron jobs executing `pg_dump`:
+  ```bash
+  docker compose -f docker-compose.production.yml exec -T db pg_dump -U postgres internship_db | gzip > /opt/backups/backup_$(date +%Y%m%d).sql.gz
+  ```
+
+### 15.15 Rollback Considerations
+- Tag container images with Git commit SHAs (e.g., `careerbridge-backend:c9b21cc`).
+- If an issue occurs, revert the image tag in `docker-compose.production.yml` and restart the container.
+- Use `alembic downgrade -1` only if schema migrations introduced backward-incompatible changes.
+
+---
+
+## 16. Financial Safety & Cloud Cost Management
+
+> [!CAUTION]
+> **FINANCIAL SAFETY DIRECTIVES FOR CLOUD DEPLOYMENTS**
+>
+> 1. **Zero-Resource Milestone**: This milestone is purely a local configuration preparation. No cloud resources have been created, and no charges have been incurred.
+> 2. **Terms and Eligibility Can Change**: AWS Free Tier offerings, quotas, and terms vary by region, account age, and policy changes. Always inspect the current [AWS Free Tier Official Terms](https://aws.amazon.com/free/) immediately before provisioning.
+> 3. **Never Assume Cloud Resources are Permanently Free**: Most AWS Free Tier allowances (such as EC2 `t2.micro`/`t3.micro` 750 hours and RDS 750 hours) apply only during the first 12 months after account creation.
+> 4. **Mandatory Pre-Provisioning Budget Alerts**:
+>    Before launching any cloud resource, create a zero-spend billing alert in the AWS Billing & Cost Management console:
+>    - Create an **AWS Budget** with an alert threshold set at **$1.00 USD**.
+>    - Configure email notifications to alert immediately on any forecasted or actual spend.
+> 5. **Avoid High-Cost Traps**:
+>    - Avoid provisioning Amazon RDS (Multi-AZ can cost upwards of $30–$40/month).
+>    - Avoid Application Load Balancers (ALBs cost ~$16–$22/month baseline).
+>    - Keep EBS storage allocations strictly at or below 30 GB.
+>    - Terminate or stop unused instances promptly.
