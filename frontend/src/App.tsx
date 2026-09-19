@@ -7,6 +7,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { AppHome } from '@/pages/AppHome';
 import { StudentProfilePage } from '@/pages/StudentProfilePage';
+import { RecruiterProfilePage } from '@/pages/RecruiterProfilePage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 export const App: React.FC = () => {
@@ -28,6 +29,10 @@ export const App: React.FC = () => {
           {/* Student-only domain routes */}
           <Route element={<ProtectedRoute allowedRoles={['student']} />}>
             <Route path="/app/student/profile" element={<StudentProfilePage />} />
+          </Route>
+          {/* Recruiter-only domain routes */}
+          <Route element={<ProtectedRoute allowedRoles={['recruiter']} />}>
+            <Route path="/app/recruiter/profile" element={<RecruiterProfilePage />} />
           </Route>
         </Route>
       </Route>
