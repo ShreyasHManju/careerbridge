@@ -62,3 +62,6 @@ jobs:
       - name: Run backend tests
         run: python run_tests.py
 
+      - name: Build and verify Docker image
+        run: docker build -t careerbridge-backend:ci .
+

@@ -115,7 +115,11 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def sync_database_url(self) -> str:
-        if self.DATABASE_URL: return self.DATABASE_URL
+        if self.DATABASE_URL:
+            url = self.DATABASE_URL.strip()
+            if url.startswith("postgres://"):
+                url = f"postgresql://{url[11:]}"
+            return url
         return (
             f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

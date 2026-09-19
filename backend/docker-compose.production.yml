@@ -31,6 +31,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - careerbridge_uploads_production:/app/uploads
 
 volumes:
   careerbridge_postgres_production_data:
+  careerbridge_uploads_production:
