@@ -71,13 +71,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(currentUser);
       setTokenState(existingToken);
       setError(null);
-    } catch (err) {
-      // If token is expired or invalid on startup, clear it gracefully
-      clearAuthentication();
+    } catch (err: unknown) {
+      const apiError = err as ApiErrorResponse;
+      const status = apiError?.status;
+
+      if (status === 401) {
+        // Backend explicitly rejected the token as expired or invalid
+        if (apiError?.error_code === 'TOKEN_EXPIRED') {
+          handleExpiredToken();
+        } else {
+          clearAuthentication();
+          setError(apiError?.message || 'Authentication session is invalid. Please log in.');
+        }
+      } else {
+        // Network failure, 500, 503, 403, 429
+        // CRITICAL: Preserve stored token so temporary outages do not destroy active session!
+        setTokenState(existingToken);
+        const fallbackMsg =
+          status && status >= 500
+            ? 'Service is temporarily unavailable. Your session is preserved.'
+            : 'Unable to reach the server. Please check your network connection.';
+        setError(apiError?.message || fallbackMsg);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [clearAuthentication]);
+  }, [clearAuthentication, handleExpiredToken]);
 
   /**
    * Authenticate user:

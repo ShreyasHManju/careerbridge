@@ -108,13 +108,12 @@ export const RegisterPage: React.FC = () => {
           <select
             id="reg-role"
             value={role}
-            onChange={(e) => setRole(e.target.value as UserRole)}
+            onChange={(e) => setRole(e.target.value as 'student' | 'recruiter')}
             disabled={isLoading}
             className="cb-select"
           >
             <option value="student">Student / Candidate</option>
             <option value="recruiter">Employer / Recruiter</option>
-            <option value="admin">Administrator</option>
           </select>
         </div>
 

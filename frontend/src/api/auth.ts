@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, getRootUrl } from './client';
 import { LoginRequest, LoginResponse, RegisterRequest, User } from '@/types/auth';
 
 /**
@@ -35,10 +35,24 @@ export async function registerApi(payload: RegisterRequest): Promise<User> {
 
 /**
  * Health probe for system and database connectivity.
- * Route: GET /health
+ * Route: GET /health (Root probe outside /api/v1 prefix)
  */
 export async function healthCheckApi(): Promise<{ status: string; database?: string; service?: string }> {
-  // Using relative path via apiClient base URL or absolute origin
-  const response = await apiClient.get<{ status: string; database?: string; service?: string }>('/health');
+  const url = getRootUrl('/health');
+  const response = await apiClient.get<{ status: string; database?: string; service?: string }>(url, {
+    baseURL: '',
+  });
+  return response.data;
+}
+
+/**
+ * Root service ping.
+ * Route: GET / (Root probe outside /api/v1 prefix)
+ */
+export async function rootPingApi(): Promise<{ message: string; status: string }> {
+  const url = getRootUrl('/');
+  const response = await apiClient.get<{ message: string; status: string }>(url, {
+    baseURL: '',
+  });
   return response.data;
 }

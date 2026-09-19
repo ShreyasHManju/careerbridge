@@ -34,6 +34,19 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+/**
+ * Derives the root URL for host-level probes (such as GET /health and GET /).
+ * Strips any trailing '/api/v1' or '/api/v1/' suffix from the configured API base URL.
+ * Example: 'http://localhost:8000/api/v1' -> 'http://localhost:8000'
+ * Example: '/api/v1' -> ''
+ */
+export function getRootUrl(path: string = '/'): string {
+  const base = apiClient.defaults.baseURL || API_BASE_URL || '/api/v1';
+  const rootBase = base.replace(/\/api\/v1\/?$/i, '');
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return rootBase ? `${rootBase}${cleanPath}` : cleanPath;
+}
+
 // Response Interceptor: Normalize Structured Errors & Handle Auth Failure
 apiClient.interceptors.response.use(
   (response) => response,
@@ -73,8 +86,13 @@ apiClient.interceptors.response.use(
     // Handle 401 Unauthorized:
     // CareerBridge uses ACCESS-TOKEN-ONLY authentication.
     // There is no refresh-token endpoint and no refresh logic.
-    // Notify the application layer to clear authentication and redirect.
-    if (status === 401) {
+    // Failed login (e.g. invalid credentials) must NOT trigger global session expiration.
+    // The global unauthorized event is strictly reserved for authenticated requests whose existing session/token is rejected.
+    const isLoginRequest = Boolean(
+      error.config?.url && /\/auth\/login(\/|\?|$)/i.test(error.config.url)
+    );
+
+    if (status === 401 && !isLoginRequest) {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('auth:unauthorized', {
