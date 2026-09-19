@@ -27,6 +27,9 @@ export const AppLayout: React.FC = () => {
 
         <nav className="cb-nav-links">
           <Link to="/app" className="cb-nav-link">Home</Link>
+          {user?.role === 'student' && (
+            <Link to="/app/student/profile" className="cb-nav-link">My Profile</Link>
+          )}
           <span className="cb-nav-placeholder">Opportunities (Phase 4)</span>
           <span className="cb-nav-placeholder">Applications (Phase 5)</span>
         </nav>

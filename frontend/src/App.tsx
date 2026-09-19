@@ -6,6 +6,7 @@ import { PublicLayout } from '@/layouts/PublicLayout';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { AppHome } from '@/pages/AppHome';
+import { StudentProfilePage } from '@/pages/StudentProfilePage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 export const App: React.FC = () => {
@@ -24,6 +25,10 @@ export const App: React.FC = () => {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/app" element={<AppHome />} />
+          {/* Student-only domain routes */}
+          <Route element={<ProtectedRoute allowedRoles={['student']} />}>
+            <Route path="/app/student/profile" element={<StudentProfilePage />} />
+          </Route>
         </Route>
       </Route>
 
