@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16
+    container_name: careerbridge-db
+    environment:
+      POSTGRES_DB: internship_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - careerbridge_postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: careerbridge-backend
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: internship_db
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/internship_db
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+volumes:
+  careerbridge_postgres_data:
