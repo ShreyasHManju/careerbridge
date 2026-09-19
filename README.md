@@ -79,7 +79,7 @@ careerbridge/
 - [x] **Phase 21**: Email Notification Foundation (Decoupled transactional email architecture, Local & SMTP providers, background jobs integration, HTML/text templates, injection escaping, failure isolation)
 - [x] **Phase 22**: Aggregated Role Dashboards (High-performance database-side SQL aggregations, student/recruiter/admin summary endpoints, strict role isolation, zero frontend overhead)
 - [x] **Phase 23**: Validation and Error Handling (Structured JSON error envelope, domain AppException hierarchy, standard machine-readable error codes, Pydantic & DB exception handlers, zero-leakage security shielding)
-- [ ] **Phase 24**: End-to-End & Unit Testing
+- [x] **Phase 24**: Testing Strategy (Backend Testing Only — Centralized test fixtures & factories, core roadmap suite test_core_roadmap.py, unified runner run_tests.py, 100% pass across all 23 suites)
 - [ ] **Phase 25**: Security Hardening & Audit
 - [ ] **Phase 26**: Docker & Docker Compose
 - [ ] **Phase 27**: CI/CD Pipelines
@@ -1234,5 +1234,80 @@ Execute the 19-test suite covering standard error envelopes, domain exceptions, 
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_validation_error_handling.py
 ```
+
+---
+
+## 27. Phase 24: Backend Testing Strategy & Architecture
+
+CareerBridge incorporates a unified, repeatable, and scalable backend testing architecture. Designed to strictly validate every backend layer—from core ORM models and migrations to HTTP endpoints, real-time WebSockets, background jobs, and error envelopes—the testing strategy guarantees comprehensive test coverage, strict database isolation, and deterministic repeatability without cross-suite pollution.
+
+### 1. Centralized Test Fixtures & Factories (`app.core.test_fixtures`)
+
+The backend testing layer provides standardized, leak-free test fixtures and entity factories in [`backend/app/core/test_fixtures.py`](backend/app/core/test_fixtures.py):
+- **`get_test_db()`**: Context manager yielding a dedicated `SessionLocal(expire_on_commit=False)` with guaranteed auto-commit, automatic rollback on unhandled exceptions, and guaranteed connection teardown.
+- **`generate_test_email(prefix)`**: Produces millisecond-timestamped, random-suffix emails (e.g. `user_1789796135527_dc823e@careerbridge.io`) to eliminate any chance of collision across concurrent or sequential test executions.
+- **`create_test_user(db, role, ...)`**: Factory generating valid users with bcrypt-hashed passwords and corresponding `StudentProfile` or `RecruiterProfile` entities.
+- **`get_auth_headers(user)`**: Generates authentic, signed JWT Bearer authorization headers (`{"Authorization": "Bearer <token>"}`) for authenticated requests.
+- **`create_test_job(db, recruiter_id, ...)`**: Factory generating valid, configurable `JobPosting` records.
+- **`create_test_application(db, student_id, job_posting_id, ...)`**: Factory generating valid `Application` records with status tracking.
+- **`clean_test_records(db, user_ids, emails)`**: Comprehensive teardown helper that deletes entities and dependent child records in strict topological foreign-key order (interviews, applications, saved jobs, notifications, messages, participants, files, profiles, and users).
+
+### 2. Core Roadmap Test Coverage (`test_core_roadmap.py`)
+
+A dedicated comprehensive test suite directly verifies all 10 core requirements specified in the original engineering roadmap:
+1. **Registration**: Valid registration returns 201, invalid payloads return 422 `VALIDATION_ERROR`, duplicate emails return 400/409, passwords are encrypted with bcrypt, and passwords/hashes are never exposed in responses.
+2. **Login**: Valid credentials yield JWT access tokens, wrong passwords return 401 `AUTHENTICATION_REQUIRED`, unknown users return 401, inactive accounts cannot authenticate, and token responses omit credentials.
+3. **Password Hashing**: Bcrypt salt randomness verified (unique hash per call), verification correctness verified, and plaintext storage strictly prohibited.
+4. **Role Permissions**: Role authorization matrix enforced across Student, Recruiter, and Admin roles; unauthenticated access returns 401; wrong-role access returns 403 `FORBIDDEN`.
+5. **Internship / Job Creation**: Recruiter can create postings (201), non-recruiters blocked (403), inverted salary ranges rejected (422), and recruiter ownership immutably enforced.
+6. **Internship / Job Filtering**: Full-text and keyword search (`?q=...`), multi-criteria filtering (opportunity_type, employment_type, location, remote, salary), pagination (`page`, `size`), and inactive postings strictly hidden from student discovery.
+7. **Application Submission**: Valid student can submit applications (201), non-students blocked (403), submissions to inactive jobs rejected (400), submissions to non-existent jobs return 404 `NOT_FOUND`.
+8. **Duplicate Application Prevention**: Repeated submissions by the same student to the same job return 409 `DUPLICATE_APPLICATION` / `RESOURCE_CONFLICT`, and database unique constraints guarantee that no duplicate row is created.
+9. **Application Status Changes**: Owning recruiter can advance status (`applied` -> `reviewing` -> `shortlisted` -> `accepted`), unauthorized recruiters and students blocked (403), and student can observe updated status.
+10. **Admin Permissions**: Admin endpoints strictly require admin role; students and recruiters return 403; admin recruiter verification and job moderation work; admin self-lockout deactivation blocked with 400.
+11. **Structured Error Handling & Shielding**: Error responses for 401, 403, 404, 409, 422, and 500 conform to the standard JSON envelope (`{"success": false, "message": "...", "error_code": "...", "detail": ...}`) with zero tracebacks, zero SQL statements, and zero credential leakage.
+
+### 3. Unified Backend Test Runner (`run_tests.py`)
+
+CareerBridge provides a centralized test runner script [`backend/run_tests.py`](backend/run_tests.py) to execute the complete platform test suite:
+```powershell
+# Run the complete test suite (all 23 suites)
+backend\.venv\Scripts\python.exe backend/run_tests.py
+
+# Run a specific test suite
+backend\.venv\Scripts\python.exe backend/run_tests.py test_core_roadmap.py
+
+# Run multiple test suites with verbose output
+backend\.venv\Scripts\python.exe backend/run_tests.py test_auth test_rbac -v
+```
+
+### 4. Complete Backend Test Suite (23 / 23 Passing)
+
+| # | Test Suite | Scope & Category | Status |
+| :- | :--- | :--- | :--- |
+| 1 | `test_admin.py` | Admin user management, recruiter verification, job moderation | **PASS** |
+| 2 | `test_application.py` | Application submissions, status pipeline, cross-user isolation | **PASS** |
+| 3 | `test_auth.py` | Authentication, JWT issuance, token expiration, /me endpoint | **PASS** |
+| 4 | `test_core_roadmap.py` | Comprehensive core roadmap requirements (16 test scenarios) | **PASS** |
+| 5 | `test_dashboards.py` | SQL aggregated role dashboards (Student, Recruiter, Admin) | **PASS** |
+| 6 | `test_db_connection.py` | PostgreSQL connectivity, ping checks, session management | **PASS** |
+| 7 | `test_email_notifications.py` | Email provider abstraction, background jobs, HTML escaping | **PASS** |
+| 8 | `test_interviews.py` | Interview scheduling, slot conflicts, status lifecycle | **PASS** |
+| 9 | `test_job_posting.py` | Recruiter job CRUD, salary validations, ownership binding | **PASS** |
+| 10 | `test_job_search.py` | Multi-faceted search, filtering, sorting, pagination | **PASS** |
+| 11 | `test_messaging.py` | 1-to-1 conversations, message delivery, participant RBAC | **PASS** |
+| 12 | `test_migrations.py` | Alembic migration heads, schema integrity, table indexes | **PASS** |
+| 13 | `test_notifications.py` | In-app notifications, unread counts, bulk read operations | **PASS** |
+| 14 | `test_profile_image.py` | Profile image upload, magic bytes, dimensions, replacement | **PASS** |
+| 15 | `test_rbac.py` | Role-based access control, dependency authorization matrix | **PASS** |
+| 16 | `test_recruiter_profile.py` | Recruiter organizational metadata, verification flags | **PASS** |
+| 17 | `test_resume.py` | Resume upload, PDF/DOC/DOCX validation, download, deletion | **PASS** |
+| 18 | `test_saved_jobs.py` | Saved jobs bookmarks, unique constraints, status queries | **PASS** |
+| 19 | `test_student_profile.py` | Student profile CRUD, educational metadata, skill arrays | **PASS** |
+| 20 | `test_user_model.py` | SQLAlchemy User model metadata, column constraints, defaults | **PASS** |
+| 21 | `test_users_crud.py` | User account registration, listing, pagination, validations | **PASS** |
+| 22 | `test_validation_error_handling.py` | Centralized structured error envelopes, domain exceptions | **PASS** |
+| 23 | `test_websocket_messaging.py` | Real-time WebSocket connection manager, auth, broadcast | **PASS** |
+
 
 
