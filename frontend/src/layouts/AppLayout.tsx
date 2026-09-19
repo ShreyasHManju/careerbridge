@@ -33,7 +33,7 @@ export const AppLayout: React.FC = () => {
           {user?.role === 'recruiter' && (
             <Link to="/app/recruiter/profile" className="cb-nav-link">Company Profile</Link>
           )}
-          <span className="cb-nav-placeholder">Opportunities (Phase 4)</span>
+          <Link to="/app/jobs" className="cb-nav-link">Opportunities</Link>
           <span className="cb-nav-placeholder">Applications (Phase 5)</span>
         </nav>
 
