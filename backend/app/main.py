@@ -57,8 +57,47 @@ class SecurityHeadersMiddleware:
 
 app = FastAPI(
     title="CareerBridge API",
-    version="0.1.0",
-    description="Backend API for CareerBridge",
+    version="1.0.0",
+    description="""
+# CareerBridge API
+
+Backend API for the CareerBridge Student Internship Management System.
+
+CareerBridge connects students, recruiters, and administrators through a
+secure internship and job management platform.
+
+## Main capabilities
+
+- **Authentication** — registration, login, JWT authentication, and current-user information
+- **Student Management** — student profiles, resumes, and profile images
+- **Recruiter Management** — recruiter profiles and job/internship postings
+- **Applications** — internship/job applications and application status tracking
+- **Saved Jobs** — bookmark and manage saved opportunities
+- **Interviews** — schedule, update, and cancel interviews
+- **Notifications** — in-app notifications and unread tracking
+- **Messaging** — one-to-one messaging and real-time WebSocket communication
+- **Dashboards** — student, recruiter, and administrator metrics
+- **Administration** — user, recruiter, and job-posting moderation
+- **RBAC** — role-based access control for students, recruiters, and administrators
+
+## Authentication
+
+Protected endpoints use a JWT Bearer access token:
+
+`Authorization: Bearer <access_token>`
+
+## API conventions
+
+- JSON request and response bodies are used where applicable.
+- Validation errors return HTTP `422`.
+- Authentication failures return HTTP `401`.
+- Permission failures return HTTP `403`.
+- Missing resources return HTTP `404`.
+- Conflict conditions return HTTP `409`.
+- Unexpected server errors return HTTP `500`.
+
+Use the Swagger UI to explore and test the API interactively.
+""",
     docs_url="/docs",
     redoc_url="/redoc",
 )
