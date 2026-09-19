@@ -50,8 +50,18 @@ def get_current_user(
         if sub is None:
             raise CREDENTIALS_EXCEPTION
         user_id = int(sub)
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     except (jwt.PyJWTError, ValueError, TypeError):
-        raise CREDENTIALS_EXCEPTION
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     user = db.scalar(select(User).where(User.id == user_id))
     if user is None:

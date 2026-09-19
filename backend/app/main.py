@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, status
 from app.core.config import settings
 from app.core.database import check_db_connection
+from app.core.error_handlers import register_error_handlers
 from app.routers import (
     admin_router,
     applications_router,
@@ -27,6 +28,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Register centralized exception and error handlers
+register_error_handlers(app)
 
 # Register API v1 Routers
 app.include_router(admin_router, prefix=settings.API_V1_STR)
@@ -71,3 +75,10 @@ def health_check():
         "database": "connected",
         "service": "CareerBridge API",
     }
+
+
+@app.get("/test-error-500", tags=["Diagnostic"], include_in_schema=False)
+def trigger_test_error_500():
+    """Diagnostic route strictly for automated testing of 500 error handling."""
+    raise RuntimeError("Simulated unexpected internal server error")
+

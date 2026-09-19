@@ -78,7 +78,7 @@ careerbridge/
 - [x] **Phase 20**: Real-Time Messaging / WebSockets Foundation (WebSocket transport layer, WebSocketConnectionManager, query/header JWT auth, participant authorization without admin bypass, multi-tab support, real-time broadcast, read receipts, offline persistence, notification triggers)
 - [x] **Phase 21**: Email Notification Foundation (Decoupled transactional email architecture, Local & SMTP providers, background jobs integration, HTML/text templates, injection escaping, failure isolation)
 - [x] **Phase 22**: Aggregated Role Dashboards (High-performance database-side SQL aggregations, student/recruiter/admin summary endpoints, strict role isolation, zero frontend overhead)
-- [ ] **Phase 23**: Unified Error Handling & Frontend States
+- [x] **Phase 23**: Validation and Error Handling (Structured JSON error envelope, domain AppException hierarchy, standard machine-readable error codes, Pydantic & DB exception handlers, zero-leakage security shielding)
 - [ ] **Phase 24**: End-to-End & Unit Testing
 - [ ] **Phase 25**: Security Hardening & Audit
 - [ ] **Phase 26**: Docker & Docker Compose
@@ -1161,4 +1161,78 @@ Execute the 31-test suite covering security, RBAC enforcement, SQL aggregation a
 ```powershell
 backend\.venv\Scripts\python.exe backend/test_dashboards.py
 ```
+
+---
+
+## 26. Phase 23: Validation & Error Handling Architecture
+
+CareerBridge incorporates a centralized, production-grade validation and error handling architecture across the entire FastAPI backend. It guarantees that every error condition—including Pydantic input validation failures, JWT authentication and RBAC issues, resource ownership violations, database integrity conflicts, and unexpected server errors—returns a uniform, structured JSON response envelope while protecting backend implementation details, database internals, and stack traces.
+
+### Uniform JSON Error Envelope
+
+Every HTTP error response (4xx, 5xx) strictly conforms to the standard CareerBridge error schema:
+```json
+{
+  "success": false,
+  "message": "Human-readable summary of the error.",
+  "error_code": "MACHINE_READABLE_ERROR_CODE",
+  "detail": "Detailed context or list of field validation errors"
+}
+```
+
+- **`success`** (`bool`): Always `false` on any non-2xx status response.
+- **`message`** (`str`): Clear, human-readable summary.
+- **`error_code`** (`str`): Standard, uppercase machine-readable code enabling programmatic frontend error handling.
+- **`detail`** (`Any`): Context-specific detail (string, list of Pydantic validation errors, or dict) preserving 100% backward compatibility with standard FastAPI clients and tests.
+
+### Standard Machine-Readable Error Codes
+
+| Error Code | HTTP Status | Description |
+| :--- | :--- | :--- |
+| `VALIDATION_ERROR` | `422` | Request body, query parameter, or path parameter failed Pydantic schema validation. |
+| `AUTHENTICATION_REQUIRED` | `401` | Missing, malformed, or missing Bearer token in authorization header. |
+| `INVALID_TOKEN` | `401` | JWT signature is invalid, decode failed, or token is corrupt. |
+| `TOKEN_EXPIRED` | `401` | JWT expiration timestamp has elapsed. |
+| `FORBIDDEN` | `403` | User lacks required role, verification status, or permissions. |
+| `RESOURCE_OWNERSHIP_ERROR` | `403` | Cross-user tampering: user attempted to modify or delete a resource owned by someone else. |
+| `NOT_FOUND` | `404` | Target resource, entity, or URL route does not exist. |
+| `DUPLICATE_APPLICATION` | `409` | Student has already submitted an active application for this job posting. |
+| `RESOURCE_CONFLICT` | `409` | Unique constraint violation or conflicting concurrent database operation. |
+| `CONFLICTING_INTERVIEW` | `409` | Double-booking conflict for the student or recruiter at the requested time slot. |
+| `INVALID_STATE` | `400` | Attempted lifecycle state transition is illegal or target entity is inactive. |
+| `FILE_TOO_LARGE` | `400` | Uploaded resume or profile image exceeds size limit (5MB for resumes, 2MB for images). |
+| `INVALID_FILE_TYPE` | `400` | File MIME type or magic bytes header is not permitted. |
+| `BAD_REQUEST` | `400` | Malformed request or client-side syntax error. |
+| `INTERNAL_SERVER_ERROR` | `500` | Unhandled server exception, sanitized to prevent information disclosure. |
+
+### Core Exception Hierarchy (`app.core.exceptions`)
+
+All domain exceptions inherit from the base `AppException`:
+- `AppException(message, error_code, status_code, detail, headers)`
+  - `NotFoundException` (404)
+  - `AuthenticationRequiredException` (401)
+  - `InvalidTokenException` (401)
+  - `TokenExpiredException` (401)
+  - `ForbiddenException` (403)
+  - `ResourceOwnershipException` (403)
+  - `DuplicateResourceException` (409)
+  - `DuplicateApplicationException` (409)
+  - `ConflictingInterviewException` (409)
+  - `InvalidStateException` (400)
+  - `ValidationException` (422)
+  - `FileTooLargeException` (400)
+  - `InvalidFileTypeException` (400)
+  - `InternalServerException` (500)
+
+### Security & Information Disclosure Shielding
+- **Database Internals Shielded**: `IntegrityError` and `SQLAlchemyError` exceptions escaping route handlers are intercepted. Raw SQL statements, table names, primary/foreign key names, and PostgreSQL error numbers are stripped. Safe messages (`"A resource with these details already exists."`) and structured error codes (`RESOURCE_CONFLICT`) are returned.
+- **Zero Stacktrace Leakage**: Unhandled server exceptions (`Exception`) return HTTP 500 with a generic message (`"An unexpected internal server error occurred."`) and `INTERNAL_SERVER_ERROR` code. Python tracebacks, module paths, line numbers, and file paths are strictly logged server-side and never emitted in client responses.
+- **Credential Protection**: Passwords, bcrypt hashes, JWT secret keys, and database connection strings are never reflected in error payloads.
+
+### Run Validation & Error Handling Test Suite
+Execute the 19-test suite covering standard error envelopes, domain exceptions, Pydantic validations, database integrity constraints, and security shielding:
+```powershell
+backend\.venv\Scripts\python.exe backend/test_validation_error_handling.py
+```
+
 

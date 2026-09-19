@@ -380,13 +380,116 @@ CareerBridge provides role-specific, aggregated dashboard metrics engineered spe
   - **Admin Application Success Rate**: Safely calculates `(accepted / total) * 100` with graceful zero-division handling (`0.0` if no applications exist).
   - **Monthly Account Registrations**: Groups account creations by `TO_CHAR(User.created_at, 'YYYY-MM')` for the target year (defaulting to the current UTC calendar year), returning structured `[{"month": "YYYY-MM", "count": N}]` items.
 
+---
 
+## 15. Validation & Error Handling Architecture (Phase 23)
 
+CareerBridge incorporates a centralized, production-grade validation and error handling system. It guarantees that every error condition across the entire platform—from Pydantic validation failures and JWT authentication errors to database integrity constraints and unhandled exceptions—produces a predictable, standardized JSON response envelope while strictly safeguarding sensitive system internals.
 
+```text
+       +-------------------------------------------------------------------------+
+       |                           HTTP Client Request                           |
+       +------------------------------------+------------------------------------+
+                                            |
+                                            v
+       +-------------------------------------------------------------------------+
+       |               FastAPI Application & Dependency Stack                   |
+       |  (Pydantic Validation, JWT Auth, RBAC, Route Handlers, Database Ops)   |
+       +------------------------------------+------------------------------------+
+                                            |
+                                            | Exception Raised
+                                            v
+       +-------------------------------------------------------------------------+
+       |               Centralized Exception Handlers (`app.core.error_handlers`)|
+       +------------------------------------+------------------------------------+
+                                            |
+       +------------------------------------+------------------------------------+
+       |                                    |                                    |
+       v                                    v                                    v
+ [AppException]               [StarletteHTTPException]            [RequestValidationError]
+  Custom domain errors         Standard HTTP exceptions            FastAPI/Pydantic schemas
+       |                                    |                                    |
+       +-----------------+------------------+------------------------------------+
+                         |
+                         +-----------------------------------+
+                         |                                   |
+                         v                                   v
+             [IntegrityError / DB Error]           [Unhandled Exception]
+              Masked DB errors (409/400)            Masked 500 (InternalServer)
+                         |                                   |
+                         +------------------+----------------+
+                                            |
+                                            v
+       +-------------------------------------------------------------------------+
+       |                    Standard JSON Error Envelope                         |
+       |  {                                                                      |
+       |    "success": false,                                                    |
+       |    "message": "Human-readable summary message",                         |
+       |    "error_code": "MACHINE_READABLE_ERROR_CODE",                         |
+       |    "detail": <string | list of field errors | object>                   |
+       |  }                                                                      |
+       +-------------------------------------------------------------------------+
+```
 
+### 1. Standard Error Envelope Specification
 
+All non-2xx responses conform to a unified JSON response schema (`ErrorResponse` / `ValidationErrorResponse`):
+```json
+{
+  "success": false,
+  "message": "Could not validate credentials",
+  "error_code": "AUTHENTICATION_REQUIRED",
+  "detail": "Could not validate credentials"
+}
+```
 
+- `success` (`bool`): Always `false` on error responses.
+- `message` (`str`): Clean, human-readable summary of the error.
+- `error_code` (`str`): Constant, uppercase snake_case string identifying the specific error category for programmatic frontend state handling.
+- `detail` (`Any`): Detailed error context, maintaining 100% backward compatibility with standard FastAPI/Starlette response parsing.
 
+### 2. Standard Machine-Readable Error Codes
 
+| Error Code | HTTP Status | Meaning |
+| :--- | :--- | :--- |
+| `VALIDATION_ERROR` | `422` | Request body, query parameter, or path parameter failed Pydantic schema validation. |
+| `AUTHENTICATION_REQUIRED` | `401` | Missing or malformed `Authorization: Bearer <token>` header. |
+| `INVALID_TOKEN` | `401` | Bearer token signature is invalid or decode failed. |
+| `TOKEN_EXPIRED` | `401` | Bearer token expiration timestamp (`exp`) has elapsed. |
+| `FORBIDDEN` | `403` | Authenticated user lacks the required role or organization verification. |
+| `RESOURCE_OWNERSHIP_ERROR` | `403` | User attempted to view, modify, or delete a resource owned by another user. |
+| `NOT_FOUND` | `404` | Requested resource, entity, or route endpoint does not exist. |
+| `DUPLICATE_APPLICATION` | `409` | Student has already submitted an active application for this job posting. |
+| `RESOURCE_CONFLICT` | `409` | General database unique constraint violation or conflicting concurrent operation. |
+| `CONFLICTING_INTERVIEW` | `409` | Double-booking conflict for the student or recruiter at the requested time slot. |
+| `INVALID_STATE` | `400` | Attempted lifecycle state transition is illegal or inactive resource operation. |
+| `FILE_TOO_LARGE` | `400` | Uploaded resume or profile image exceeds configured byte limit. |
+| `INVALID_FILE_TYPE` | `400` | Uploaded document or image violates MIME type or magic bytes verification. |
+| `BAD_REQUEST` | `400` | Generic malformed request or client-side syntax error. |
+| `INTERNAL_SERVER_ERROR` | `500` | Unhandled server exception; sanitized to prevent information disclosure. |
 
+### 3. Domain Exception Hierarchy (`app.core.exceptions`)
 
+CareerBridge defines a structured hierarchy rooted at `AppException(Exception)`:
+- `AppException`: Base class accepting `message`, `error_code`, `status_code`, `detail`, and optional `headers`.
+  - `NotFoundException` (404)
+  - `AuthenticationRequiredException` (401)
+  - `InvalidTokenException` (401)
+  - `TokenExpiredException` (401)
+  - `ForbiddenException` (403)
+  - `ResourceOwnershipException` (403)
+  - `DuplicateResourceException` (409)
+  - `DuplicateApplicationException` (409)
+  - `ConflictingInterviewException` (409)
+  - `InvalidStateException` (400)
+  - `ValidationException` (422)
+  - `FileTooLargeException` (400)
+  - `InvalidFileTypeException` (400)
+  - `InternalServerException` (500)
+
+### 4. Security & Information Disclosure Shielding
+
+The exception handling layer enforces strict zero-leakage security boundaries:
+- **Database Internals Shielding**: `IntegrityError` and `SQLAlchemyError` exceptions escaping route handlers are intercepted. Raw SQL statements, table names, primary/foreign key names, and PostgreSQL error numbers are stripped. Safe messages (`"A resource with these details already exists."`) and structured error codes (`RESOURCE_CONFLICT`) are returned.
+- **Stack Trace Suppression**: Unhandled server exceptions (`Exception`) return HTTP 500 with a generic message (`"An unexpected internal server error occurred."`) and `INTERNAL_SERVER_ERROR` code. Python tracebacks, module paths, line numbers, and file paths are strictly logged server-side and never emitted in client responses.
+- **Credential Protection**: Passwords, bcrypt hashes, JWT secret keys, and database connection strings are never reflected in error payloads.
