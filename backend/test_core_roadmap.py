@@ -636,6 +636,136 @@ def test_16_structured_error_envelopes_and_zero_leakage():
 
 
 # ==============================================================================
+# 12. COMPLETE END-TO-END FLOW TESTS (FLOW A + FLOW B + FLOW C)
+# ==============================================================================
+
+def test_17_end_to_end_student_recruiter_lifecycle_flow():
+    """
+    Validate the complete end-to-end integration lifecycle across personas:
+    FLOW A: Student registers -> logs in -> discovers opportunity -> applies.
+    FLOW B: Recruiter logs in -> views owned jobs & candidate applications -> updates status.
+    FLOW C: Student observes updated application status.
+    """
+    stu_email = generate_test_email("e2e_student")
+    rec_email = generate_test_email("e2e_recruiter")
+    password = "E2EFlowPassword123!"
+
+    # 1. FLOW A: Student registers
+    res_reg = client.post("/api/v1/users", json={
+        "email": stu_email,
+        "password": password,
+        "role": "student"
+    })
+    assert res_reg.status_code == 201, f"Student registration failed: {res_reg.text}"
+    stu_id = res_reg.json()["id"]
+    created_user_ids.append(stu_id)
+
+    # 2. Student logs in
+    res_login_stu = client.post("/api/v1/auth/login", json={
+        "email": stu_email,
+        "password": password
+    })
+    assert res_login_stu.status_code == 200, f"Student login failed: {res_login_stu.text}"
+    stu_token = res_login_stu.json()["access_token"]
+    stu_headers = {"Authorization": f"Bearer {stu_token}"}
+
+    # 3. Recruiter registers and logs in
+    res_reg_rec = client.post("/api/v1/users", json={
+        "email": rec_email,
+        "password": password,
+        "role": "recruiter"
+    })
+    assert res_reg_rec.status_code == 201
+    rec_id = res_reg_rec.json()["id"]
+    created_user_ids.append(rec_id)
+
+    res_login_rec = client.post("/api/v1/auth/login", json={
+        "email": rec_email,
+        "password": password
+    })
+    assert res_login_rec.status_code == 200
+    rec_token = res_login_rec.json()["access_token"]
+    rec_headers = {"Authorization": f"Bearer {rec_token}"}
+
+    # 4. Recruiter posts an internship opportunity
+    res_create_job = client.post("/api/v1/jobs", headers=rec_headers, json={
+        "title": "Full Stack AI Engineer Intern",
+        "description": "Build end-to-end full stack applications with React, FastAPI, and PostgreSQL.",
+        "company_name": "E2E Horizon Tech",
+        "location": "San Francisco, CA",
+        "is_remote": True,
+        "opportunity_type": "internship",
+        "employment_type": "full_time",
+        "salary_min": 6000,
+        "salary_max": 9000
+    })
+    assert res_create_job.status_code == 201
+    job_id = res_create_job.json()["id"]
+
+    # 5. Student searches opportunities
+    res_search = client.get("/api/v1/jobs?q=Full+Stack+AI", headers=stu_headers)
+    assert res_search.status_code == 200
+    search_body = res_search.json()
+    items = search_body.get("items", search_body) if isinstance(search_body, dict) else search_body
+    assert any(j["id"] == job_id for j in items), "Expected posted job to be discoverable in candidate search"
+
+    # 6. Student opens job details
+    res_job_detail = client.get(f"/api/v1/jobs/{job_id}", headers=stu_headers)
+    assert res_job_detail.status_code == 200
+    assert res_job_detail.json()["title"] == "Full Stack AI Engineer Intern"
+
+    # 7. Student applies to the opportunity
+    res_apply = client.post(f"/api/v1/jobs/{job_id}/applications", headers=stu_headers, json={
+        "cover_message": "Excited to contribute to E2E Horizon Tech as a Full Stack AI Engineer Intern."
+    })
+    assert res_apply.status_code == 201
+    application_id = res_apply.json()["id"]
+    assert res_apply.json()["status"] == "applied"
+
+    # 8. FLOW B: Recruiter views owned jobs
+    res_my_jobs = client.get("/api/v1/jobs/my", headers=rec_headers)
+    assert res_my_jobs.status_code == 200
+    my_jobs_list = res_my_jobs.json()
+    assert any(j["id"] == job_id for j in my_jobs_list)
+
+    # 9. Recruiter views received applications
+    res_rec_apps = client.get("/api/v1/recruiter/applications", headers=rec_headers)
+    assert res_rec_apps.status_code == 200
+    rec_apps_list = res_rec_apps.json()
+    matching_app = next((a for a in rec_apps_list if a["id"] == application_id), None)
+    assert matching_app is not None, "Recruiter must see the submitted student application"
+    assert matching_app["student_id"] == stu_id
+    assert matching_app["status"] == "applied"
+
+    # 10. Recruiter changes application status to 'shortlisted'
+    res_patch_short = client.patch(f"/api/v1/recruiter/applications/{application_id}", headers=rec_headers, json={
+        "status": "shortlisted"
+    })
+    assert res_patch_short.status_code == 200
+    assert res_patch_short.json()["status"] == "shortlisted"
+
+    # 11. Recruiter updates status to 'accepted'
+    res_patch_acc = client.patch(f"/api/v1/recruiter/applications/{application_id}", headers=rec_headers, json={
+        "status": "accepted"
+    })
+    assert res_patch_acc.status_code == 200
+    assert res_patch_acc.json()["status"] == "accepted"
+
+    # 12. FLOW C: Student logs in / views applications and observes updated status
+    res_stu_apps = client.get("/api/v1/applications/me", headers=stu_headers)
+    assert res_stu_apps.status_code == 200
+    stu_apps_list = res_stu_apps.json()
+    stu_matching = next((a for a in stu_apps_list if a["id"] == application_id), None)
+    assert stu_matching is not None
+    assert stu_matching["status"] == "accepted"
+
+    # Direct application query
+    res_stu_app_detail = client.get(f"/api/v1/applications/{application_id}", headers=stu_headers)
+    assert res_stu_app_detail.status_code == 200
+    assert res_stu_app_detail.json()["status"] == "accepted"
+
+
+# ==============================================================================
 # TEST RUNNER ENTRYPOINT
 # ==============================================================================
 
@@ -661,6 +791,7 @@ def run_core_roadmap_tests():
         test_14_application_status_transitions_and_isolation,
         test_15_admin_permissions_and_moderation,
         test_16_structured_error_envelopes_and_zero_leakage,
+        test_17_end_to_end_student_recruiter_lifecycle_flow,
     ]
 
     passed = 0

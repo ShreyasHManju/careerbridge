@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RegisterPage } from '../RegisterPage';
 import * as useAuthModule from '@/auth/useAuth';
@@ -54,5 +54,69 @@ describe('RegisterPage', () => {
     );
 
     expect(screen.queryByText(/Administrator/i)).not.toBeInTheDocument();
+  });
+
+  it('validates required fields on client before submitting', () => {
+    render(
+      <MemoryRouter>
+        <RegisterPage />
+      </MemoryRouter>
+    );
+
+    const submitBtn = screen.getByRole('button', { name: /Register/i });
+    fireEvent.click(submitBtn);
+
+    expect(mockRegister).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Please enter both email and password.');
+  });
+
+  it('validates password minimum length (>= 6 chars)', () => {
+    render(
+      <MemoryRouter>
+        <RegisterPage />
+      </MemoryRouter>
+    );
+
+    const emailInput = screen.getByLabelText(/Email Address/i);
+    const passwordInput = screen.getByLabelText(/Password/i);
+    const submitBtn = screen.getByRole('button', { name: /Register/i });
+
+    fireEvent.change(emailInput, { target: { value: 'newuser@example.com' } });
+    fireEvent.change(passwordInput, { target: { value: '123' } });
+    fireEvent.click(submitBtn);
+
+    expect(mockRegister).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Password must be at least 6 characters long.');
+  });
+
+  it('submits valid registration payload to register API', async () => {
+    mockRegister.mockResolvedValueOnce({
+      id: 5,
+      email: 'newstudent@example.com',
+      role: 'student',
+    });
+
+    render(
+      <MemoryRouter>
+        <RegisterPage />
+      </MemoryRouter>
+    );
+
+    const emailInput = screen.getByLabelText(/Email Address/i);
+    const passwordInput = screen.getByLabelText(/Password/i);
+    const submitBtn = screen.getByRole('button', { name: /Register/i });
+
+    fireEvent.change(emailInput, { target: { value: '  newstudent@example.com  ' } });
+    fireEvent.change(passwordInput, { target: { value: 'Password123!' } });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockRegister).toHaveBeenCalledWith({
+        email: 'newstudent@example.com',
+        password: 'Password123!',
+        role: 'student',
+      });
+      expect(screen.getByRole('alert')).toHaveTextContent('Account created successfully');
+    });
   });
 });
