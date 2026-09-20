@@ -4,16 +4,61 @@
 # File: deploy/nginx/careerbridge.conf.example
 #
 # PURPOSE:
-# Configures Nginx on the host (e.g., Ubuntu EC2) to terminate SSL/TLS,
-# forward API traffic to the CareerBridge FastAPI container (127.0.0.1:8000),
-# and route persistent WebSocket connections with appropriate upgrade headers.
+# Configures Nginx on the host (e.g., Ubuntu EC2) to:
+# 1. Provide an initial HTTP endpoint on Port 80 for Let's Encrypt ACME webroot challenges.
+# 2. Terminate SSL/TLS on Port 443 with Let's Encrypt certificates (after certificate issuance).
+# 3. Redirect all unencrypted HTTP traffic to HTTPS once TLS is enabled.
+# 4. Serve the production React SPA frontend statically with client-side SPA routing fallback.
+# 5. Proxy REST API traffic (/api/, /health, /docs, /redoc, /openapi.json) to FastAPI (127.0.0.1:8000).
+# 6. Handle persistent real-time WebSocket connections (/api/v1/ws/) with protocol upgrades.
 #
-# INSTRUCTIONS:
-# 1. Copy this file to /etc/nginx/sites-available/careerbridge.conf
-# 2. Replace all placeholder values (e.g., api.yourdomain.example.com).
-# 3. Create a symbolic link in /etc/nginx/sites-enabled/
-# 4. Test configuration: sudo nginx -t
-# 5. Reload Nginx: sudo systemctl reload nginx
+# ==============================================================================
+# SAFE FIRST-DEPLOYMENT SEQUENCE (TWO PHASES):
+# ==============================================================================
+# On a fresh EC2 instance, SSL certificate files (/etc/letsencrypt/live/YOUR_DOMAIN/...)
+# do NOT exist initially. The HTTPS block below is INTENTIONALLY COMMENTED OUT so that
+# 'nginx -t' succeeds on a clean host before certificates are created.
+#
+# ------------------------------------------------------------------------------
+# PHASE A — INITIAL HTTP SETUP & CERTIFICATE ISSUANCE (WEBROOT METHOD):
+# ------------------------------------------------------------------------------
+# 1. Copy this template to sites-available:
+#      sudo cp /opt/careerbridge/deploy/nginx/careerbridge.conf.example /etc/nginx/sites-available/careerbridge.conf
+#
+# 2. Replace 'YOUR_DOMAIN' with your actual domain (e.g. careerbridge.example.com):
+#      sudo sed -i 's/YOUR_DOMAIN/careerbridge.example.com/g' /etc/nginx/sites-available/careerbridge.conf
+#
+# 3. Create the ACME challenge webroot directory:
+#      sudo mkdir -p /var/www/certbot
+#
+# 4. Enable the HTTP site and test Nginx:
+#      sudo ln -sf /etc/nginx/sites-available/careerbridge.conf /etc/nginx/sites-enabled/
+#      sudo rm -f /etc/nginx/sites-enabled/default
+#      sudo nginx -t
+#      sudo systemctl reload nginx
+#
+# 5. Obtain your first certificate using the Certbot webroot authenticator:
+#      sudo certbot certonly \
+#        --webroot \
+#        -w /var/www/certbot \
+#        -d YOUR_DOMAIN \
+#        -m YOUR_EMAIL \
+#        --agree-tos
+#
+# ------------------------------------------------------------------------------
+# PHASE B — ENABLE PRODUCTION HTTPS & WEBSOCKETS:
+# ------------------------------------------------------------------------------
+# 1. After Certbot successfully creates the certificate files in /etc/letsencrypt/live/YOUR_DOMAIN/,
+#    edit /etc/nginx/sites-available/careerbridge.conf and UNCOMMENT the entire HTTPS server block
+#    (Section 2 below).
+#
+# 2. Validate configuration syntax:
+#      sudo nginx -t
+#
+# 3. Reload Nginx to activate HTTPS, SPA hosting, API proxying, and WebSockets:
+#      sudo systemctl reload nginx
+#
+# 4. HTTP traffic on Port 80 will now automatically redirect to HTTPS on Port 443.
 # ==============================================================================
 
 # Map directive for standard WebSocket connection upgrades
@@ -29,12 +74,12 @@ upstream careerbridge_backend {
 }
 
 # ------------------------------------------------------------------------------
-# 1. HTTP Server — Redirect all unencrypted traffic to HTTPS
+# 1. HTTP Server (Port 80) — Active by Default for ACME Challenges & Redirection
 # ------------------------------------------------------------------------------
 server {
     listen 80;
     listen [::]:80;
-    server_name api.yourdomain.example.com;
+    server_name YOUR_DOMAIN;
 
     # Allow Let's Encrypt / Certbot ACME challenge verification over HTTP
     location /.well-known/acme-challenge/ {
@@ -42,94 +87,133 @@ server {
         allow all;
     }
 
-    # Redirect all other HTTP traffic to HTTPS
+    # Redirect all other HTTP traffic to HTTPS (once HTTPS server block is active)
     location / {
         return 301 https://$host$request_uri;
     }
 }
 
 # ------------------------------------------------------------------------------
-# 2. HTTPS Server — SSL Termination, Reverse Proxy & WebSocket Handling
+# 2. HTTPS Server (Port 443) — Production SSL Termination, SPA Hosting & API Proxy
 # ------------------------------------------------------------------------------
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name api.yourdomain.example.com;
+# IMPORTANT DEPLOYMENT SAFETY NOTICE:
+# The HTTPS server block below is INTENTIONALLY COMMENTED OUT for initial deployment.
+# Do NOT uncomment this block until Certbot has successfully issued your certificates
+# to /etc/letsencrypt/live/YOUR_DOMAIN/.
+#
+# After obtaining certificates via Phase A above:
+# 1. Uncomment all lines in the server block below.
+# 2. Run: sudo nginx -t
+# 3. Run: sudo systemctl reload nginx
+# ------------------------------------------------------------------------------
 
-    # --------------------------------------------------------------------------
-    # SSL/TLS Certificate Configuration (Placeholders — Managed by Certbot)
-    # --------------------------------------------------------------------------
-    ssl_certificate /etc/letsencrypt/live/api.yourdomain.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.yourdomain.example.com/privkey.pem;
-
-    # Recommended TLS Security Protocols & Ciphers
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 1d;
-    ssl_session_tickets off;
-
-    # --------------------------------------------------------------------------
-    # Request Body Size Limitation
-    # --------------------------------------------------------------------------
-    # CareerBridge permits resumes up to 5MB and profile images up to 2MB.
-    # Set client_max_body_size to 10M to accommodate multipart upload overhead.
-    client_max_body_size 10M;
-
-    # --------------------------------------------------------------------------
-    # Logging Configuration
-    # --------------------------------------------------------------------------
-    access_log /var/log/nginx/careerbridge_access.log;
-    error_log /var/log/nginx/careerbridge_error.log warn;
-
-    # --------------------------------------------------------------------------
-    # Standard REST API Routing
-    # --------------------------------------------------------------------------
-    location / {
-        proxy_pass http://careerbridge_backend;
-        proxy_http_version 1.1;
-
-        # Standard Proxy Headers for Client Identification & Scheme Preservation
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # API Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-
-        # Buffer settings
-        proxy_buffering on;
-        proxy_buffer_size 8k;
-        proxy_buffers 8 8k;
-    }
-
-    # --------------------------------------------------------------------------
-    # Real-Time WebSocket Messaging Route
-    # --------------------------------------------------------------------------
-    location /api/v1/ws/ {
-        proxy_pass http://careerbridge_backend;
-        proxy_http_version 1.1;
-
-        # WebSocket Protocol Upgrade Headers
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection $connection_upgrade;
-
-        # Client Identity Preservation for Authentication and Rate Limiting
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # Extended Timeouts for Long-Lived WebSocket Connections
-        # Prevents proxy from prematurely terminating idle chat connections
-        proxy_read_timeout 86400s;
-        proxy_send_timeout 86400s;
-
-        # Disable buffering for real-time WebSocket communication
-        proxy_buffering off;
-    }
-}
+# server {
+#     listen 443 ssl http2;
+#     listen [::]:443 ssl http2;
+#     server_name YOUR_DOMAIN;
+#
+#     # --------------------------------------------------------------------------
+#     # SSL/TLS Certificate Configuration (Managed by Certbot)
+#     # --------------------------------------------------------------------------
+#     ssl_certificate /etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem;
+#
+#     # Recommended TLS Security Protocols & Ciphers
+#     ssl_protocols TLSv1.2 TLSv1.3;
+#     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+#     ssl_prefer_server_ciphers on;
+#     ssl_session_cache shared:SSL:10m;
+#     ssl_session_timeout 1d;
+#     ssl_session_tickets off;
+#
+#     # --------------------------------------------------------------------------
+#     # Request Body Size Limitation
+#     # --------------------------------------------------------------------------
+#     # CareerBridge permits resumes up to 5MB and profile images up to 2MB.
+#     # Set client_max_body_size to 10M to accommodate multipart upload overhead.
+#     client_max_body_size 10M;
+#
+#     # --------------------------------------------------------------------------
+#     # Logging Configuration
+#     # --------------------------------------------------------------------------
+#     access_log /var/log/nginx/careerbridge_access.log;
+#     error_log /var/log/nginx/careerbridge_error.log warn;
+#
+#     # --------------------------------------------------------------------------
+#     # Static Frontend SPA Hosting (React + Vite Build Output)
+#     # --------------------------------------------------------------------------
+#     root /var/www/careerbridge/frontend;
+#     index index.html;
+#
+#     # Cache immutable static assets (JavaScript, CSS, fonts, images)
+#     location /assets/ {
+#         expires 1y;
+#         add_header Cache-Control "public, max-age=31536000, immutable";
+#         access_log off;
+#     }
+#
+#     # --------------------------------------------------------------------------
+#     # REST API Routes Forwarding
+#     # --------------------------------------------------------------------------
+#     location /api/ {
+#         proxy_pass http://careerbridge_backend;
+#         proxy_http_version 1.1;
+#
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#
+#         proxy_connect_timeout 60s;
+#         proxy_send_timeout 60s;
+#         proxy_read_timeout 60s;
+#         proxy_buffering on;
+#     }
+#
+#     # --------------------------------------------------------------------------
+#     # Diagnostic & Documentation Routes Forwarding (Constrained Boundary)
+#     # Matches: /health, /health/, /docs, /docs/, /redoc, /redoc/, /openapi.json
+#     # Does NOT match unintended prefixes like /healthsomething or /docssomething
+#     # --------------------------------------------------------------------------
+#     location ~ ^/(health|docs|redoc|openapi\.json)(/|$) {
+#         proxy_pass http://careerbridge_backend;
+#         proxy_http_version 1.1;
+#
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#
+#         proxy_connect_timeout 30s;
+#         proxy_read_timeout 30s;
+#     }
+#
+#     # --------------------------------------------------------------------------
+#     # Real-Time WebSocket Messaging Route
+#     # --------------------------------------------------------------------------
+#     location /api/v1/ws/ {
+#         proxy_pass http://careerbridge_backend;
+#         proxy_http_version 1.1;
+#
+#         # WebSocket Protocol Upgrade Headers
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection $connection_upgrade;
+#
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#
+#         # Extended Timeouts for Long-Lived WebSocket Connections
+#         proxy_read_timeout 86400s;
+#         proxy_send_timeout 86400s;
+#         proxy_buffering off;
+#     }
+#
+#     # --------------------------------------------------------------------------
+#     # Client-Side SPA Fallback
+#     # --------------------------------------------------------------------------
+#     location / {
+#         try_files $uri $uri/ /index.html;
+#     }
+# }

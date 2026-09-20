@@ -1,40 +1,75 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# CareerBridge EC2 Host Initialization Template (Example)
+# CareerBridge EC2 Host Initialization & Deployment Template (Example)
 # ==============================================================================
 # File: deploy/ec2/bootstrap.sh.example
 # Target OS: Ubuntu 22.04 LTS / 24.04 LTS (x86_64 or arm64)
 #
 # PURPOSE:
-# Reference guide for initializing a fresh Ubuntu EC2 host to run the
-# CareerBridge containerized backend behind a host-level Nginx reverse proxy.
+# Reference guide for:
+#   PHASE 1: Initializing a fresh Ubuntu EC2 host (Security, Swap, Docker, Node, Nginx, Certbot).
+#   PHASE 2: Deploying the containerized application stack (Docker Compose, PostgreSQL, Alembic, Healthchecks).
 #
 # SAFETY NOTICE:
 # - This template contains NO secrets, NO credentials, and NO cloud keys.
-# - Do NOT run this blindly; inspect each step and execute with administrative oversight.
+# - Do NOT run blindly; inspect each step and configure placeholders for your environment.
 # - NEVER run destructive commands (such as docker compose down -v) in production.
 # ==============================================================================
 
 set -euo pipefail
 
 echo "=================================================================="
-echo "CareerBridge Production Host Bootstrap"
+echo "CareerBridge Production Host Bootstrap & Deployment"
 echo "=================================================================="
+
+# ==============================================================================
+# PHASE 1: HOST SYSTEM BOOTSTRAP (Idempotent System Initialization)
+# ==============================================================================
 
 # ------------------------------------------------------------------------------
 # 1. System Update and Baseline Tools
 # ------------------------------------------------------------------------------
-echo "[1/9] Updating system packages..."
+echo "[1/7] Updating system packages..."
 sudo apt-get update -y
 sudo apt-get upgrade -y
 sudo apt-get install -y curl wget git ufw apt-transport-https ca-certificates gnupg lsb-release
 
 # ------------------------------------------------------------------------------
-# 2. Swap Space Configuration (Recommended for instances with <= 2 GB RAM)
+# 2. Configure Host Firewall (UFW) with Explicit SSH Restriction
+# ------------------------------------------------------------------------------
+echo "[2/7] Configuring host firewall (UFW)..."
+
+# OPERATOR CONFIGURATION REQUIRED:
+# Replace 'YOUR_ADMIN_IP/32' with your actual administrator IP/CIDR (e.g. 203.0.113.50/32).
+# To find your current public IP address, run: curl -s https://checkip.amazonaws.com
+ADMIN_SSH_CIDR="YOUR_ADMIN_IP/32"
+
+if [ "$ADMIN_SSH_CIDR" = "YOUR_ADMIN_IP/32" ]; then
+    echo "=================================================================="
+    echo "CONFIGURATION REQUIRED: SSH Firewall Rule"
+    echo "Please edit this script and set ADMIN_SSH_CIDR to your real IP/CIDR"
+    echo "before enabling UFW to prevent locking yourself out."
+    echo "Example: ADMIN_SSH_CIDR=\"203.0.113.50/32\""
+    echo "=================================================================="
+    exit 1
+fi
+
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow from "$ADMIN_SSH_CIDR" to any port 22 proto tcp comment 'Admin SSH Access Only'
+sudo ufw allow 80/tcp comment 'HTTP (Let'\''s Encrypt / Certbot & Redirect)'
+sudo ufw allow 443/tcp comment 'HTTPS (Web & API Traffic)'
+
+# Ensure internal Docker ports (5432, 8000) are NEVER opened on public interface
+sudo ufw --force enable
+sudo ufw status verbose
+
+# ------------------------------------------------------------------------------
+# 3. Swap Space Configuration (Recommended for instances with <= 2 GB RAM)
 # ------------------------------------------------------------------------------
 # Small instances (t2.micro / t3.micro) have 1 GB of RAM. A 2 GB swap file
 # prevents out-of-memory (OOM) killer terminations during builds or traffic spikes.
-echo "[2/9] Checking swap configuration..."
+echo "[3/7] Checking swap configuration..."
 if [ ! -f /swapfile ]; then
     echo "Allocating 2GB swap file..."
     sudo fallocate -l 2G /swapfile
@@ -50,9 +85,9 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 3. Docker Engine & Docker Compose V2 Installation
+# 4. Docker Engine & Docker Compose V2 Installation
 # ------------------------------------------------------------------------------
-echo "[3/9] Installing Docker Engine..."
+echo "[4/7] Installing Docker Engine & Compose plugin..."
 if ! command -v docker &> /dev/null; then
     sudo install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -75,29 +110,81 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 4. Host Nginx & Certbot Installation
+# 5. Node.js & npm Runtime (For optional on-host static frontend builds)
 # ------------------------------------------------------------------------------
-echo "[4/9] Installing Nginx and Certbot..."
+echo "[5/7] Checking Node.js runtime..."
+if ! command -v node &> /dev/null; then
+    echo "Installing Node.js 20 LTS via NodeSource..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+    echo "Node.js installed: $(node --version)"
+    echo "npm installed: $(npm --version)"
+else
+    echo "Node.js already installed: $(node --version)"
+fi
+
+# ------------------------------------------------------------------------------
+# 6. Host Nginx & Certbot Installation
+# ------------------------------------------------------------------------------
+echo "[6/7] Installing Nginx and Certbot..."
 sudo apt-get install -y nginx certbot python3-certbot-nginx
 sudo systemctl enable nginx
 sudo systemctl start nginx
 
 # ------------------------------------------------------------------------------
-# 5. Application Directory Setup
+# 7. Application & Web Directory Setup
 # ------------------------------------------------------------------------------
 APP_DIR="/opt/careerbridge"
-echo "[5/9] Setting up application directory at ${APP_DIR}..."
+WEB_DIR="/var/www/careerbridge/frontend"
+
+echo "[7/7] Setting up application directories (${APP_DIR} and ${WEB_DIR})..."
 sudo mkdir -p "${APP_DIR}"
 sudo chown -R "$USER":"$USER" "${APP_DIR}"
 
+sudo mkdir -p "${WEB_DIR}"
+sudo chown -R www-data:www-data /var/www/careerbridge
+sudo chmod -R 755 /var/www/careerbridge
+
+echo "=================================================================="
+echo "PHASE 1 (Host System Bootstrap) Completed Successfully!"
+echo "=================================================================="
+
 # ------------------------------------------------------------------------------
-# 6. Environment Configuration Verification
+# Docker Group Permission Check / Re-entry Boundary
 # ------------------------------------------------------------------------------
-echo "[6/9] Verifying environment configuration..."
+if ! docker info >/dev/null 2>&1; then
+    echo ""
+    echo "NOTICE: Docker group membership was updated for user '$USER'."
+    echo "Your current shell session has not yet reloaded group permissions."
+    echo "To continue with application deployment, please:"
+    echo "  1. Log out and reconnect via SSH (recommended), OR"
+    echo "  2. Run: newgrp docker"
+    echo "Then proceed with Phase 2 (Application Deployment)."
+    exit 0
+fi
+
+
+# ==============================================================================
+# PHASE 2: APPLICATION DEPLOYMENT & VALIDATION
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 8. Verify Application Checkout and Environment Configuration
+# ------------------------------------------------------------------------------
+echo "Checking application prerequisites in ${APP_DIR}..."
+
+if [ ! -f "${APP_DIR}/backend/docker-compose.production.yml" ]; then
+    echo "INFO: Repository not found at ${APP_DIR}."
+    echo "Clone the repository to proceed with application deployment:"
+    echo "  git clone https://github.com/ShreyasHManju/careerbridge.git ${APP_DIR}"
+    echo "Then populate ${APP_DIR}/backend/.env and re-run this script."
+    exit 0
+fi
+
 cd "${APP_DIR}/backend"
 
 if [ ! -f .env ]; then
-    echo "WARNING: .env file not found in ${APP_DIR}/backend!"
+    echo "ERROR: Production environment file not found in ${APP_DIR}/backend/.env!"
     echo "Create .env from .env.example before starting the application:"
     echo "  cp .env.example .env"
     echo "  chmod 600 .env"
@@ -107,41 +194,84 @@ fi
 
 # Enforce secure file permissions on .env
 chmod 600 .env
-echo "Environment permissions secured (chmod 600)."
+echo "Environment permissions verified (chmod 600)."
 
 # ------------------------------------------------------------------------------
-# 7. Start Containerized Application Services
+# 9. Start Containerized Application Services
 # ------------------------------------------------------------------------------
-echo "[7/9] Starting CareerBridge production stack (PostgreSQL + FastAPI)..."
+echo "Starting CareerBridge production stack (PostgreSQL + FastAPI)..."
 docker compose -f docker-compose.production.yml up -d --build
 
 # ------------------------------------------------------------------------------
-# 8. Run Controlled Database Migrations
+# 10. Specific PostgreSQL Health Verification
 # ------------------------------------------------------------------------------
-# Migrations are NEVER run automatically on container startup.
-# Execute Alembic migrations explicitly after containers are healthy.
-echo "[8/9] Applying database migrations via Alembic..."
-echo "Waiting 5 seconds for PostgreSQL healthcheck..."
-sleep 5
+echo "Waiting for PostgreSQL database container (careerbridge-db-production) to become healthy..."
+DB_HEALTHY=false
+for i in {1..30}; do
+    CONTAINER_HEALTH=$(docker inspect --format='{{json .State.Health.Status}}' careerbridge-db-production 2>/dev/null | tr -d '"' || true)
+    if [ "$CONTAINER_HEALTH" = "healthy" ]; then
+        echo "PostgreSQL container is healthy."
+        DB_HEALTHY=true
+        break
+    fi
+    echo "Waiting for database readiness (status: ${CONTAINER_HEALTH:-starting})... ($i/30)"
+    sleep 2
+done
+
+if [ "$DB_HEALTHY" != "true" ]; then
+    echo "ERROR: PostgreSQL database container failed to become healthy within 60 seconds!"
+    echo "Inspect database logs with: docker compose -f docker-compose.production.yml logs db"
+    exit 1
+fi
+
+# ------------------------------------------------------------------------------
+# 11. Controlled Alembic Database Migrations
+# ------------------------------------------------------------------------------
+# Migrations execute only after production .env exists, containers are running,
+# and PostgreSQL is specifically reporting healthy.
+echo "Applying database migrations via Alembic to head..."
 docker compose -f docker-compose.production.yml exec backend alembic upgrade head
-echo "Database migrations successfully applied."
+echo "Verifying migration state:"
+docker compose -f docker-compose.production.yml exec backend alembic current
 
 # ------------------------------------------------------------------------------
-# 9. Health & Port Verification
+# 12. Local Health Endpoint Verification
 # ------------------------------------------------------------------------------
-echo "[9/9] Verifying backend health and local port binding..."
-HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health || echo "FAILED")
+echo "Waiting for CareerBridge backend (http://127.0.0.1:8000/health) to become ready..."
+BACKEND_HEALTHY=false
+for i in {1..30}; do
+    HEALTH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health || echo "FAILED")
+    if [ "$HEALTH_RESPONSE" = "200" ]; then
+        echo "SUCCESS: CareerBridge backend is healthy (HTTP 200) on 127.0.0.1:8000."
+        BACKEND_HEALTHY=true
+        break
+    fi
+    echo "Waiting for backend healthcheck (HTTP status: ${HEALTH_RESPONSE})... ($i/30)"
+    sleep 2
+done
 
-if [ "$HEALTH_RESPONSE" = "200" ]; then
-    echo "SUCCESS: CareerBridge backend is healthy (HTTP 200) on 127.0.0.1:8000."
-else
-    echo "ERROR: Health check failed with response: $HEALTH_RESPONSE"
-    echo "Inspect container logs with: docker compose -f docker-compose.production.yml logs"
+if [ "$BACKEND_HEALTHY" != "true" ]; then
+    echo "ERROR: Backend health check failed to return HTTP 200 within 60 seconds!"
+    echo "Printing recent backend container logs:"
+    docker compose -f docker-compose.production.yml logs --tail=100 backend
     exit 1
 fi
 
 echo "=================================================================="
-echo "CareerBridge Host Bootstrap Completed Successfully!"
-echo "Next: Configure Nginx site from deploy/nginx/careerbridge.conf.example"
-echo "and obtain TLS certificates via: sudo certbot --nginx"
+echo "CareerBridge Host Bootstrap & Backend Deployment Succeeded!"
+echo ""
+echo "OPERATIONAL NEXT STEPS:"
+echo "1. Frontend Build & Deploy:"
+echo "   cd /opt/careerbridge/frontend && npm ci && npm run build"
+echo "   sudo cp -r dist/* /var/www/careerbridge/frontend/"
+echo ""
+echo "2. Nginx Configuration:"
+echo "   sudo cp /opt/careerbridge/deploy/nginx/careerbridge.conf.example /etc/nginx/sites-available/careerbridge.conf"
+echo "   sudo nano /etc/nginx/sites-available/careerbridge.conf  # Replace YOUR_DOMAIN"
+echo "   sudo ln -sf /etc/nginx/sites-available/careerbridge.conf /etc/nginx/sites-enabled/"
+echo "   sudo rm -f /etc/nginx/sites-enabled/default"
+echo "   sudo nginx -t && sudo systemctl reload nginx"
+echo ""
+echo "3. SSL/TLS Certificate Provisioning:"
+echo "   sudo certbot --nginx -d YOUR_DOMAIN -m YOUR_EMAIL --agree-tos --redirect"
 echo "=================================================================="

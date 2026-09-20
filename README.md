@@ -81,9 +81,9 @@ careerbridge/
 - [x] **Phase 23**: Validation and Error Handling (Structured JSON error envelope, domain AppException hierarchy, standard machine-readable error codes, Pydantic & DB exception handlers, zero-leakage security shielding)
 - [x] **Phase 24**: Testing Strategy (Backend Testing Only — Centralized test fixtures & factories, core roadmap suite test_core_roadmap.py, unified runner run_tests.py, 100% pass across all 23 suites)
 - [x] **Phase 25**: Security Improvements (Backend Security Hardening — CORS origin enforcement, defense-in-depth HTTP security headers, thread-safe in-memory sliding-window login rate limiting, timing attack mitigation, security audit logging, 100% pass across all 24 suites)
-- [ ] **Phase 26**: Docker & Docker Compose
-- [ ] **Phase 27**: CI/CD Pipelines
-- [ ] **Phase 28**: Production Deployment Prep
+- [x] **Phase 26**: Docker & Docker Compose (Multi-stage Dockerfile, production Compose, non-root appuser, named volume persistence)
+- [x] **Phase 27**: CI/CD Pipelines (GitHub Actions workflows for backend and frontend test suites and build verification)
+- [x] **Phase 28**: Production Deployment Prep (Production Deployment Preparation — AWS EC2 architecture, host bootstrap template, Nginx reverse proxy template, Certbot TLS bootstrap guide, Alembic migration verification)
 - [ ] **Phase 29**: Performance & Query Optimization
 - [ ] **Phase 30**: Advanced Enhancements
 
