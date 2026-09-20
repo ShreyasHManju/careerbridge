@@ -37,7 +37,7 @@ export const JobDiscoveryPage: React.FC = () => {
     if (isStudent) {
       getSavedJobs()
         .then((saved) => {
-          const ids = new Set(saved.map((item) => item.job_posting_id));
+          const ids = new Set(saved.map((item) => item.job_posting_id ?? item.id));
           setSavedJobIds(ids);
         })
         .catch(() => {

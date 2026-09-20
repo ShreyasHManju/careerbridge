@@ -7,6 +7,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { AppHome } from '@/pages/AppHome';
 import { StudentProfilePage } from '@/pages/StudentProfilePage';
+import { SavedJobsPage } from '@/pages/SavedJobsPage';
 import { RecruiterProfilePage } from '@/pages/RecruiterProfilePage';
 import { JobDiscoveryPage } from '@/pages/JobDiscoveryPage';
 import { JobDetailPage } from '@/pages/JobDetailPage';
@@ -38,6 +39,7 @@ export const App: React.FC = () => {
           {/* Student-only domain routes */}
           <Route element={<ProtectedRoute allowedRoles={['student']} />}>
             <Route path="/app/student/profile" element={<StudentProfilePage />} />
+            <Route path="/app/saved-jobs" element={<SavedJobsPage />} />
             <Route path="/app/applications" element={<StudentApplicationsPage />} />
             <Route path="/app/interviews" element={<StudentInterviewsPage />} />
           </Route>

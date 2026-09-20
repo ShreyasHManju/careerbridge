@@ -61,10 +61,27 @@ export interface SavedJobStatus {
 
 export interface SavedJob {
   id: number;
-  student_id: number;
-  job_posting_id: number;
+  saved_id?: number;
+  student_id?: number;
+  job_posting_id?: number;
+  title?: string;
+  description?: string;
+  opportunity_type?: OpportunityType;
+  company_name?: string;
+  location?: string | null;
+  is_remote?: boolean;
+  employment_type?: EmploymentType;
+  skills?: string | null;
+  minimum_qualification?: string | null;
+  experience_required?: string | null;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  application_deadline?: string | null;
+  is_active?: boolean;
   created_at: string;
-  job_posting: JobPosting;
+  updated_at?: string;
+  saved_at?: string;
+  job_posting?: JobPosting;
 }
 
 // Re-export canonical Application types from ./application
