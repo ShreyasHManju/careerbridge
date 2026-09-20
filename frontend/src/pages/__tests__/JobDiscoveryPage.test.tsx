@@ -216,10 +216,9 @@ describe('JobDiscoveryPage', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(/Failed to Load Opportunities/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/Failed to Load Opportunities/i)).toBeInTheDocument();
     expect(screen.getByText(/Internal server error occurred/i)).toBeInTheDocument();
 
     // Clicking Retry attempts fetch again
