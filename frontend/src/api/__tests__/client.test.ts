@@ -210,6 +210,114 @@ describe('apiClient', () => {
     });
   });
 
+  it('normalizes 404 Not Found error responses', async () => {
+    const mock404Error = {
+      response: {
+        status: 404,
+        data: {
+          success: false,
+          message: 'Requested resource not found',
+          error_code: 'NOT_FOUND',
+          detail: 'Requested resource not found',
+        },
+      },
+    };
+
+    const errorHandler = (apiClient.interceptors.response as any).handlers[0]?.rejected;
+    expect(errorHandler).toBeDefined();
+
+    await expect(errorHandler(mock404Error)).rejects.toEqual({
+      success: false,
+      message: 'Requested resource not found',
+      error_code: 'NOT_FOUND',
+      detail: 'Requested resource not found',
+      status: 404,
+    });
+  });
+
+  it('normalizes 409 Conflict duplicate application error responses', async () => {
+    const mock409Error = {
+      response: {
+        status: 409,
+        data: {
+          success: false,
+          message: 'You have already applied for this internship.',
+          error_code: 'DUPLICATE_APPLICATION',
+          detail: 'You have already applied for this internship.',
+        },
+      },
+    };
+
+    const errorHandler = (apiClient.interceptors.response as any).handlers[0]?.rejected;
+    expect(errorHandler).toBeDefined();
+
+    await expect(errorHandler(mock409Error)).rejects.toEqual({
+      success: false,
+      message: 'You have already applied for this internship.',
+      error_code: 'DUPLICATE_APPLICATION',
+      detail: 'You have already applied for this internship.',
+      status: 409,
+    });
+  });
+
+  it('normalizes 500 Internal Server Error responses safely', async () => {
+    const mock500Error = {
+      response: {
+        status: 500,
+        data: {
+          success: false,
+          message: 'An unexpected internal server error occurred.',
+          error_code: 'INTERNAL_SERVER_ERROR',
+          detail: 'An unexpected internal server error occurred.',
+        },
+      },
+    };
+
+    const errorHandler = (apiClient.interceptors.response as any).handlers[0]?.rejected;
+    expect(errorHandler).toBeDefined();
+
+    await expect(errorHandler(mock500Error)).rejects.toEqual({
+      success: false,
+      message: 'An unexpected internal server error occurred.',
+      error_code: 'INTERNAL_SERVER_ERROR',
+      detail: 'An unexpected internal server error occurred.',
+      status: 500,
+    });
+  });
+
+  it('normalizes unexpected network drops / connection failures when response is undefined', async () => {
+    const mockNetworkError = {
+      message: 'Network Error',
+      response: undefined,
+    };
+
+    const errorHandler = (apiClient.interceptors.response as any).handlers[0]?.rejected;
+    expect(errorHandler).toBeDefined();
+
+    await expect(errorHandler(mockNetworkError)).rejects.toEqual({
+      success: false,
+      message: 'Network Error',
+      error_code: 'UNKNOWN_ERROR',
+      status: undefined,
+    });
+  });
+
+  it('uses default fallback message when network error has no message', async () => {
+    const mockEmptyNetworkError = {
+      response: undefined,
+    };
+
+    const errorHandler = (apiClient.interceptors.response as any).handlers[0]?.rejected;
+    expect(errorHandler).toBeDefined();
+
+    await expect(errorHandler(mockEmptyNetworkError)).rejects.toEqual({
+      success: false,
+      message: 'An unexpected network error occurred. Please try again.',
+      error_code: 'UNKNOWN_ERROR',
+      status: undefined,
+    });
+  });
+
   describe('getRootUrl and Health Probe Routing', () => {
     it('strips /api/v1 prefix from the configured base URL to form root probe paths', () => {
       expect(getRootUrl('/health')).toMatch(/\/health$/);

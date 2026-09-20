@@ -50,6 +50,7 @@ from app.core.exceptions import (
     InvalidStateException,
     InvalidTokenException,
     NotFoundException,
+    RateLimitExceededException,
     ResourceOwnershipException,
     TokenExpiredException,
     ValidationException,
@@ -584,6 +585,34 @@ def test_19_app_exception_hierarchy():
     assert exc_500.status_code == 500
     assert exc_500.error_code == ErrorCode.INTERNAL_SERVER_ERROR.value
 
+    exc_rate = RateLimitExceededException(message="Too many login attempts", retry_after=45)
+    assert exc_rate.status_code == 429
+    assert exc_rate.error_code == ErrorCode.RATE_LIMIT_EXCEEDED.value
+    assert exc_rate.headers == {"Retry-After": "45"}
+
+
+def test_20_error_code_derivation_mapping():
+    """Verify _derive_error_code maps HTTP status codes and error messages correctly."""
+    from app.core.error_handlers import _derive_error_code
+
+    assert _derive_error_code(400, "File size exceeds maximum allowed") == ErrorCode.FILE_TOO_LARGE.value
+    assert _derive_error_code(400, "Unsupported file extension") == ErrorCode.INVALID_FILE_TYPE.value
+    assert _derive_error_code(400, "Invalid resource state") == ErrorCode.INVALID_STATE.value
+    assert _derive_error_code(401, "Token has expired") == ErrorCode.TOKEN_EXPIRED.value
+    assert _derive_error_code(401, "Invalid token provided") == ErrorCode.INVALID_TOKEN.value
+    assert _derive_error_code(401, "Authentication credentials missing") == ErrorCode.AUTHENTICATION_REQUIRED.value
+    assert _derive_error_code(403, "Not authorized to modify this resource") == ErrorCode.RESOURCE_OWNERSHIP_ERROR.value
+    assert _derive_error_code(403, "Not enough permissions") == ErrorCode.FORBIDDEN.value
+    assert _derive_error_code(404, "Job not found") == ErrorCode.NOT_FOUND.value
+    assert _derive_error_code(409, "You have already applied for this internship.") == ErrorCode.DUPLICATE_APPLICATION.value
+    assert _derive_error_code(409, "A resource with these details already exists") == ErrorCode.RESOURCE_CONFLICT.value
+    assert _derive_error_code(413, "Payload too large") == ErrorCode.FILE_TOO_LARGE.value
+    assert _derive_error_code(415, "Unsupported media type") == ErrorCode.INVALID_FILE_TYPE.value
+    assert _derive_error_code(422, "Request validation failed") == ErrorCode.VALIDATION_ERROR.value
+    assert _derive_error_code(429, "Too many requests. Please try again later.") == ErrorCode.RATE_LIMIT_EXCEEDED.value
+    assert _derive_error_code(500, "Internal server error") == ErrorCode.INTERNAL_SERVER_ERROR.value
+    assert _derive_error_code(503, "Database connection failed") == ErrorCode.INTERNAL_SERVER_ERROR.value
+
 
 def run_all_tests():
     """Execute all tests sequentially."""
@@ -612,6 +641,7 @@ def run_all_tests():
         test_17_unexpected_exception_returns_500_without_traceback,
         test_18_error_responses_contain_no_credentials_or_secrets,
         test_19_app_exception_hierarchy,
+        test_20_error_code_derivation_mapping,
     ]
 
     passed = 0
