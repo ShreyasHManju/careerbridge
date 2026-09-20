@@ -84,10 +84,37 @@ careerbridge/
 - [x] **Phase 26**: Docker & Docker Compose (Multi-stage Dockerfile, production Compose, non-root appuser, named volume persistence)
 - [x] **Phase 27**: CI/CD Pipelines (GitHub Actions workflows for backend and frontend test suites and build verification)
 - [x] **Phase 28**: Production Deployment Prep (Production Deployment Preparation — AWS EC2 architecture, host bootstrap template, Nginx reverse proxy template, Certbot TLS bootstrap guide, Alembic migration verification)
-- [ ] **Phase 29**: Performance & Query Optimization
-- [ ] **Phase 30**: Advanced Enhancements
+- [x] **Phase 29**: Performance & Query Optimization (Batched conversation queries, index-bounded interview conflict detection, joined eager loading, PostgreSQL composite indexing)
+- [x] **Phase 30A**: Production Observability & Operational Reliability (Request correlation IDs via `X-Request-ID`, structured backend logging with ContextVar propagation, error response correlation, database backup & verification restore scripts)
+- [ ] **Phase 30B**: Advanced Workflow Enhancements
 
 ---
+
+## Observability & Disaster Recovery Operations
+
+### Request Correlation IDs (`X-Request-ID`)
+- Every HTTP request receives an `X-Request-ID` correlation identifier.
+- Safe client-supplied trace IDs matching `^[a-zA-Z0-9_-]{1,64}$` are preserved; missing or unsafe IDs are automatically regenerated as UUIDv4 to prevent header splitting or log injection.
+- The correlation ID is returned in the `X-Request-ID` response header and bound to an async `ContextVar` for the lifetime of the request.
+- Standardized error JSON responses include `"request_id": "<id>"`.
+
+### Centralized Structured Logging
+- Formatted production logs:
+  `[2026-09-20 21:16:30] [INFO] [careerbridge.auth] [request_id=c8b4f210-98ef-4c6e-82df-7707e7b72db7] User login successful for student@careerbridge.io`
+- Non-request background tasks gracefully default `request_id` to `"-"`.
+
+### Database Backup & Restore Operations
+```bash
+# 1. Database Backup (Generates timestamped SQL dump in backend/backups/)
+./backend/scripts/backup_db.sh
+
+# 2. Database Restore with Verification Check (Destructive - requires confirmation)
+./backend/scripts/restore_db.sh ./backend/backups/careerbridge_backup_internship_db_YYYYMMDD_HHMMSS.sql
+
+# Non-interactive restoration in automated staging pipelines:
+CONFIRM_RESTORE=yes ./backend/scripts/restore_db.sh ./path/to/backup.sql
+```
+*Note: Automated cron scheduling and off-host cloud retention (e.g. S3 replication) are intentionally managed at the cloud infrastructure layer.*
 
 ## 5. Getting Started
 

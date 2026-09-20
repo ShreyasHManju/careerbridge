@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.exceptions import AppException, ErrorCode
+from app.core.logging import get_request_id
 
 logger = logging.getLogger("careerbridge.error_handlers")
 
@@ -75,20 +76,36 @@ def _derive_error_code(status_code: int, message: str) -> str:
     return ErrorCode.BAD_REQUEST.value
 
 
+def _extract_request_id(request: Request) -> str:
+    """Safely extracts request_id from contextvar, request state, or headers."""
+    req_id = get_request_id()
+    if req_id and req_id != "-":
+        return req_id
+    if hasattr(request, "state") and hasattr(request.state, "request_id") and request.state.request_id:
+        return str(request.state.request_id)
+    if hasattr(request, "headers") and "x-request-id" in request.headers:
+        return request.headers["x-request-id"]
+    return "-"
+
+
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
     """
     Handler for all custom domain AppException instances.
     """
+    req_id = _extract_request_id(request)
     payload = {
         "success": False,
         "message": exc.message,
         "error_code": exc.error_code,
         "detail": exc.detail,
+        "request_id": req_id,
     }
+    headers = dict(exc.headers or {}) if hasattr(exc, "headers") and exc.headers else {}
+    headers["x-request-id"] = req_id
     return JSONResponse(
         status_code=exc.status_code,
         content=jsonable_encoder(payload),
-        headers=exc.headers,
+        headers=headers,
     )
 
 
@@ -96,8 +113,9 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     """
     Handler for standard Starlette/FastAPI HTTPExceptions.
     Ensures that every HTTP error returns a consistent JSON envelope with
-    machine-readable error_code and backward-compatible detail.
+    machine-readable error_code, backward-compatible detail, and correlation request_id.
     """
+    req_id = _extract_request_id(request)
     message = str(exc.detail) if isinstance(exc.detail, str) else "Request error"
     error_code = _derive_error_code(exc.status_code, message)
 
@@ -106,11 +124,14 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         "message": message,
         "error_code": error_code,
         "detail": exc.detail,
+        "request_id": req_id,
     }
+    headers = dict(exc.headers or {}) if hasattr(exc, "headers") and exc.headers else {}
+    headers["x-request-id"] = req_id
     return JSONResponse(
         status_code=exc.status_code,
         content=jsonable_encoder(payload),
-        headers=exc.headers,
+        headers=headers,
     )
 
 
@@ -118,15 +139,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     """
     Handler for Pydantic and FastAPI input validation errors (HTTP 422).
     """
+    req_id = _extract_request_id(request)
     payload = {
         "success": False,
         "message": "Request validation failed.",
         "error_code": ErrorCode.VALIDATION_ERROR.value,
         "detail": jsonable_encoder(exc.errors()),
+        "request_id": req_id,
     }
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=jsonable_encoder(payload),
+        headers={"x-request-id": req_id},
     )
 
 
@@ -135,6 +159,7 @@ async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSON
     Handler for database integrity constraint violations escaping route handlers.
     Shields database internals, table names, and SQL statements.
     """
+    req_id = _extract_request_id(request)
     err_str = str(exc.orig).lower() if hasattr(exc, "orig") and exc.orig else str(exc).lower()
 
     if "unique" in err_str or "duplicate key" in err_str or "already exists" in err_str:
@@ -157,10 +182,12 @@ async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSON
         "message": message,
         "error_code": error_code,
         "detail": message,
+        "request_id": req_id,
     }
     return JSONResponse(
         status_code=status_code,
         content=payload,
+        headers={"x-request-id": req_id},
     )
 
 
@@ -169,16 +196,25 @@ async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> JS
     Handler for unexpected database errors.
     Logs the full database error internally without exposing SQL queries or connection strings.
     """
+    req_id = _extract_request_id(request)
     logger.exception("Database error occurred: %s", exc)
     payload = {
         "success": False,
         "message": "An internal database error occurred.",
         "error_code": ErrorCode.INTERNAL_SERVER_ERROR.value,
         "detail": "An internal database error occurred.",
+        "request_id": req_id,
     }
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=payload,
+        headers={
+            "x-request-id": req_id,
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "1; mode=block",
+            "referrer-policy": "strict-origin-when-cross-origin",
+        },
     )
 
 
@@ -188,16 +224,25 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     Logs the full traceback to the server console and logs, but returns a safe,
     sanitized error payload without leaking stack traces or internal paths.
     """
+    req_id = _extract_request_id(request)
     logger.exception("Unhandled server exception: %s", exc)
     payload = {
         "success": False,
         "message": "An unexpected internal server error occurred.",
         "error_code": ErrorCode.INTERNAL_SERVER_ERROR.value,
         "detail": "An unexpected internal server error occurred.",
+        "request_id": req_id,
     }
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=payload,
+        headers={
+            "x-request-id": req_id,
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "x-xss-protection": "1; mode=block",
+            "referrer-policy": "strict-origin-when-cross-origin",
+        },
     )
 
 

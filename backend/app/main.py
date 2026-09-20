@@ -1,3 +1,5 @@
+import re
+import uuid
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -5,6 +7,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.core.config import settings
 from app.core.database import check_db_connection
 from app.core.error_handlers import register_error_handlers
+from app.core.logging import reset_request_id, set_request_id, setup_logging
 from app.routers import (
     admin_router,
     applications_router,
@@ -23,6 +26,62 @@ from app.routers import (
     users_router,
     websocket_messaging_router,
 )
+
+# Initialize centralized structured logging
+setup_logging()
+
+SAFE_REQUEST_ID_REGEX = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+
+
+class RequestIdMiddleware:
+    """
+    Pure ASGI middleware to manage request correlation IDs:
+    - Extracts or generates a unique correlation ID for every HTTP request.
+    - Validates incoming X-Request-ID to prevent log injection or header splitting.
+    - Binds the correlation ID to the async ContextVar for structured logging.
+    - Appends X-Request-ID header to all HTTP responses.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        req_id = None
+        for name, value in scope.get("headers", []):
+            if name.lower() == b"x-request-id":
+                try:
+                    decoded = value.decode("latin1").strip()
+                    if SAFE_REQUEST_ID_REGEX.match(decoded):
+                        req_id = decoded
+                except Exception:
+                    pass
+                break
+
+        if not req_id:
+            req_id = str(uuid.uuid4())
+
+        token = set_request_id(req_id)
+        if "state" not in scope:
+            scope["state"] = {}
+        scope["state"]["request_id"] = req_id
+
+        async def send_with_request_id(message: dict) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                has_req_id = any(h[0].lower() == b"x-request-id" for h in headers)
+                if not has_req_id:
+                    headers.append((b"x-request-id", req_id.encode("latin1")))
+                message["headers"] = headers
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_with_request_id)
+        finally:
+            reset_request_id(token)
 
 
 class SecurityHeadersMiddleware:
@@ -175,7 +234,7 @@ Use the Swagger UI to explore and test the API interactively.
     openapi_tags=TAGS_METADATA,
 )
 
-# Register CORS and Security Middlewares
+# Register CORS, Request ID, and Security Middlewares
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -184,6 +243,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestIdMiddleware)
 
 # Register centralized exception and error handlers
 register_error_handlers(app)
