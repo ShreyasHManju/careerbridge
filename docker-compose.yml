@@ -18,11 +18,11 @@ services:
 
   backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: careerbridge-backend
     env_file:
-      - .env
+      - ./backend/.env
     environment:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
