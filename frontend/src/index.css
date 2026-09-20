@@ -1678,3 +1678,271 @@ body {
   color: #dc2626;
   font-weight: bold;
 }
+
+/* ==========================================================================
+   Phase 22 — Aggregated Role Dashboards Styles
+   ========================================================================== */
+
+.cb-dashboard-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+  padding-bottom: 2rem;
+}
+
+.cb-dashboard-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 1rem;
+  color: var(--cb-text-muted);
+  gap: 1rem;
+}
+
+.cb-dashboard-error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem 1rem;
+}
+
+.cb-retry-btn {
+  margin-top: 0.5rem;
+}
+
+.cb-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.cb-stat-card {
+  background-color: var(--cb-surface);
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--cb-shadow-sm);
+  border-top: 4px solid var(--cb-border);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cb-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--cb-shadow-md);
+}
+
+.cb-stat-card.cb-stat-primary {
+  border-top-color: var(--cb-primary);
+}
+
+.cb-stat-card.cb-stat-success {
+  border-top-color: #10b981;
+}
+
+.cb-stat-card.cb-stat-warning {
+  border-top-color: #f59e0b;
+}
+
+.cb-stat-card.cb-stat-info {
+  border-top-color: #0284c7;
+}
+
+.cb-stat-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--cb-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cb-stat-value {
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--cb-text);
+  line-height: 1.2;
+  margin: 0.35rem 0 0.2rem;
+}
+
+.cb-stat-desc {
+  font-size: 0.8rem;
+  color: var(--cb-text-muted);
+}
+
+.cb-dashboard-alert {
+  margin-bottom: 1.5rem;
+}
+
+.cb-alert-content-with-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.cb-dashboard-actions-section {
+  margin-top: 2rem;
+}
+
+.cb-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.cb-action-card {
+  background-color: var(--cb-surface);
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius);
+  padding: 1.25rem;
+  text-decoration: none;
+  color: var(--cb-text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  display: block;
+}
+
+.cb-action-card:hover {
+  border-color: var(--cb-primary);
+  box-shadow: var(--cb-shadow-md);
+  transform: translateY(-2px);
+}
+
+.cb-action-card-body {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.cb-action-icon {
+  font-size: 1.75rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.cb-action-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  color: var(--cb-text);
+}
+
+.cb-action-desc {
+  font-size: 0.825rem;
+  color: var(--cb-text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Admin Monthly Registrations Chart Card */
+.cb-chart-card {
+  background-color: var(--cb-surface);
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--cb-shadow-sm);
+}
+
+.cb-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--cb-border);
+}
+
+.cb-chart-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+
+.cb-chart-subtitle {
+  font-size: 0.85rem;
+  color: var(--cb-text-muted);
+  margin: 0;
+}
+
+.cb-year-filter-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cb-year-filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.cb-year-input {
+  width: 90px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+.cb-year-alert {
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.cb-bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.cb-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cb-bar-label-group {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.cb-bar-month-text {
+  font-weight: 600;
+  color: var(--cb-text);
+}
+
+.cb-bar-count-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  background-color: #f1f5f9;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  color: var(--cb-text);
+}
+
+.cb-bar-track {
+  height: 12px;
+  background-color: #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cb-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.cb-chart-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--cb-text-muted);
+  font-style: italic;
+}
