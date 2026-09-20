@@ -101,4 +101,49 @@ describe('AppLayout Navigation (Phase F-08)', () => {
     expect(screen.queryByRole('link', { name: /^Applications$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Interviews/i })).not.toBeInTheDocument();
   });
+
+  it('renders notification center control for authenticated users across all roles', () => {
+    // Student
+    setupAuth(mockStudentUser);
+    const { unmount: unmountStudent } = render(
+      <MemoryRouter>
+        <AppLayout />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('button', { name: /Notifications/i })).toBeInTheDocument();
+    unmountStudent();
+
+    // Recruiter
+    setupAuth(mockRecruiterUser);
+    const { unmount: unmountRecruiter } = render(
+      <MemoryRouter>
+        <AppLayout />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('button', { name: /Notifications/i })).toBeInTheDocument();
+    unmountRecruiter();
+
+    // Admin
+    setupAuth(mockAdminUser);
+    const { unmount: unmountAdmin } = render(
+      <MemoryRouter>
+        <AppLayout />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('button', { name: /Notifications/i })).toBeInTheDocument();
+    unmountAdmin();
+  });
+
+  it('does not render notification control or user pill when unauthenticated', () => {
+    setupAuth(null);
+
+    render(
+      <MemoryRouter>
+        <AppLayout />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByRole('button', { name: /Notifications/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/student@example.com/i)).not.toBeInTheDocument();
+  });
 });

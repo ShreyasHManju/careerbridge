@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/auth/useAuth';
+import { NotificationDrawer } from '@/components/notifications/NotificationDrawer';
 
 /**
  * Minimal Authenticated Application Shell
@@ -50,15 +51,18 @@ export const AppLayout: React.FC = () => {
 
         <div className="cb-nav-user">
           {user && (
-            <div className="cb-user-pill">
-              <span className="cb-user-email">{user.email}</span>
-              <span className={`cb-role-tag cb-role-${user.role}`}>
-                {user.role}
-              </span>
-              {user.is_verified && (
-                <span className="cb-verified-badge" title="Verified Account">✓ Verified</span>
-              )}
-            </div>
+            <>
+              <NotificationDrawer />
+              <div className="cb-user-pill">
+                <span className="cb-user-email">{user.email}</span>
+                <span className={`cb-role-tag cb-role-${user.role}`}>
+                  {user.role}
+                </span>
+                {user.is_verified && (
+                  <span className="cb-verified-badge" title="Verified Account">✓ Verified</span>
+                )}
+              </div>
+            </>
           )}
           <button
             onClick={handleLogout}
