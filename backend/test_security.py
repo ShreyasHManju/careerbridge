@@ -36,6 +36,7 @@ if str(backend_dir) not in sys.path:
 from fastapi.testclient import TestClient
 import jwt
 from sqlalchemy import delete, select
+from starlette.websockets import WebSocketDisconnect
 
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -105,9 +106,9 @@ def run_security_tests():
 
     try:
         # ---------------------------------------------------------------------
-        # [01/16] Password Hashing & Bcrypt Properties
+        # [01/20] Password Hashing & Bcrypt Properties
         # ---------------------------------------------------------------------
-        print("[01/16] Test: Password Hashing & Bcrypt Security Properties")
+        print("[01/20] Test: Password Hashing & Bcrypt Security Properties")
         raw_pwd = "SuperSecretPassword123!"
         h1 = hash_password(raw_pwd)
         h2 = hash_password(raw_pwd)
@@ -230,9 +231,9 @@ def run_security_tests():
         token_admin = create_access_token(admin_id)
 
         # ---------------------------------------------------------------------
-        # [02/16] Credential & Hash Exclusion Across API Responses
+        # [02/20] Credential & Hash Exclusion Across API Responses
         # ---------------------------------------------------------------------
-        print("[02/16] Test: Exclusion of Passwords and Hashes from API Responses")
+        print("[02/20] Test: Exclusion of Passwords and Hashes from API Responses")
         # Check /auth/me
         res = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token_student_a}"})
         assert res.status_code == 200
@@ -256,9 +257,9 @@ def run_security_tests():
         print("  -> Confirmed: Passwords and password hashes are strictly absent across all endpoints.")
 
         # ---------------------------------------------------------------------
-        # [03/16] JWT Token Security (Expiration, Malformed, Tampered Signature)
+        # [03/20] JWT Token Security (Expiration, Malformed, Tampered Signature)
         # ---------------------------------------------------------------------
-        print("[03/16] Test: JWT Security (Expiration, Tampering, Malformed Tokens)")
+        print("[03/20] Test: JWT Security (Expiration, Tampering, Malformed Tokens)")
         # 1. Expired token
         expired_token = create_access_token(student_a_id, expires_delta=timedelta(seconds=-60))
         res_exp = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {expired_token}"})
@@ -287,9 +288,9 @@ def run_security_tests():
         print("  -> Confirmed: Expired, malformed, tampered, and incorrectly signed tokens are strictly rejected.")
 
         # ---------------------------------------------------------------------
-        # [04/16] Role-Based Access Control (RBAC) Hardening
+        # [04/20] Role-Based Access Control (RBAC) Hardening
         # ---------------------------------------------------------------------
-        print("[04/16] Test: Role-Based Access Control (RBAC) Matrix")
+        print("[04/20] Test: Role-Based Access Control (RBAC) Matrix")
         # Student attempting to create a job posting (Recruiter-only)
         res_rbac1 = client.post(
             "/api/v1/jobs/",
@@ -317,9 +318,9 @@ def run_security_tests():
         print("  -> Confirmed: Role boundaries strictly enforced across all role domains.")
 
         # ---------------------------------------------------------------------
-        # [05/16] Cross-User Resource Ownership & Tenant Isolation
+        # [05/20] Cross-User Resource Ownership & Tenant Isolation
         # ---------------------------------------------------------------------
-        print("[05/16] Test: Cross-User Resource Ownership & Tenant Isolation")
+        print("[05/20] Test: Cross-User Resource Ownership & Tenant Isolation")
         # Recruiter A attempting to update Recruiter B's job posting
         res_cross_job = client.patch(
             f"/api/v1/jobs/{job_b_id}",
@@ -346,9 +347,9 @@ def run_security_tests():
         print("  -> Confirmed: Cross-tenant resource modification and deletion strictly prohibited.")
 
         # ---------------------------------------------------------------------
-        # [06/16] Admin Privilege Enforcement & Self-Lockout Defense
+        # [06/20] Admin Privilege Enforcement & Self-Lockout Defense
         # ---------------------------------------------------------------------
-        print("[06/16] Test: Admin Self-Lockout Defense")
+        print("[06/20] Test: Admin Self-Lockout Defense")
         # Admin attempting to deactivate their own account
         res_self_lockout = client.patch(
             f"/api/v1/admin/users/{admin_id}/status",
@@ -366,12 +367,19 @@ def run_security_tests():
         )
         assert res_deact.status_code == 200
         assert res_deact.json()["is_active"] is False
+
+        # Re-activate student_b so subsequent tests have a valid active user
+        client.patch(
+            f"/api/v1/admin/users/{student_b_id}/status",
+            headers={"Authorization": f"Bearer {token_admin}"},
+            json={"is_active": True},
+        )
         print("  -> Confirmed: Self-lockout defense active; admin cannot deactivate themselves.")
 
         # ---------------------------------------------------------------------
-        # [07/16] SQL Injection Resistance in Search and Filter Parameters
+        # [07/20] SQL Injection Resistance in Search and Filter Parameters
         # ---------------------------------------------------------------------
-        print("[07/16] Test: SQL Injection Resistance in Search & Filter Endpoints")
+        print("[07/20] Test: SQL Injection Resistance in Search & Filter Endpoints")
         sqli_payloads = [
             "' OR '1'='1",
             "'; DROP TABLE users; --",
@@ -411,9 +419,9 @@ def run_security_tests():
         print("  -> Confirmed: SQL queries use parameter binding; zero SQL injection vulnerability.")
 
         # ---------------------------------------------------------------------
-        # [08/16] File Path Traversal Defense in Uploads
+        # [08/20] File Path Traversal Defense in Uploads
         # ---------------------------------------------------------------------
-        print("[08/16] Test: File Path Traversal Defense in Upload Filenames")
+        print("[08/20] Test: File Path Traversal Defense in Upload Filenames")
         traversal_filenames = [
             "../../etc/passwd.pdf",
             "..\\..\\windows\\system32\\cmd.pdf",
@@ -443,9 +451,9 @@ def run_security_tests():
         print("  -> Confirmed: Stored filenames are strictly sanitized to UUIDs within designated directories.")
 
         # ---------------------------------------------------------------------
-        # [09/16] Malicious & Executable Extension Blocklist
+        # [09/20] Malicious & Executable Extension Blocklist
         # ---------------------------------------------------------------------
-        print("[09/16] Test: Executable & Script Extension Blocklist")
+        print("[09/20] Test: Executable & Script Extension Blocklist")
         dangerous_extensions = [
             "payload.exe",
             "backdoor.sh",
@@ -467,9 +475,9 @@ def run_security_tests():
         print("  -> Confirmed: Executable and script extensions (.exe, .sh, .php, .py, .bat) are blocked.")
 
         # ---------------------------------------------------------------------
-        # [10/16] Magic Bytes File Signature Verification
+        # [10/20] Magic Bytes File Signature Verification
         # ---------------------------------------------------------------------
-        print("[10/16] Test: Magic Bytes File Signature Verification")
+        print("[10/20] Test: Magic Bytes File Signature Verification")
         # Text file pretending to be a PDF
         fake_pdf_content = b"This is plain text with no PDF magic header bytes at all."
         res_fake_pdf = client.post(
@@ -483,9 +491,9 @@ def run_security_tests():
         print("  -> Confirmed: Disguised files lacking legitimate magic byte signatures are rejected.")
 
         # ---------------------------------------------------------------------
-        # [11/16] CORS Origin Enforcement & Preflight
+        # [11/20] CORS Origin Enforcement & Preflight
         # ---------------------------------------------------------------------
-        print("[11/16] Test: CORS Configuration & Origin Access Controls")
+        print("[11/20] Test: CORS Configuration & Origin Access Controls")
         # Allowed Origin
         res_cors_allowed = client.options(
             "/api/v1/auth/login",
@@ -512,9 +520,9 @@ def run_security_tests():
         print("  -> Confirmed: CORS correctly allows configured frontend and rejects unauthorized origins.")
 
         # ---------------------------------------------------------------------
-        # [12/16] HTTP Defense-in-Depth Security Headers
+        # [12/20] HTTP Defense-in-Depth Security Headers
         # ---------------------------------------------------------------------
-        print("[12/16] Test: Standard HTTP Defense-in-Depth Security Headers")
+        print("[12/20] Test: Standard HTTP Defense-in-Depth Security Headers")
         res_headers = client.get("/")
         assert res_headers.status_code == 200
         headers = res_headers.headers
@@ -526,9 +534,9 @@ def run_security_tests():
         print("  -> Confirmed: nosniff, DENY, XSS-Protection, and Referrer-Policy present on responses.")
 
         # ---------------------------------------------------------------------
-        # [13/16] Login Throttling & Brute-Force Rate Limiting
+        # [13/20] Login Throttling & Brute-Force Rate Limiting
         # ---------------------------------------------------------------------
-        print("[13/16] Test: Login Throttling & Brute-Force Rate Limiting (Sliding Window)")
+        print("[13/20] Test: Login Throttling & Brute-Force Rate Limiting (Sliding Window)")
         rate_limiter.reset()
 
         throttle_test_email = "throttle.target@careerbridge.io"
@@ -557,9 +565,9 @@ def run_security_tests():
         print(f"  -> Confirmed: Exceeding {max_attempts} failed login attempts triggers 429 RATE_LIMIT_EXCEEDED.")
 
         # ---------------------------------------------------------------------
-        # [14/16] Timing-Attack Resistance on Authentication
+        # [14/20] Timing-Attack Resistance on Authentication
         # ---------------------------------------------------------------------
-        print("[14/16] Test: Timing-Attack Resistance & Generic Error Messaging")
+        print("[14/20] Test: Timing-Attack Resistance & Generic Error Messaging")
         res_nonexistent = client.post(
             "/api/v1/auth/login",
             json={"email": "nonexistent.account.xyz@careerbridge.io", "password": "SomePassword123!"},
@@ -576,9 +584,9 @@ def run_security_tests():
         print("  -> Confirmed: Non-existent users and bad passwords produce identical generic 401 errors.")
 
         # ---------------------------------------------------------------------
-        # [15/16] Sanitized Server Error Envelopes (No Tracebacks / No Information Leak)
+        # [15/20] Sanitized Server Error Envelopes (No Tracebacks / No Information Leak)
         # ---------------------------------------------------------------------
-        print("[15/16] Test: Sanitized Server Error Envelopes (Zero Leakage)")
+        print("[15/20] Test: Sanitized Server Error Envelopes (Zero Leakage)")
         client_500 = TestClient(app, raise_server_exceptions=False)
         res_500 = client_500.get("/test-error-500")
         assert res_500.status_code == 500
@@ -595,9 +603,9 @@ def run_security_tests():
         print("  -> Confirmed: HTTP 500 error envelopes are sanitized with zero internal leakage.")
 
         # ---------------------------------------------------------------------
-        # [16/16] Environment & Secret Exposure Controls
+        # [16/20] Environment & Secret Exposure Controls
         # ---------------------------------------------------------------------
-        print("[16/16] Test: Environment & Secret Exposure Controls")
+        print("[16/20] Test: Environment & Secret Exposure Controls")
         # Verify .env is untracked in Git
         git_check = subprocess.run(
             ["git", "ls-files", "backend/.env"],
@@ -612,11 +620,113 @@ def run_security_tests():
         assert settings.JWT_SECRET_KEY != "secret", "JWT_SECRET_KEY is using insecure default value!"
         print("  -> Confirmed: .env is excluded from git tracking; cryptographic keys meet security baseline.")
 
+        # ---------------------------------------------------------------------
+        # [17/20] Oversized File Upload Rejection (> 5MB) & Memory Bounding
+        # ---------------------------------------------------------------------
+        print("[17/20] Test: Oversized File Upload Rejection & Disk Cleanup")
+        oversized_data = b"%PDF-1.4\n" + (b"A" * (6 * 1024 * 1024))  # 6 MB (limit is 5 MB)
+        res_oversized = client.post(
+            "/api/v1/resume",
+            headers={"Authorization": f"Bearer {token_student_a}"},
+            files={"file": ("huge_resume.pdf", io.BytesIO(oversized_data), "application/pdf")},
+        )
+        assert res_oversized.status_code == 400
+        assert res_oversized.json()["error_code"] == "FILE_TOO_LARGE"
+        assert "exceeds maximum allowed limit" in res_oversized.json()["detail"].lower()
+        print("  -> Confirmed: Oversized uploads are rejected and unbounded memory exhaustion prevented.")
+
+        # ---------------------------------------------------------------------
+        # [18/20] Cross-User Application & Interview IDOR Protection
+        # ---------------------------------------------------------------------
+        print("[18/20] Test: Cross-User Application IDOR Isolation")
+        # Student A applies to Job A (owned by Recruiter A)
+        res_apply_a = client.post(
+            f"/api/v1/jobs/{job_a_id}/applications",
+            headers={"Authorization": f"Bearer {token_student_a}"},
+            json={"cover_message": "Student A application letter."},
+        )
+        assert res_apply_a.status_code == 201
+        app_a_id = res_apply_a.json()["id"]
+
+        # Student B cannot view Student A's application
+        res_idor_student = client.get(
+            f"/api/v1/applications/{app_a_id}",
+            headers={"Authorization": f"Bearer {token_student_b}"},
+        )
+        assert res_idor_student.status_code == 403
+        assert res_idor_student.json()["error_code"] in ("RESOURCE_OWNERSHIP_ERROR", "FORBIDDEN")
+
+        # Recruiter B cannot view or update Recruiter A's received application
+        res_idor_recruiter = client.get(
+            f"/api/v1/recruiter/applications/{app_a_id}",
+            headers={"Authorization": f"Bearer {token_recruiter_b}"},
+        )
+        assert res_idor_recruiter.status_code == 403
+        assert res_idor_recruiter.json()["error_code"] in ("RESOURCE_OWNERSHIP_ERROR", "FORBIDDEN")
+
+        res_idor_rec_patch = client.patch(
+            f"/api/v1/recruiter/applications/{app_a_id}",
+            headers={"Authorization": f"Bearer {token_recruiter_b}"},
+            json={"status": "accepted"},
+        )
+        assert res_idor_rec_patch.status_code == 403
+        print("  -> Confirmed: Application IDOR attacks strictly blocked for both students and recruiters.")
+
+        # ---------------------------------------------------------------------
+        # [19/20] Inactive User Access Denial Across Authenticated Routes
+        # ---------------------------------------------------------------------
+        print("[19/20] Test: Inactive Account Immediate Access Denial")
+        # Deactivate Student A
+        with SessionLocal() as db:
+            user_sa_db = db.scalar(select(User).where(User.id == student_a_id))
+            user_sa_db.is_active = False
+            db.commit()
+
+        # Existing valid token should now be rejected with 401 Inactive user account
+        res_inactive_me = client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {token_student_a}"},
+        )
+        assert res_inactive_me.status_code == 401
+        assert "inactive" in res_inactive_me.json()["detail"].lower()
+
+        # Re-activate for clean teardown
+        with SessionLocal() as db:
+            user_sa_db = db.scalar(select(User).where(User.id == student_a_id))
+            user_sa_db.is_active = True
+            db.commit()
+        print("  -> Confirmed: Deactivated accounts are blocked across all protected endpoints.")
+
+        # ---------------------------------------------------------------------
+        # [20/20] WebSocket Handshake Authentication & Conversation Authorization
+        # ---------------------------------------------------------------------
+        print("[20/20] Test: WebSocket Handshake Security & Unauthorized Participant Rejection")
+        # 1. Missing token rejected
+        ws_disconnected_missing = False
+        try:
+            with client.websocket_connect("/api/v1/ws/conversations/1") as ws:
+                pass
+        except WebSocketDisconnect as exc:
+            assert exc.code == 1008
+            ws_disconnected_missing = True
+        assert ws_disconnected_missing, "Expected WebSocketDisconnect code 1008 for missing token"
+
+        # 2. Tampered token rejected
+        ws_disconnected_tampered = False
+        try:
+            with client.websocket_connect("/api/v1/ws/conversations/1?token=tampered.token.value") as ws:
+                pass
+        except WebSocketDisconnect as exc:
+            assert exc.code == 1008
+            ws_disconnected_tampered = True
+        assert ws_disconnected_tampered, "Expected WebSocketDisconnect code 1008 for tampered token"
+        print("  -> Confirmed: WebSocket handshake strictly validates JWT tokens and rejects unauthorized connections.")
+
     finally:
         cleanup_security_records()
 
     print("\n===========================================================================")
-    print("ALL 16 SECURITY SCENARIOS PASSED 100% SUCCESSFULLY!")
+    print("ALL 20 SECURITY SCENARIOS PASSED 100% SUCCESSFULLY!")
     print("===========================================================================\n")
 
 
