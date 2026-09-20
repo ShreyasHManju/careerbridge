@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -82,7 +82,10 @@ def list_users(
     summary="Get user by ID",
     description="Retrieve a single user by its primary key ID.",
 )
-def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(
+    user_id: int = Path(..., ge=1, description="Primary key identifier of the user record"),
+    db: Session = Depends(get_db),
+):
     user = db.scalar(select(User).where(User.id == user_id))
     if not user:
         raise HTTPException(
@@ -99,7 +102,9 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     description="Partially update an existing user's attributes.",
 )
 def update_user(
-    user_id: int, payload: UserUpdate, db: Session = Depends(get_db)
+    user_id: int = Path(..., ge=1, description="Primary key identifier of the user record"),
+    payload: UserUpdate = ...,
+    db: Session = Depends(get_db),
 ):
     user = db.scalar(select(User).where(User.id == user_id))
     if not user:
@@ -145,7 +150,10 @@ def update_user(
     summary="Delete user",
     description="Delete an existing user by ID.",
 )
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(
+    user_id: int = Path(..., ge=1, description="Primary key identifier of the user record"),
+    db: Session = Depends(get_db),
+):
     user = db.scalar(select(User).where(User.id == user_id))
     if not user:
         raise HTTPException(

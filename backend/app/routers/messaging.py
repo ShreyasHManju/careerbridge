@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -71,7 +71,7 @@ def list_conversations(
     summary="Get single conversation details",
 )
 def get_conversation(
-    conversation_id: int,
+    conversation_id: int = Path(..., ge=1, description="Primary key identifier of the conversation"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -91,8 +91,8 @@ def get_conversation(
     summary="Send a message in a conversation",
 )
 async def send_message(
-    conversation_id: int,
-    payload: MessageCreate,
+    conversation_id: int = Path(..., ge=1, description="Primary key identifier of the conversation"),
+    payload: MessageCreate = ...,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -125,7 +125,7 @@ async def send_message(
     summary="List messages in a conversation",
 )
 def list_messages(
-    conversation_id: int,
+    conversation_id: int = Path(..., ge=1, description="Primary key identifier of the conversation"),
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(20, ge=1, le=100, description="Page size (1-100)"),
     current_user: User = Depends(get_current_user),
@@ -157,7 +157,7 @@ def list_messages(
     summary="Mark all received messages in conversation as read",
 )
 async def mark_conversation_read(
-    conversation_id: int,
+    conversation_id: int = Path(..., ge=1, description="Primary key identifier of the conversation"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -191,7 +191,7 @@ async def mark_conversation_read(
     summary="Mark a single received message as read",
 )
 async def mark_single_message_read(
-    message_id: int,
+    message_id: int = Path(..., ge=1, description="Primary key identifier of the message"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):

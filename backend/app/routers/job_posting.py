@@ -1,6 +1,6 @@
 import math
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -252,7 +252,7 @@ def browse_active_job_postings(
     description="Retrieve details of a job posting by ID. Inactive postings are hidden from candidates (404) but accessible to the owning recruiter or admin.",
 )
 def get_job_posting_by_id(
-    job_id: int,
+    job_id: int = Path(..., ge=1, description="Primary key identifier of the job posting"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -290,8 +290,8 @@ def get_job_posting_by_id(
     description="Allows the owning recruiter to partially update a job posting. Rejects attempts by other recruiters (403).",
 )
 def update_job_posting(
-    job_id: int,
-    payload: JobPostingUpdate,
+    job_id: int = Path(..., ge=1, description="Primary key identifier of the job posting"),
+    payload: JobPostingUpdate = ...,
     current_user: User = Depends(require_role(UserRole.RECRUITER)),
     db: Session = Depends(get_db),
 ):
@@ -344,7 +344,7 @@ def update_job_posting(
     description="Allows the owning recruiter to permanently delete a job posting. Rejects attempts by other recruiters (403).",
 )
 def delete_job_posting(
-    job_id: int,
+    job_id: int = Path(..., ge=1, description="Primary key identifier of the job posting"),
     current_user: User = Depends(require_role(UserRole.RECRUITER)),
     db: Session = Depends(get_db),
 ):

@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
@@ -25,7 +25,7 @@ router = APIRouter(tags=["Saved Jobs"])
     description="Allows an authenticated student to bookmark an active job or internship posting. Ownership is strictly bound to current_user.id.",
 )
 def save_job_posting(
-    job_id: int,
+    job_id: int = Path(..., ge=1, description="Primary key identifier of the job posting to bookmark"),
     current_user: User = Depends(require_role(UserRole.STUDENT)),
     db: Session = Depends(get_db),
 ):
@@ -96,7 +96,7 @@ def save_job_posting(
     description="Returns whether the specified job is saved by the authenticated student along with the saved_at timestamp.",
 )
 def check_saved_job_status(
-    job_id: int,
+    job_id: int = Path(..., ge=1, description="Primary key identifier of the job posting to inspect"),
     current_user: User = Depends(require_role(UserRole.STUDENT)),
     db: Session = Depends(get_db),
 ):
@@ -144,7 +144,7 @@ def check_saved_job_status(
     description="Allows an authenticated student to remove a bookmark for a job posting. Returns 204 No Content on success.",
 )
 def remove_saved_job(
-    job_id: int,
+    job_id: int = Path(..., ge=1, description="Primary key identifier of the job posting to unbookmark"),
     current_user: User = Depends(require_role(UserRole.STUDENT)),
     db: Session = Depends(get_db),
 ):

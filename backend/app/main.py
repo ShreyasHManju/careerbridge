@@ -55,6 +55,78 @@ class SecurityHeadersMiddleware:
         await self.app(scope, receive, send_with_security_headers)
 
 
+TAGS_METADATA = [
+    {
+        "name": "Authentication",
+        "description": "User authentication, JWT token issuance, and authenticated identity retrieval.",
+    },
+    {
+        "name": "Users",
+        "description": "User account registration and management operations.",
+    },
+    {
+        "name": "Student Profile",
+        "description": "Student candidate profiles, educational backgrounds, skills, and portfolio links.",
+    },
+    {
+        "name": "Recruiter Profile",
+        "description": "Recruiter company profiles, corporate contact information, and verification status.",
+    },
+    {
+        "name": "Jobs & Internships",
+        "description": "Job and internship postings, discovery search, filtering, and recruiter management.",
+    },
+    {
+        "name": "Applications",
+        "description": "Internship and job application submissions, lifecycle status tracking, and recruiter review.",
+    },
+    {
+        "name": "Saved Jobs",
+        "description": "Student job bookmarking and saved opportunity management.",
+    },
+    {
+        "name": "Interviews",
+        "description": "Interview scheduling, updates, rescheduling, and cancellation workflows.",
+    },
+    {
+        "name": "Notifications",
+        "description": "In-app notifications, unread counters, and notification status updates.",
+    },
+    {
+        "name": "Messaging",
+        "description": "Direct one-to-one messaging conversations and message history.",
+    },
+    {
+        "name": "Real-Time Messaging",
+        "description": "Real-time WebSocket two-way messaging connection and live event broadcasts.",
+    },
+    {
+        "name": "Resume & Documents",
+        "description": "Student resume PDF/DOCX document uploads, metadata inspection, and downloads.",
+    },
+    {
+        "name": "Profile Image",
+        "description": "Student profile image avatar uploads, metadata inspection, and downloads.",
+    },
+    {
+        "name": "Dashboards",
+        "description": "Role-specific aggregate metrics and KPI analytics for students, recruiters, and admins.",
+    },
+    {
+        "name": "Admin",
+        "description": "Administrative moderation of user accounts, recruiter verifications, and job postings.",
+    },
+    {
+        "name": "RBAC Demonstration",
+        "description": "Role-based access control validation and role enforcement demonstration routes.",
+    },
+    {
+        "name": "Health",
+        "description": "Service health probes and uptime diagnostics.",
+    },
+]
+
+
 app = FastAPI(
     title="CareerBridge API",
     version="1.0.0",
@@ -100,6 +172,7 @@ Use the Swagger UI to explore and test the API interactively.
 """,
     docs_url="/docs",
     redoc_url="/redoc",
+    openapi_tags=TAGS_METADATA,
 )
 
 # Register CORS and Security Middlewares
@@ -134,10 +207,12 @@ app.include_router(users_router, prefix=settings.API_V1_STR)
 app.include_router(dashboards_router, prefix=settings.API_V1_STR)
 
 
-
-
-
-@app.get("/", tags=["Health"])
+@app.get(
+    "/",
+    tags=["Health"],
+    summary="API root status",
+    description="Root endpoint returning API service identity and health indicator.",
+)
 def root():
     return {
         "message": "CareerBridge API",
@@ -145,7 +220,12 @@ def root():
     }
 
 
-@app.get("/health", tags=["Health"])
+@app.get(
+    "/health",
+    tags=["Health"],
+    summary="System health check",
+    description="Health check endpoint verifying application connectivity and database availability.",
+)
 def health_check():
     db_ok = check_db_connection()
     if not db_ok:

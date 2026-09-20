@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -29,9 +29,9 @@ router = APIRouter(tags=["Interviews"])
     description="Allows a hiring recruiter to schedule an interview for a candidate application on an active job posting.",
 )
 def schedule_interview(
-    application_id: int,
-    payload: InterviewCreate,
-    background_tasks: BackgroundTasks,
+    application_id: int = Path(..., ge=1, description="Primary key identifier of the candidate application"),
+    payload: InterviewCreate = ...,
+    background_tasks: BackgroundTasks = ...,
     current_user: User = Depends(require_role(UserRole.RECRUITER)),
     db: Session = Depends(get_db),
 ):
@@ -113,7 +113,7 @@ def get_recruiter_interviews(
     description="Retrieves interview details. Accessible by the participating student, hiring recruiter, or administrator.",
 )
 def get_interview_detail(
-    interview_id: int,
+    interview_id: int = Path(..., ge=1, description="Primary key identifier of the scheduled interview"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -159,8 +159,8 @@ def get_interview_detail(
     description="Allows the hiring recruiter to update interview parameters or reschedule timing while enforcing conflict protection.",
 )
 def update_interview(
-    interview_id: int,
-    payload: InterviewUpdate,
+    interview_id: int = Path(..., ge=1, description="Primary key identifier of the scheduled interview"),
+    payload: InterviewUpdate = ...,
     current_user: User = Depends(require_role(UserRole.RECRUITER)),
     db: Session = Depends(get_db),
 ):
@@ -184,7 +184,7 @@ def update_interview(
     description="Allows the hiring recruiter to cancel an interview, transitioning status to cancelled and notifying the candidate.",
 )
 def cancel_interview(
-    interview_id: int,
+    interview_id: int = Path(..., ge=1, description="Primary key identifier of the scheduled interview"),
     current_user: User = Depends(require_role(UserRole.RECRUITER)),
     db: Session = Depends(get_db),
 ):

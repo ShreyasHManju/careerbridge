@@ -1,6 +1,6 @@
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
@@ -85,7 +85,7 @@ def list_users(
     description="Administrative endpoint to inspect a specific user account. Returns safe user metadata and excludes sensitive credential fields.",
 )
 def get_user_detail(
-    user_id: int,
+    user_id: int = Path(..., ge=1, description="Primary key identifier of the user account"),
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):
@@ -106,8 +106,8 @@ def get_user_detail(
     description="Administrative endpoint to toggle user activity. Enforces self-lockout prevention to prohibit an administrator from deactivating their own account.",
 )
 def update_user_status(
-    user_id: int,
-    payload: AdminUserStatusUpdate,
+    user_id: int = Path(..., ge=1, description="Primary key identifier of the user account"),
+    payload: AdminUserStatusUpdate = ...,
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):
@@ -228,8 +228,8 @@ def list_recruiters(
     description="Administrative endpoint to update recruiter verification status. Validates target user is a recruiter and has an existing profile.",
 )
 def update_recruiter_verification(
-    user_id: int,
-    payload: AdminRecruiterVerificationUpdate,
+    user_id: int = Path(..., ge=1, description="Primary key identifier of the recruiter user account"),
+    payload: AdminRecruiterVerificationUpdate = ...,
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):
@@ -365,8 +365,8 @@ def list_jobs_for_moderation(
     description="Administrative endpoint to moderate job posting visibility. Only updates is_active, leaving recruiter ownership and opportunity details intact.",
 )
 def update_job_status(
-    job_id: int,
-    payload: AdminJobStatusUpdate,
+    job_id: int = Path(..., ge=1, description="Primary key identifier of the job posting"),
+    payload: AdminJobStatusUpdate = ...,
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):

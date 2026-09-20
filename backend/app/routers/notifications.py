@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -85,7 +85,7 @@ def mark_all_as_read(
     description="Marks a specific notification as read for the authenticated user. Rejects unowned notifications with 404.",
 )
 def mark_notification_as_read(
-    notification_id: int,
+    notification_id: int = Path(..., ge=1, description="Primary key identifier of the notification to mark as read"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):

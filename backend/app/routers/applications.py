@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -31,9 +31,9 @@ router = APIRouter(tags=["Applications"])
     description="Allows an authenticated student to apply to an active job or internship posting. Ownership is securely bound to current_user.id.",
 )
 def apply_to_job_posting(
-    job_id: int,
-    payload: ApplicationCreate,
-    background_tasks: BackgroundTasks,
+    job_id: int = Path(..., ge=1, description="Primary key identifier of the job posting to apply to"),
+    payload: ApplicationCreate = ...,
+    background_tasks: BackgroundTasks = ...,
     current_user: User = Depends(require_role(UserRole.STUDENT)),
     db: Session = Depends(get_db),
 ):
@@ -136,7 +136,7 @@ def get_my_applications(
     description="Retrieve details of a single application. Accessible by the applicant student, the hiring recruiter, or admin.",
 )
 def get_application_by_id(
-    application_id: int,
+    application_id: int = Path(..., ge=1, description="Primary key identifier of the application"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -204,7 +204,7 @@ def get_recruiter_applications(
     description="Retrieves single candidate application for a job posting owned by the authenticated recruiter.",
 )
 def get_recruiter_application_by_id(
-    application_id: int,
+    application_id: int = Path(..., ge=1, description="Primary key identifier of the candidate application"),
     current_user: User = Depends(require_role(UserRole.RECRUITER)),
     db: Session = Depends(get_db),
 ):
@@ -237,9 +237,9 @@ def get_recruiter_application_by_id(
     description="Allows the hiring recruiter to transition application status (applied, reviewing, shortlisted, rejected, accepted).",
 )
 def update_application_status(
-    application_id: int,
-    payload: ApplicationUpdate,
-    background_tasks: BackgroundTasks,
+    application_id: int = Path(..., ge=1, description="Primary key identifier of the candidate application"),
+    payload: ApplicationUpdate = ...,
+    background_tasks: BackgroundTasks = ...,
     current_user: User = Depends(require_role(UserRole.RECRUITER)),
     db: Session = Depends(get_db),
 ):
