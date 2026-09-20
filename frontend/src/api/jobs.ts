@@ -1,9 +1,15 @@
 import { apiClient } from './client';
-import { JobPosting, JobPostingPagination, JobFilters } from '@/types/job';
+import {
+  JobPosting,
+  JobPostingPagination,
+  JobFilters,
+  JobPostingCreate,
+  JobPostingUpdate,
+} from '@/types/job';
 
 /**
- * Opportunity Discovery API Service
- * Handles listing, searching, filtering, paginating, and fetching job details.
+ * Opportunity Discovery & Recruiter Management API Service
+ * Handles candidate discovery search/filtering, and recruiter-owned job CRUD operations.
  */
 
 export async function getJobs(filters: JobFilters = {}): Promise<JobPostingPagination> {
@@ -53,4 +59,42 @@ export async function getJobs(filters: JobFilters = {}): Promise<JobPostingPagin
 export async function getJobById(id: number): Promise<JobPosting> {
   const response = await apiClient.get<JobPosting>(`/jobs/${id}`);
   return response.data;
+}
+
+/**
+ * Retrieve all job postings owned by the authenticated recruiter (active and inactive).
+ * GET /api/v1/jobs/my
+ */
+export async function getMyJobPostings(): Promise<JobPosting[]> {
+  const response = await apiClient.get<JobPosting[]>('/jobs/my');
+  return response.data;
+}
+
+/**
+ * Create a new job or internship posting (recruiter only).
+ * POST /api/v1/jobs
+ */
+export async function createJob(payload: JobPostingCreate): Promise<JobPosting> {
+  const response = await apiClient.post<JobPosting>('/jobs', payload);
+  return response.data;
+}
+
+/**
+ * Partially update an existing job posting (owning recruiter only).
+ * PATCH /api/v1/jobs/{id}
+ */
+export async function updateJob(
+  jobId: number,
+  payload: JobPostingUpdate
+): Promise<JobPosting> {
+  const response = await apiClient.patch<JobPosting>(`/jobs/${jobId}`, payload);
+  return response.data;
+}
+
+/**
+ * Permanently delete a job posting (owning recruiter only).
+ * DELETE /api/v1/jobs/{id}
+ */
+export async function deleteJob(jobId: number): Promise<void> {
+  await apiClient.delete<void>(`/jobs/${jobId}`);
 }

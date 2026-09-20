@@ -9,6 +9,7 @@ import { AppHome } from '@/pages/AppHome';
 import { StudentProfilePage } from '@/pages/StudentProfilePage';
 import { SavedJobsPage } from '@/pages/SavedJobsPage';
 import { RecruiterProfilePage } from '@/pages/RecruiterProfilePage';
+import { RecruiterJobsPage } from '@/pages/RecruiterJobsPage';
 import { JobDiscoveryPage } from '@/pages/JobDiscoveryPage';
 import { JobDetailPage } from '@/pages/JobDetailPage';
 import { StudentApplicationsPage } from '@/pages/StudentApplicationsPage';
@@ -46,6 +47,7 @@ export const App: React.FC = () => {
           {/* Recruiter-only domain routes */}
           <Route element={<ProtectedRoute allowedRoles={['recruiter']} />}>
             <Route path="/app/recruiter/profile" element={<RecruiterProfilePage />} />
+            <Route path="/app/recruiter/jobs" element={<RecruiterJobsPage />} />
             <Route path="/app/recruiter/applications" element={<RecruiterApplicationsPage />} />
             <Route path="/app/recruiter/interviews" element={<RecruiterInterviewsPage />} />
           </Route>

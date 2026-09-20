@@ -30,6 +30,40 @@ export interface JobPosting {
   updated_at: string;
 }
 
+export interface JobPostingCreate {
+  title: string;
+  description: string;
+  opportunity_type: OpportunityType;
+  company_name: string;
+  location?: string | null;
+  is_remote?: boolean;
+  employment_type: EmploymentType;
+  skills?: string | null;
+  minimum_qualification?: string | null;
+  experience_required?: string | null;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  application_deadline?: string | null;
+  is_active?: boolean;
+}
+
+export interface JobPostingUpdate {
+  title?: string;
+  description?: string;
+  opportunity_type?: OpportunityType;
+  company_name?: string;
+  location?: string | null;
+  is_remote?: boolean;
+  employment_type?: EmploymentType;
+  skills?: string | null;
+  minimum_qualification?: string | null;
+  experience_required?: string | null;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  application_deadline?: string | null;
+  is_active?: boolean;
+}
+
 export interface JobPostingPagination {
   items: JobPosting[];
   page: number;
