@@ -5,6 +5,7 @@ import { Application, ApplicationFilterStatus, ApplicationStatus } from '@/types
 import { JobPosting } from '@/types/job';
 import { RecruiterApplicationCard } from '@/components/applications/RecruiterApplicationCard';
 import { ApplicationFilterBar } from '@/components/applications/ApplicationFilterBar';
+import { ScheduleInterviewModal } from '@/components/interviews/ScheduleInterviewModal';
 import { ApiErrorResponse } from '@/types/api';
 
 export const RecruiterApplicationsPage: React.FC = () => {
@@ -14,6 +15,12 @@ export const RecruiterApplicationsPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [updatingAppId, setUpdatingAppId] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Scheduling modal state
+  const [schedulingTarget, setSchedulingTarget] = useState<{
+    application: Application;
+    job: JobPosting | null;
+  } | null>(null);
 
   // Client-side filter states
   const [statusFilter, setStatusFilter] = useState<ApplicationFilterStatus>('all');
@@ -137,7 +144,7 @@ export const RecruiterApplicationsPage: React.FC = () => {
         <div className="cb-page-header-title-group">
           <h1 className="cb-page-title">Candidate Applications</h1>
           <p className="cb-page-subtitle">
-            Review applicant submissions across all your job postings and triage candidate statuses.
+            Review applicant submissions across all your job postings, schedule interviews, and triage candidate statuses.
           </p>
         </div>
       </div>
@@ -223,12 +230,34 @@ export const RecruiterApplicationsPage: React.FC = () => {
                   application={app}
                   job={jobsMap.get(app.job_posting_id) || null}
                   onStatusChange={handleStatusChange}
+                  onScheduleInterview={(targetApp, targetJob) =>
+                    setSchedulingTarget({ application: targetApp, job: targetJob })
+                  }
                   isUpdating={updatingAppId === app.id}
                 />
               ))}
             </div>
           )}
         </div>
+      )}
+
+      {/* Schedule Interview Modal */}
+      {schedulingTarget && (
+        <ScheduleInterviewModal
+          isOpen={Boolean(schedulingTarget)}
+          applicationId={schedulingTarget.application.id}
+          candidateEmail={`Candidate #${schedulingTarget.application.student_id}`}
+          jobTitle={schedulingTarget.job?.title || `Job #${schedulingTarget.application.job_posting_id}`}
+          companyName={schedulingTarget.job?.company_name || 'Your Company'}
+          onClose={() => setSchedulingTarget(null)}
+          onSuccess={() => {
+            setToastMessage({
+              type: 'success',
+              text: `Interview scheduled successfully for Candidate #${schedulingTarget.application.student_id}.`,
+            });
+            setSchedulingTarget(null);
+          }}
+        />
       )}
     </div>
   );

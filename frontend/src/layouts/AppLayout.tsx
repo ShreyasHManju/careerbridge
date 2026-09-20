@@ -4,7 +4,7 @@ import { useAuth } from '@/auth/useAuth';
 
 /**
  * Minimal Authenticated Application Shell
- * Demonstrates CareerBridge branding, navigation placeholder, user identity, and sign-out.
+ * Demonstrates CareerBridge branding, navigation, user identity, and sign-out.
  */
 export const AppLayout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -37,8 +37,14 @@ export const AppLayout: React.FC = () => {
           {user?.role === 'student' && (
             <Link to="/app/applications" className="cb-nav-link">My Applications</Link>
           )}
+          {user?.role === 'student' && (
+            <Link to="/app/interviews" className="cb-nav-link">Interviews</Link>
+          )}
           {user?.role === 'recruiter' && (
             <Link to="/app/recruiter/applications" className="cb-nav-link">Applications</Link>
+          )}
+          {user?.role === 'recruiter' && (
+            <Link to="/app/recruiter/interviews" className="cb-nav-link">Interviews</Link>
           )}
         </nav>
 

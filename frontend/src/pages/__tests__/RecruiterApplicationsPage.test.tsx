@@ -164,6 +164,27 @@ describe('RecruiterApplicationsPage', () => {
     });
   });
 
+  it('opens ScheduleInterviewModal when Schedule Interview is clicked', async () => {
+    vi.spyOn(applicationsApi, 'getRecruiterApplications').mockResolvedValue([mockRecruiterApp1]);
+    vi.spyOn(jobsApi, 'getJobById').mockResolvedValue(mockJob10);
+
+    render(
+      <MemoryRouter>
+        <RecruiterApplicationsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Application #301')).toBeInTheDocument();
+    });
+
+    const scheduleBtn = screen.getByTestId('schedule-interview-btn-301');
+    fireEvent.click(scheduleBtn);
+
+    expect(screen.getByTestId('schedule-interview-modal')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Schedule Interview/i })).toBeInTheDocument();
+  });
+
   it('filters candidate applications by status client-side', async () => {
     vi.spyOn(applicationsApi, 'getRecruiterApplications').mockResolvedValue([
       mockRecruiterApp1,

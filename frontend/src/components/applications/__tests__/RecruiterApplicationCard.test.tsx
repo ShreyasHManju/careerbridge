@@ -78,6 +78,44 @@ describe('RecruiterApplicationCard Component', () => {
     expect(onStatusChangeMock).toHaveBeenCalledWith(201, 'reviewing');
   });
 
+  it('invokes onScheduleInterview when Schedule Interview button is clicked on eligible application', () => {
+    const onScheduleMock = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <RecruiterApplicationCard
+          application={mockApplication}
+          job={mockJob}
+          onStatusChange={vi.fn()}
+          onScheduleInterview={onScheduleMock}
+        />
+      </MemoryRouter>
+    );
+
+    const scheduleBtn = screen.getByRole('button', { name: /Schedule Interview/i });
+    expect(scheduleBtn).toBeInTheDocument();
+
+    fireEvent.click(scheduleBtn);
+    expect(onScheduleMock).toHaveBeenCalledWith(mockApplication, mockJob);
+  });
+
+  it('does NOT render Schedule Interview button when application is rejected or accepted', () => {
+    const rejectedApp: Application = { ...mockApplication, status: 'rejected' };
+
+    render(
+      <MemoryRouter>
+        <RecruiterApplicationCard
+          application={rejectedApp}
+          job={mockJob}
+          onStatusChange={vi.fn()}
+          onScheduleInterview={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByRole('button', { name: /Schedule Interview/i })).not.toBeInTheDocument();
+  });
+
   it('displays error alert and reverts select value when status update fails', async () => {
     const onStatusChangeMock = vi.fn().mockRejectedValueOnce({
       detail: 'Permission denied: Not enough permissions to update this application',

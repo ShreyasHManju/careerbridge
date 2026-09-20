@@ -8,6 +8,7 @@ interface RecruiterApplicationCardProps {
   application: Application;
   job?: JobPosting | null;
   onStatusChange: (applicationId: number, newStatus: ApplicationStatus) => Promise<void>;
+  onScheduleInterview?: (application: Application, job: JobPosting | null) => void;
   isUpdating?: boolean;
 }
 
@@ -23,6 +24,7 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
   application,
   job,
   onStatusChange,
+  onScheduleInterview,
   isUpdating = false,
 }) => {
   const [selectedStatus, setSelectedStatus] = useState<ApplicationStatus>(application.status);
@@ -65,6 +67,10 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
   };
 
   const isBusy = localUpdating || isUpdating;
+  const isInterviewEligible =
+    application.status === 'applied' ||
+    application.status === 'reviewing' ||
+    application.status === 'shortlisted';
 
   return (
     <article
@@ -153,6 +159,20 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
         <div className="cb-app-card-cover-message cb-app-card-cover-empty">
           <span className="cb-app-card-cover-label">Cover Message:</span>
           <p className="cb-app-card-cover-text">No cover message provided.</p>
+        </div>
+      )}
+
+      {/* Recruiter Action Row */}
+      {onScheduleInterview && isInterviewEligible && (
+        <div className="cb-app-card-bottom-actions">
+          <button
+            type="button"
+            className="cb-btn cb-btn-outline-primary cb-btn-sm"
+            onClick={() => onScheduleInterview(application, job || null)}
+            data-testid={`schedule-interview-btn-${application.id}`}
+          >
+            📅 Schedule Interview
+          </button>
         </div>
       )}
     </article>

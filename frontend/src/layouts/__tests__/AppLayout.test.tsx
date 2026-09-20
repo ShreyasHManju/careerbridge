@@ -51,8 +51,8 @@ function setupAuth(user: User | null) {
   });
 }
 
-describe('AppLayout Navigation (Phase F-06)', () => {
-  it('renders student navigation links including My Applications (/app/applications)', () => {
+describe('AppLayout Navigation (Phase F-08)', () => {
+  it('renders student navigation links including My Applications (/app/applications) and Interviews (/app/interviews)', () => {
     setupAuth(mockStudentUser);
 
     render(
@@ -65,11 +65,11 @@ describe('AppLayout Navigation (Phase F-06)', () => {
     expect(screen.getByRole('link', { name: /My Profile/i })).toHaveAttribute('href', '/app/student/profile');
     expect(screen.getByRole('link', { name: /Opportunities/i })).toHaveAttribute('href', '/app/jobs');
     expect(screen.getByRole('link', { name: /My Applications/i })).toHaveAttribute('href', '/app/applications');
+    expect(screen.getByRole('link', { name: /Interviews/i })).toHaveAttribute('href', '/app/interviews');
     expect(screen.queryByRole('link', { name: /^Applications$/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Applications \(Phase 5\)/i)).not.toBeInTheDocument();
   });
 
-  it('renders recruiter navigation links including Applications (/app/recruiter/applications)', () => {
+  it('renders recruiter navigation links including Applications (/app/recruiter/applications) and Interviews (/app/recruiter/interviews)', () => {
     setupAuth(mockRecruiterUser);
 
     render(
@@ -82,10 +82,11 @@ describe('AppLayout Navigation (Phase F-06)', () => {
     expect(screen.getByRole('link', { name: /Company Profile/i })).toHaveAttribute('href', '/app/recruiter/profile');
     expect(screen.getByRole('link', { name: /Opportunities/i })).toHaveAttribute('href', '/app/jobs');
     expect(screen.getByRole('link', { name: /^Applications$/i })).toHaveAttribute('href', '/app/recruiter/applications');
+    expect(screen.getByRole('link', { name: /Interviews/i })).toHaveAttribute('href', '/app/recruiter/interviews');
     expect(screen.queryByRole('link', { name: /My Applications/i })).not.toBeInTheDocument();
   });
 
-  it('renders admin navigation without application self-service management link', () => {
+  it('renders admin navigation without application or interview self-service links', () => {
     setupAuth(mockAdminUser);
 
     render(
@@ -98,5 +99,6 @@ describe('AppLayout Navigation (Phase F-06)', () => {
     expect(screen.getByRole('link', { name: /Opportunities/i })).toHaveAttribute('href', '/app/jobs');
     expect(screen.queryByRole('link', { name: /My Applications/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Applications$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Interviews/i })).not.toBeInTheDocument();
   });
 });
