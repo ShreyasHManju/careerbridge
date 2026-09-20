@@ -46,11 +46,15 @@ class InterviewService:
         end_time = start_time + timedelta(minutes=duration_minutes)
 
         active_statuses = [InterviewStatus.SCHEDULED, InterviewStatus.RESCHEDULED]
+        # Max interview duration allowed by system is 480 minutes (8 hours)
+        window_lower_bound = start_time - timedelta(minutes=480)
 
-        # 1. Check Recruiter active interviews
+        # 1. Check Recruiter active interviews within the relevant time window
         recruiter_stmt = select(Interview).where(
             Interview.recruiter_id == recruiter_id,
             Interview.status.in_(active_statuses),
+            Interview.scheduled_at < end_time,
+            Interview.scheduled_at > window_lower_bound,
         )
         if exclude_interview_id is not None:
             recruiter_stmt = recruiter_stmt.where(Interview.id != exclude_interview_id)
@@ -69,10 +73,12 @@ class InterviewService:
                     detail="Recruiter has a conflicting interview scheduled during this time window",
                 )
 
-        # 2. Check Student active interviews
+        # 2. Check Student active interviews within the relevant time window
         student_stmt = select(Interview).where(
             Interview.student_id == student_id,
             Interview.status.in_(active_statuses),
+            Interview.scheduled_at < end_time,
+            Interview.scheduled_at > window_lower_bound,
         )
         if exclude_interview_id is not None:
             student_stmt = student_stmt.where(Interview.id != exclude_interview_id)

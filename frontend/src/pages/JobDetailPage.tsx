@@ -39,17 +39,18 @@ export const JobDetailPage: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      const jobData = await getJobById(numericJobId);
-      setJob(jobData);
+      const savedJobPromise = isStudent
+        ? getSavedJobStatus(numericJobId).catch(() => null)
+        : Promise.resolve(null);
 
-      // If student, check saved status
-      if (isStudent) {
-        try {
-          const status = await getSavedJobStatus(numericJobId);
-          setIsSaved(status.is_saved);
-        } catch {
-          // Non-critical saved status fetch error
-        }
+      const [jobData, savedStatus] = await Promise.all([
+        getJobById(numericJobId),
+        savedJobPromise,
+      ]);
+
+      setJob(jobData);
+      if (savedStatus) {
+        setIsSaved(savedStatus.is_saved);
       }
     } catch (err: unknown) {
       const apiError = err as ApiErrorResponse;

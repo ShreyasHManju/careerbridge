@@ -243,4 +243,21 @@ describe('JobDetailPage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Apply for Cloud Infrastructure Intern/i })).toBeInTheDocument();
   });
+
+  it('renders job details successfully even when saved status check fails', async () => {
+    vi.spyOn(jobsApi, 'getJobById').mockResolvedValueOnce(mockJob);
+    vi.spyOn(savedJobsApi, 'getSavedJobStatus').mockRejectedValueOnce({
+      status: 500,
+      message: 'Failed to fetch saved status',
+    });
+
+    renderWithRouter();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('job-detail-container')).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Cloud Infrastructure Intern' })).toBeInTheDocument();
+    expect(screen.getByTestId('detail-save-btn')).toHaveTextContent('☆ Save Opportunity');
+  });
 });

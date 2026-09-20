@@ -1,7 +1,7 @@
 from datetime import datetime
 import enum
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -30,6 +30,7 @@ class Application(Base):
         UniqueConstraint(
             "job_posting_id", "student_id", name="uq_job_posting_student_application"
         ),
+        Index("ix_applications_student_id_created_at", "student_id", "created_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

@@ -148,7 +148,9 @@ def get_application_by_id(
     - Admins may view any application.
     """
     application = db.scalar(
-        select(Application).where(Application.id == application_id)
+        select(Application)
+        .options(joinedload(Application.job_posting))
+        .where(Application.id == application_id)
     )
     if not application:
         raise HTTPException(
@@ -213,7 +215,9 @@ def get_recruiter_application_by_id(
     Rejects cross-recruiter access with 403 Forbidden.
     """
     application = db.scalar(
-        select(Application).where(Application.id == application_id)
+        select(Application)
+        .options(joinedload(Application.job_posting))
+        .where(Application.id == application_id)
     )
     if not application:
         raise HTTPException(

@@ -12,7 +12,7 @@ if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.core.database import SessionLocal
 from app.core.security import create_access_token, hash_password
@@ -1261,6 +1261,86 @@ def test_cascade_deletion_on_recruiter_user_delete():
         assert db.scalar(select(Interview).where(Interview.id == inv_id)) is None
 
 
+def test_interview_conflict_boundary_conditions():
+    """Verify exact interval boundary conditions, overlap detection, and self-edit immunity in SQL-bounded check_conflicts."""
+    rec1_headers = get_auth_headers(RECRUITER1_EMAIL)
+    with SessionLocal() as db:
+        rec1 = db.scalar(select(User).where(User.email == RECRUITER1_EMAIL))
+        stu1 = db.scalar(select(User).where(User.email == STUDENT1_EMAIL))
+        # Find or create an application
+        app = db.scalar(
+            select(Application)
+            .join(JobPosting)
+            .where(JobPosting.recruiter_id == rec1.id, Application.student_id == stu1.id, Application.status.in_([ApplicationStatus.APPLIED, ApplicationStatus.REVIEWING, ApplicationStatus.SHORTLISTED]))
+        )
+        app_id = app.id
+
+    base_time = (datetime.now(timezone.utc) + timedelta(days=10)).replace(hour=10, minute=0, second=0, microsecond=0)
+
+    # 1. Create base interview: [10:00, 10:30) (30 mins)
+    resp = client.post(
+        f"/api/v1/applications/{app_id}/interviews",
+        headers=rec1_headers,
+        json={"scheduled_at": base_time.isoformat(), "duration_minutes": 30},
+    )
+    assert resp.status_code == 201
+    base_inv_id = resp.json()["id"]
+
+    try:
+        # 2. Exact Boundary End: [10:30, 11:00) starts exactly when base ends -> SUCCESS (201)
+        boundary_end_time = base_time + timedelta(minutes=30)
+        resp_boundary_end = client.post(
+            f"/api/v1/applications/{app_id}/interviews",
+            headers=rec1_headers,
+            json={"scheduled_at": boundary_end_time.isoformat(), "duration_minutes": 30},
+        )
+        assert resp_boundary_end.status_code == 201
+        boundary_inv_id = resp_boundary_end.json()["id"]
+
+        # 3. Exact Boundary Start: [09:30, 10:00) ends exactly when base starts -> SUCCESS (201)
+        boundary_start_time = base_time - timedelta(minutes=30)
+        resp_boundary_start = client.post(
+            f"/api/v1/applications/{app_id}/interviews",
+            headers=rec1_headers,
+            json={"scheduled_at": boundary_start_time.isoformat(), "duration_minutes": 30},
+        )
+        assert resp_boundary_start.status_code == 201
+        boundary_start_inv_id = resp_boundary_start.json()["id"]
+
+        # 4. Partial Overlap Inside: [10:15, 10:45) -> FAILS 409
+        overlap_time = base_time + timedelta(minutes=15)
+        resp_overlap = client.post(
+            f"/api/v1/applications/{app_id}/interviews",
+            headers=rec1_headers,
+            json={"scheduled_at": overlap_time.isoformat(), "duration_minutes": 30},
+        )
+        assert resp_overlap.status_code == 409
+        assert "conflicting interview" in resp_overlap.json()["detail"].lower()
+
+        # 5. Editing base interview without changing time -> SUCCESS 200 (No self-conflict)
+        resp_self_edit = client.patch(
+            f"/api/v1/interviews/{base_inv_id}",
+            headers=rec1_headers,
+            json={"notes": "Updated notes without moving time slot"},
+        )
+        assert resp_self_edit.status_code == 200
+
+        # Cleanup created boundary interviews
+        with SessionLocal() as db:
+            ids_to_del = [base_inv_id]
+            if 'boundary_inv_id' in locals():
+                ids_to_del.append(boundary_inv_id)
+            if 'boundary_start_inv_id' in locals():
+                ids_to_del.append(boundary_start_inv_id)
+            db.execute(text(f"DELETE FROM notifications WHERE id > 0 AND title LIKE '%Interview%'"))
+            db.execute(text(f"DELETE FROM interviews WHERE id IN ({','.join(map(str, ids_to_del))})"))
+            db.commit()
+    finally:
+        with SessionLocal() as db:
+            db.execute(text(f"DELETE FROM interviews WHERE id = {base_inv_id}"))
+            db.commit()
+
+
 if __name__ == "__main__":
     setup_module()
     try:
@@ -1346,6 +1426,8 @@ if __name__ == "__main__":
         print("PASS: test_recruiter_interviews_sorted_chronological_ascending")
         test_no_password_hash_leakage_in_interview_responses()
         print("PASS: test_no_password_hash_leakage_in_interview_responses")
+        test_interview_conflict_boundary_conditions()
+        print("PASS: test_interview_conflict_boundary_conditions")
         test_cascade_deletion_on_student_user_delete()
         print("PASS: test_cascade_deletion_on_student_user_delete")
         test_cascade_deletion_on_recruiter_user_delete()

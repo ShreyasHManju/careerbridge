@@ -1025,6 +1025,59 @@ def test_cascade_deletion_on_user_delete():
             db.commit()
 
 
+def test_batched_conversation_listing_multi_conversations():
+    """Verify batched conversation listing handles multiple conversations with exact latest message, unread count, and <= 3 DB queries."""
+    from sqlalchemy import event
+    from app.core.database import engine
+
+    headers_s1 = get_auth_headers(STUDENT1_EMAIL)
+
+    # Ensure multiple conversations exist for student 1
+    with SessionLocal() as db:
+        s1 = db.scalar(select(User).where(User.email == STUDENT1_EMAIL))
+        s2 = db.scalar(select(User).where(User.email == STUDENT2_EMAIL))
+        r1 = db.scalar(select(User).where(User.email == RECRUITER1_EMAIL))
+        r2 = db.scalar(select(User).where(User.email == RECRUITER2_EMAIL))
+
+    # Create/ensure conversations with r1, r2, and s2
+    client.post("/api/v1/conversations", headers=headers_s1, json={"other_user_id": r1.id, "initial_message": "Hello Recruiter 1"})
+    client.post("/api/v1/conversations", headers=headers_s1, json={"other_user_id": r2.id, "initial_message": "Hello Recruiter 2"})
+    client.post("/api/v1/conversations", headers=headers_s1, json={"other_user_id": s2.id, "initial_message": "Hello Student 2"})
+
+    # Send a message from Recruiter 1 to Student 1
+    headers_r1 = get_auth_headers(RECRUITER1_EMAIL)
+    r1_conv_id = client.post("/api/v1/conversations", headers=headers_r1, json={"other_user_id": s1.id}).json()["id"]
+    client.post(f"/api/v1/conversations/{r1_conv_id}/messages", headers=headers_r1, json={"body": "Latest from Recruiter 1"})
+
+    # Track SQL query count during list_conversations
+    query_count = 0
+    def count_queries(conn, cursor, statement, parameters, context, executemany):
+        nonlocal query_count
+        # Ignore rollback/commit or unrelated auth statements if any
+        if not statement.strip().upper().startswith(("ROLLBACK", "COMMIT")):
+            query_count += 1
+
+    event.listen(engine, "before_cursor_execute", count_queries)
+    try:
+        resp = client.get("/api/v1/conversations", headers=headers_s1)
+    finally:
+        event.remove(engine, "before_cursor_execute", count_queries)
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "items" in data
+    assert len(data["items"]) >= 3
+
+    # Verify query count is strictly bounded (1 for auth user + 3 for batched conversations = at most 4 total SQL queries)
+    assert query_count <= 4, f"Expected <= 4 queries for list_conversations with 3+ conversations, but got {query_count}"
+
+    # Verify unread count and latest message for the recruiter 1 conversation
+    r1_conv = next(item for item in data["items"] if item["id"] == r1_conv_id)
+    assert r1_conv["unread_count"] >= 1
+    assert r1_conv["last_message"] is not None
+    assert r1_conv["last_message"]["body"] == "Latest from Recruiter 1"
+
+
 if __name__ == "__main__":
     setup_module()
     try:
@@ -1120,6 +1173,8 @@ if __name__ == "__main__":
         print("PASS: test_invalid_conversation_id_handled_correctly")
         test_no_password_hash_leakage_in_messaging_responses()
         print("PASS: test_no_password_hash_leakage_in_messaging_responses")
+        test_batched_conversation_listing_multi_conversations()
+        print("PASS: test_batched_conversation_listing_multi_conversations")
         test_cascade_deletion_on_user_delete()
         print("PASS: test_cascade_deletion_on_user_delete")
         print("\n=======================================================")

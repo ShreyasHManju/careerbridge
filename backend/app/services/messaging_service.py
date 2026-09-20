@@ -194,6 +194,7 @@ class MessagingService:
         """
         List all conversations for the current user, ordered by most recent activity.
         Strictly excludes conversations belonging to other users.
+        Uses batched queries to avoid 1 + 2N query overhead.
         """
         conversations = db.scalars(
             select(Conversation)
@@ -212,10 +213,67 @@ class MessagingService:
             .order_by(Conversation.updated_at.desc(), Conversation.id.desc())
         ).all()
 
-        return [
-            cls._build_conversation_response(db, conv, current_user.id)
-            for conv in conversations
-        ]
+        if not conversations:
+            return []
+
+        conv_ids = [c.id for c in conversations]
+
+        # 1. Batched unread counts query for all conversations
+        unread_rows = db.execute(
+            select(
+                Message.conversation_id,
+                func.count(Message.id).label("unread_count"),
+            )
+            .where(
+                Message.conversation_id.in_(conv_ids),
+                Message.sender_id != current_user.id,
+                Message.is_read.is_(False),
+            )
+            .group_by(Message.conversation_id)
+        ).all()
+        unread_map = {row[0]: int(row[1]) for row in unread_rows}
+
+        # 2. Batched latest messages query using window function
+        subq = (
+            select(
+                Message.id,
+                func.row_number()
+                .over(
+                    partition_by=Message.conversation_id,
+                    order_by=(Message.created_at.desc(), Message.id.desc()),
+                )
+                .label("rn"),
+            )
+            .where(Message.conversation_id.in_(conv_ids))
+            .subquery()
+        )
+        latest_ids_select = select(subq.c.id).where(subq.c.rn == 1)
+        latest_messages = db.scalars(
+            select(Message)
+            .options(joinedload(Message.sender))
+            .where(Message.id.in_(latest_ids_select))
+        ).all()
+        latest_msg_map = {
+            m.conversation_id: cls._build_message_response(m) for m in latest_messages
+        }
+
+        # 3. Assemble response objects in exact conversation order
+        responses: List[ConversationResponse] = []
+        for conv in conversations:
+            other_user = conv.user2 if conv.user1_id == current_user.id else conv.user1
+            other_summary = cls._build_participant_summary(other_user)
+            responses.append(
+                ConversationResponse(
+                    id=conv.id,
+                    created_at=conv.created_at,
+                    updated_at=conv.updated_at,
+                    other_participant=other_summary,
+                    last_message=latest_msg_map.get(conv.id),
+                    unread_count=unread_map.get(conv.id, 0),
+                )
+            )
+
+        return responses
 
     @classmethod
     def get_conversation(

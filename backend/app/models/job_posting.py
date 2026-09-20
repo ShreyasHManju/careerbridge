@@ -1,7 +1,7 @@
 from datetime import datetime
 import enum
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -30,6 +30,9 @@ class JobPosting(Base):
     Connected many-to-one to User (holding the RECRUITER role).
     """
     __tablename__ = "job_postings"
+    __table_args__ = (
+        Index("ix_job_postings_is_active_created_at", "is_active", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     recruiter_id: Mapped[int] = mapped_column(
