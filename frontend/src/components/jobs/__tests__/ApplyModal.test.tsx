@@ -31,7 +31,6 @@ const mockApplicationResponse: Application = {
   student_id: 5,
   status: 'applied',
   cover_message: 'Excited for this opportunity!',
-  resume_id: 12,
   created_at: '2026-09-19T12:00:00Z',
   updated_at: '2026-09-19T12:00:00Z',
 };

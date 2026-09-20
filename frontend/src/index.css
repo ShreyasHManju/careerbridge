@@ -1015,3 +1015,329 @@ body {
   color: var(--cb-text);
   line-height: 1.6;
 }
+
+/* ========================================================
+   Phase F-06: Application Management Styles
+   ======================================================== */
+
+/* --- Status Badges --- */
+.cb-app-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.cb-app-status-indicator {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+}
+
+.cb-app-badge-applied {
+  background-color: #ebf5ff;
+  color: #1e429f;
+  border: 1px solid #c3ddfd;
+}
+.cb-app-badge-applied .cb-app-status-indicator {
+  background-color: #3f83f8;
+}
+
+.cb-app-badge-reviewing {
+  background-color: #fefce8;
+  color: #713f12;
+  border: 1px solid #fef08a;
+}
+.cb-app-badge-reviewing .cb-app-status-indicator {
+  background-color: #eab308;
+}
+
+.cb-app-badge-shortlisted {
+  background-color: #f5f3ff;
+  color: #4c1d95;
+  border: 1px solid #ddd6fe;
+}
+.cb-app-badge-shortlisted .cb-app-status-indicator {
+  background-color: #8b5cf6;
+}
+
+.cb-app-badge-rejected {
+  background-color: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+.cb-app-badge-rejected .cb-app-status-indicator {
+  background-color: #ef4444;
+}
+
+.cb-app-badge-accepted {
+  background-color: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+.cb-app-badge-accepted .cb-app-status-indicator {
+  background-color: #22c55e;
+}
+
+.cb-app-badge-sm {
+  padding: 0.15rem 0.45rem;
+  font-size: 0.725rem;
+}
+
+.cb-app-badge-lg {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.9rem;
+}
+
+/* --- Student & Recruiter Applications Page Layout --- */
+.cb-student-applications-page,
+.cb-recruiter-applications-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.cb-applications-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.cb-applications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* --- Application Cards --- */
+.cb-student-app-card,
+.cb-recruiter-app-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cb-student-app-card:hover,
+.cb-recruiter-app-card:hover {
+  border-color: var(--cb-border-hover, #cbd5e1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.cb-app-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.cb-app-card-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 250px;
+}
+
+.cb-app-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  margin: 0;
+}
+
+.cb-app-card-link {
+  color: var(--cb-primary);
+  text-decoration: none;
+}
+
+.cb-app-card-link:hover {
+  text-decoration: underline;
+}
+
+.cb-app-card-company {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--cb-text-muted);
+  margin: 0;
+}
+
+.cb-app-card-status-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.cb-app-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--cb-text-muted);
+}
+
+.cb-app-card-location,
+.cb-app-card-date {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* --- Cover Message in Card --- */
+.cb-app-card-cover-message {
+  background-color: var(--cb-bg-subtle, #f8fafc);
+  border-left: 3px solid var(--cb-primary);
+  padding: 0.75rem 1rem;
+  border-radius: 0 0.375rem 0.375rem 0;
+}
+
+.cb-app-card-cover-empty {
+  border-left-color: var(--cb-border);
+  opacity: 0.75;
+}
+
+.cb-app-card-cover-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--cb-text-muted);
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.05em;
+}
+
+.cb-app-card-cover-text {
+  font-size: 0.9rem;
+  color: var(--cb-text);
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.cb-app-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* --- Recruiter Specific Card Controls --- */
+.cb-recruiter-card-subheading {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.cb-app-id-pill,
+.cb-candidate-id-pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background-color: var(--cb-bg-subtle, #f1f5f9);
+  color: var(--cb-text-muted);
+}
+
+.cb-candidate-id-pill {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+}
+
+.cb-recruiter-status-control-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.cb-status-select-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cb-status-select-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--cb-text-muted);
+  white-space: nowrap;
+}
+
+.cb-status-select {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  min-width: 120px;
+}
+
+.cb-status-updating-indicator {
+  font-size: 0.75rem;
+  color: var(--cb-primary);
+  font-weight: 500;
+}
+
+.cb-status-error-alert {
+  margin: 0.25rem 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+/* --- Application Filter Bar --- */
+.cb-app-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cb-app-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.cb-app-filter-search-group {
+  flex: 2;
+  min-width: 220px;
+}
+
+.cb-app-filter-status-group {
+  flex: 1;
+  min-width: 150px;
+}
+
+.cb-app-filter-actions {
+  display: flex;
+  align-items: flex-end;
+  height: 38px;
+}
+
+.cb-app-filter-count-bar {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--cb-border);
+  font-size: 0.85rem;
+  color: var(--cb-text-muted);
+}
+
+.cb-filtered-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.cb-toast-alert {
+  position: sticky;
+  top: 1rem;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.cb-retry-btn {
+  margin-top: 0.5rem;
+}

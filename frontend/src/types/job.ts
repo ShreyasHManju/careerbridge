@@ -67,18 +67,5 @@ export interface SavedJob {
   job_posting: JobPosting;
 }
 
-export interface Application {
-  id: number;
-  job_posting_id: number;
-  student_id: number;
-  status: string;
-  cover_message: string | null;
-  resume_id: number;
-  created_at: string;
-  updated_at: string;
-  job_posting?: JobPosting;
-}
-
-export interface ApplicationCreate {
-  cover_message?: string;
-}
+// Re-export canonical Application types from ./application
+export type { ApplicationStatus, Application, ApplicationCreate, ApplicationUpdate } from './application';

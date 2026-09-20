@@ -10,6 +10,8 @@ import { StudentProfilePage } from '@/pages/StudentProfilePage';
 import { RecruiterProfilePage } from '@/pages/RecruiterProfilePage';
 import { JobDiscoveryPage } from '@/pages/JobDiscoveryPage';
 import { JobDetailPage } from '@/pages/JobDetailPage';
+import { StudentApplicationsPage } from '@/pages/StudentApplicationsPage';
+import { RecruiterApplicationsPage } from '@/pages/RecruiterApplicationsPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 export const App: React.FC = () => {
@@ -34,10 +36,12 @@ export const App: React.FC = () => {
           {/* Student-only domain routes */}
           <Route element={<ProtectedRoute allowedRoles={['student']} />}>
             <Route path="/app/student/profile" element={<StudentProfilePage />} />
+            <Route path="/app/applications" element={<StudentApplicationsPage />} />
           </Route>
           {/* Recruiter-only domain routes */}
           <Route element={<ProtectedRoute allowedRoles={['recruiter']} />}>
             <Route path="/app/recruiter/profile" element={<RecruiterProfilePage />} />
+            <Route path="/app/recruiter/applications" element={<RecruiterApplicationsPage />} />
           </Route>
         </Route>
       </Route>
