@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.models.notification_preference import NotificationFrequency, NotificationPreference
 from app.models.user import User
 from app.schemas.notification import (
     NotificationMarkAllReadResponse,
     NotificationPaginationResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
     NotificationResponse,
     NotificationUnreadCountResponse,
 )
@@ -100,3 +104,93 @@ def mark_notification_as_read(
             detail="Notification not found",
         )
     return notification
+
+
+# --------------------------------------------------------------------------
+# Notification Preferences Endpoints (Phase 30B)
+# --------------------------------------------------------------------------
+@router.get(
+    "/preferences",
+    response_model=NotificationPreferenceResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get current user notification digest & delivery preferences",
+    description="Retrieves the notification frequency (instant vs digest) and email settings for the authenticated user. Defaults to instant delivery if not yet configured.",
+)
+def get_notification_preferences(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    pref = db.scalar(
+        select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
+    )
+    if not pref:
+        # Return default instant delivery settings without mutating DB unnecessarily
+        return NotificationPreferenceResponse(
+            id=None,
+            user_id=current_user.id,
+            frequency="instant",
+            email_notifications=True,
+            created_at=None,
+            updated_at=None,
+        )
+
+    return NotificationPreferenceResponse(
+        id=pref.id,
+        user_id=pref.user_id,
+        frequency=pref.frequency.value if hasattr(pref.frequency, "value") else str(pref.frequency),
+        email_notifications=pref.email_notifications,
+        created_at=pref.created_at,
+        updated_at=pref.updated_at,
+    )
+
+
+@router.patch(
+    "/preferences",
+    response_model=NotificationPreferenceResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update current user notification digest & delivery preferences",
+    description="Updates the notification frequency ('instant' or 'digest') and email notification toggles for the authenticated user.",
+)
+def update_notification_preferences(
+    payload: NotificationPreferenceUpdate = ...,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    pref = db.scalar(
+        select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
+    )
+
+    if not pref:
+        freq = (
+            NotificationFrequency(payload.frequency)
+            if payload.frequency
+            else NotificationFrequency.INSTANT
+        )
+        email_notif = (
+            payload.email_notifications
+            if payload.email_notifications is not None
+            else True
+        )
+        pref = NotificationPreference(
+            user_id=current_user.id,
+            frequency=freq,
+            email_notifications=email_notif,
+        )
+        db.add(pref)
+    else:
+        if payload.frequency is not None:
+            pref.frequency = NotificationFrequency(payload.frequency)
+        if payload.email_notifications is not None:
+            pref.email_notifications = payload.email_notifications
+
+    db.commit()
+    db.refresh(pref)
+
+    return NotificationPreferenceResponse(
+        id=pref.id,
+        user_id=pref.user_id,
+        frequency=pref.frequency.value if hasattr(pref.frequency, "value") else str(pref.frequency),
+        email_notifications=pref.email_notifications,
+        created_at=pref.created_at,
+        updated_at=pref.updated_at,
+    )

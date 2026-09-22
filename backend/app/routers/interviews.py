@@ -1,5 +1,6 @@
 from typing import List
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -13,6 +14,7 @@ from app.schemas.interview import (
     InterviewResponse,
     InterviewUpdate,
 )
+from app.services.export_service import generate_csv_stream
 from app.services.interview_service import InterviewService
 
 router = APIRouter(tags=["Interviews"])
@@ -194,3 +196,80 @@ def cancel_interview(
         recruiter_id=current_user.id,
     )
     return InterviewResponse.from_interview(interview)
+
+
+# --------------------------------------------------------------------------
+# Interview Data Export (Phase 30B)
+# --------------------------------------------------------------------------
+@router.get(
+    "/recruiter/interviews/export",
+    summary="Export scheduled interviews as CSV (Recruiter only)",
+    description="Streams a safe CSV file containing interviews scheduled by the authenticated recruiter. Protects against CSV formula injection.",
+)
+def export_recruiter_interviews_csv(
+    current_user: User = Depends(require_role(UserRole.RECRUITER)),
+    db: Session = Depends(get_db),
+):
+    """
+    Export recruiter interviews to CSV:
+    - Restricted to recruiters (403 for students / non-recruiters).
+    - Exports only interviews where recruiter_id == current_user.id.
+    - Sanitizes cell values against formula injection.
+    """
+    interviews = db.scalars(
+        select(Interview)
+        .options(joinedload(Interview.application).joinedload(Application.job_posting))
+        .where(Interview.recruiter_id == current_user.id)
+        .order_by(Interview.scheduled_at.desc())
+    ).all()
+
+    fieldnames = [
+        "interview_id",
+        "application_id",
+        "job_id",
+        "job_title",
+        "student_id",
+        "scheduled_at",
+        "duration_minutes",
+        "interview_type",
+        "status",
+        "location_or_link",
+        "notes",
+        "created_at",
+    ]
+
+    rows = []
+    for itv in interviews:
+        job_id = itv.application.job_posting_id if itv.application else ""
+        job_title = (
+            itv.application.job_posting.title
+            if itv.application and itv.application.job_posting
+            else ""
+        )
+        rows.append(
+            {
+                "interview_id": itv.id,
+                "application_id": itv.application_id,
+                "job_id": job_id,
+                "job_title": job_title,
+                "student_id": itv.student_id,
+                "scheduled_at": itv.scheduled_at.isoformat() if itv.scheduled_at else "",
+                "duration_minutes": itv.duration_minutes,
+                "interview_type": itv.interview_type.value if hasattr(itv.interview_type, "value") else str(itv.interview_type),
+                "status": itv.status.value if hasattr(itv.status, "value") else str(itv.status),
+                "location_or_link": itv.location_or_link or "",
+                "notes": itv.notes or "",
+                "created_at": itv.created_at.isoformat() if itv.created_at else "",
+            }
+        )
+
+    csv_stream = generate_csv_stream(fieldnames, rows)
+
+    return StreamingResponse(
+        csv_stream,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="recruiter_interviews.csv"',
+            "Content-Type": "text/csv; charset=utf-8",
+        },
+    )

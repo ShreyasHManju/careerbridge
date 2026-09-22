@@ -244,4 +244,94 @@ describe('RecruiterApplicationsPage', () => {
     expect(screen.queryByText('Application #301')).not.toBeInTheDocument();
     expect(screen.getByText(/No candidate applications match your selected filter criteria/i)).toBeInTheDocument();
   });
+
+  it('handles multi-select and select all toggling', async () => {
+    vi.spyOn(applicationsApi, 'getRecruiterApplications').mockResolvedValue([
+      mockRecruiterApp1,
+      mockRecruiterApp2,
+    ]);
+    vi.spyOn(jobsApi, 'getJobById').mockResolvedValue(mockJob10);
+
+    render(
+      <MemoryRouter>
+        <RecruiterApplicationsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Application #301')).toBeInTheDocument();
+    });
+
+    const selectAllCheckbox = screen.getByTestId('select-all-checkbox');
+    expect(selectAllCheckbox).not.toBeChecked();
+
+    // Select All
+    fireEvent.click(selectAllCheckbox);
+    expect(screen.getByTestId('selected-count-badge')).toHaveTextContent('2 selected');
+
+    // Deselect single
+    const checkbox1 = screen.getByTestId('select-app-checkbox-301');
+    fireEvent.click(checkbox1);
+    expect(screen.getByTestId('selected-count-badge')).toHaveTextContent('1 selected');
+  });
+
+  it('performs atomic bulk status update for selected applications', async () => {
+    vi.spyOn(applicationsApi, 'getRecruiterApplications').mockResolvedValue([
+      mockRecruiterApp1,
+      mockRecruiterApp2,
+    ]);
+    vi.spyOn(jobsApi, 'getJobById').mockResolvedValue(mockJob10);
+    const bulkSpy = vi.spyOn(applicationsApi, 'bulkUpdateApplicationStatus').mockResolvedValue({
+      updated_count: 2,
+      status: 'shortlisted',
+      items: [
+        { ...mockRecruiterApp1, status: 'shortlisted' },
+        { ...mockRecruiterApp2, status: 'shortlisted' },
+      ],
+    });
+
+    render(
+      <MemoryRouter>
+        <RecruiterApplicationsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Application #301')).toBeInTheDocument();
+    });
+
+    // Select All
+    fireEvent.click(screen.getByTestId('select-all-checkbox'));
+
+    // Choose shortlisted and apply
+    fireEvent.change(screen.getByTestId('bulk-status-select'), {
+      target: { value: 'shortlisted' },
+    });
+    fireEvent.click(screen.getByTestId('apply-bulk-status-btn'));
+
+    await waitFor(() => {
+      expect(bulkSpy).toHaveBeenCalledWith([301, 302], 'shortlisted');
+      expect(screen.getByText(/Successfully updated 2 applications to "shortlisted"/i)).toBeInTheDocument();
+    });
+  });
+
+  it('triggers CSV export when clicking the export button', async () => {
+    vi.spyOn(applicationsApi, 'getRecruiterApplications').mockResolvedValue([
+      mockRecruiterApp1,
+    ]);
+    vi.spyOn(jobsApi, 'getJobById').mockResolvedValue(mockJob10);
+
+    render(
+      <MemoryRouter>
+        <RecruiterApplicationsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Application #301')).toBeInTheDocument();
+    });
+
+    const exportBtn = screen.getByTestId('export-applications-btn');
+    expect(exportBtn).toBeInTheDocument();
+  });
 });

@@ -45,3 +45,19 @@ export interface NotificationFilters {
   page_size?: number;
   unread_only?: boolean;
 }
+
+export type NotificationFrequency = 'instant' | 'digest';
+
+export interface NotificationPreference {
+  id: number | null;
+  user_id: number;
+  frequency: NotificationFrequency;
+  email_notifications: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface NotificationPreferenceUpdate {
+  frequency?: NotificationFrequency;
+  email_notifications?: boolean;
+}

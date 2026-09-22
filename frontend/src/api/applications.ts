@@ -1,15 +1,17 @@
 import { apiClient } from './client';
 import {
   Application,
+  ApplicationBulkStatusResponse,
+  ApplicationBulkStatusUpdate,
   ApplicationCreate,
   ApplicationStatus,
   ApplicationUpdate,
 } from '@/types/application';
 
 /**
- * Applications API Service Module (Phase F-06)
+ * Applications API Service Module (Phase F-06 / Phase 30B)
  * Handles student application submission and tracking,
- * as well as recruiter application review and status lifecycle updates.
+ * as well as recruiter application review, batch updates, and lifecycle triage.
  */
 
 // ============================================================================
@@ -99,6 +101,25 @@ export async function updateApplicationStatus(
   const payload: ApplicationUpdate = { status };
   const response = await apiClient.patch<Application>(
     `/recruiter/applications/${applicationId}`,
+    payload
+  );
+  return response.data;
+}
+
+/**
+ * Atomically update multiple candidate application statuses in a single batch action (recruiter only).
+ * POST /api/v1/applications/bulk-status
+ */
+export async function bulkUpdateApplicationStatus(
+  applicationIds: number[],
+  status: ApplicationStatus
+): Promise<ApplicationBulkStatusResponse> {
+  const payload: ApplicationBulkStatusUpdate = {
+    application_ids: applicationIds,
+    status,
+  };
+  const response = await apiClient.post<ApplicationBulkStatusResponse>(
+    '/applications/bulk-status',
     payload
   );
   return response.data;

@@ -29,6 +29,17 @@ export interface ApplicationUpdate {
   status: ApplicationStatus;
 }
 
+export interface ApplicationBulkStatusUpdate {
+  application_ids: number[];
+  status: ApplicationStatus;
+}
+
+export interface ApplicationBulkStatusResponse {
+  updated_count: number;
+  status: ApplicationStatus;
+  items: Application[];
+}
+
 /**
  * Filter status options for client-side filtering
  */

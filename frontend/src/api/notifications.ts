@@ -5,10 +5,12 @@ import {
   NotificationUnreadCount,
   NotificationMarkAllRead,
   NotificationFilters,
+  NotificationPreference,
+  NotificationPreferenceUpdate,
 } from '@/types/notification';
 
 /**
- * Notifications API Service Module
+ * Notifications API Service Module (Phase F-09 / Phase 30B)
  * Aligned with backend router: /api/v1/notifications
  */
 
@@ -55,5 +57,28 @@ export async function markAllNotificationsAsRead(): Promise<NotificationMarkAllR
  */
 export async function markNotificationAsRead(notificationId: number): Promise<Notification> {
   const response = await apiClient.patch<Notification>(`/notifications/${notificationId}/read`);
+  return response.data;
+}
+
+/**
+ * Retrieve current user notification digest & delivery preferences.
+ * GET /api/v1/notifications/preferences
+ */
+export async function getNotificationPreferences(): Promise<NotificationPreference> {
+  const response = await apiClient.get<NotificationPreference>('/notifications/preferences');
+  return response.data;
+}
+
+/**
+ * Update current user notification digest & delivery preferences.
+ * PATCH /api/v1/notifications/preferences
+ */
+export async function updateNotificationPreferences(
+  payload: NotificationPreferenceUpdate
+): Promise<NotificationPreference> {
+  const response = await apiClient.patch<NotificationPreference>(
+    '/notifications/preferences',
+    payload
+  );
   return response.data;
 }

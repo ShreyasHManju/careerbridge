@@ -141,7 +141,7 @@ describe('NotificationDrawer Component', () => {
     await screen.findByText('Application Received');
 
     // Click Unread tab
-    const unreadTab = screen.getByRole('button', { name: /^Unread/i });
+    const unreadTab = screen.getByRole('tab', { name: /^Unread/i });
     await user.click(unreadTab);
 
     await waitFor(() => {
@@ -224,7 +224,7 @@ describe('NotificationDrawer Component', () => {
     await screen.findByText('Application Received');
 
     // Switch to Unread filter
-    await user.click(screen.getByRole('button', { name: /^Unread/i }));
+    await user.click(screen.getByRole('tab', { name: /^Unread/i }));
     await screen.findByText('Application Received');
 
     // Mark as read
@@ -280,7 +280,7 @@ describe('NotificationDrawer Component', () => {
     await screen.findByText('Application Received');
 
     // Switch to Unread
-    await user.click(screen.getByRole('button', { name: /^Unread/i }));
+    await user.click(screen.getByRole('tab', { name: /^Unread/i }));
 
     const markAllBtn = screen.getByRole('button', { name: /Mark all notifications as read/i });
     await user.click(markAllBtn);

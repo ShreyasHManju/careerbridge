@@ -24,6 +24,7 @@ def test_migrations():
     assert "users" in Base.metadata.tables, "Table 'users' missing from Base.metadata"
     assert "saved_jobs" in Base.metadata.tables, "Table 'saved_jobs' missing from Base.metadata"
     assert "notifications" in Base.metadata.tables, "Table 'notifications' missing from Base.metadata"
+    assert "notification_preferences" in Base.metadata.tables, "Table 'notification_preferences' missing from Base.metadata"
     assert "interviews" in Base.metadata.tables, "Table 'interviews' missing from Base.metadata"
     assert "conversations" in Base.metadata.tables, "Table 'conversations' missing from Base.metadata"
     assert "conversation_participants" in Base.metadata.tables, "Table 'conversation_participants' missing from Base.metadata"
@@ -43,6 +44,7 @@ def test_migrations():
     assert "profile_images" in tables, "Table 'profile_images' not found in database!"
     assert "saved_jobs" in tables, "Table 'saved_jobs' not found in database!"
     assert "notifications" in tables, "Table 'notifications' not found in database!"
+    assert "notification_preferences" in tables, "Table 'notification_preferences' not found in database!"
     assert "interviews" in tables, "Table 'interviews' not found in database!"
     assert "conversations" in tables, "Table 'conversations' not found in database!"
     assert "conversation_participants" in tables, "Table 'conversation_participants' not found in database!"
@@ -359,7 +361,14 @@ def test_migrations():
     assert "conversations" in msg_ref_tables, "FK to conversations missing on messages!"
     assert "users" in msg_ref_tables, "FK to users missing on messages!"
 
-    print("[15/15] Verifying alembic_version table in PostgreSQL")
+    print("[15/16] Verifying 'notification_preferences' table columns, indexes, and FKs")
+    pref_columns = {col["name"]: col for col in inspector.get_columns("notification_preferences")}
+    for c in ["id", "user_id", "frequency", "email_notifications", "created_at", "updated_at"]:
+        assert c in pref_columns, f"Column '{c}' missing from 'notification_preferences' table"
+    pref_fks = inspector.get_foreign_keys("notification_preferences")
+    assert any(fk.get("referred_table") == "users" for fk in pref_fks), "FK to users missing on notification_preferences!"
+
+    print("[16/16] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")

@@ -1,5 +1,6 @@
-from typing import List
+from typing import List, Set
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -10,11 +11,14 @@ from app.models.job_posting import JobPosting
 from app.models.notification import NotificationType
 from app.models.user import User, UserRole
 from app.schemas.application import (
+    ApplicationBulkStatusResponse,
+    ApplicationBulkStatusUpdate,
     ApplicationCreate,
     ApplicationResponse,
     ApplicationUpdate,
 )
 from app.services.email_service import EmailService
+from app.services.export_service import generate_csv_stream
 from app.services.notification_service import NotificationService
 
 router = APIRouter(tags=["Applications"])
@@ -199,6 +203,69 @@ def get_recruiter_applications(
     return apps
 
 
+# --------------------------------------------------------------------------
+# Applicant Data Export (Phase 30B)
+# --------------------------------------------------------------------------
+@router.get(
+    "/recruiter/applications/export",
+    summary="Export candidate applications as CSV (Recruiter only)",
+    description="Streams a safe CSV file containing candidate applications for job postings owned by the authenticated recruiter. Protects against CSV formula injection.",
+)
+def export_recruiter_applications_csv(
+    current_user: User = Depends(require_role(UserRole.RECRUITER)),
+    db: Session = Depends(get_db),
+):
+    """
+    Export recruiter candidate applications to CSV:
+    - Restricted to recruiters (403 for students / non-recruiters).
+    - Exports only applications to postings owned by current_user.
+    - Sanitizes cell values against formula injection.
+    """
+    apps = db.scalars(
+        select(Application)
+        .join(JobPosting, Application.job_posting_id == JobPosting.id)
+        .options(joinedload(Application.job_posting))
+        .where(JobPosting.recruiter_id == current_user.id)
+        .order_by(Application.created_at.desc())
+    ).all()
+
+    fieldnames = [
+        "application_id",
+        "job_id",
+        "job_title",
+        "company_name",
+        "student_id",
+        "status",
+        "cover_message",
+        "created_at",
+    ]
+
+    rows = [
+        {
+            "application_id": app.id,
+            "job_id": app.job_posting_id,
+            "job_title": app.job_posting.title if app.job_posting else "",
+            "company_name": app.job_posting.company_name if app.job_posting else "",
+            "student_id": app.student_id,
+            "status": app.status.value,
+            "cover_message": app.cover_message or "",
+            "created_at": app.created_at.isoformat() if app.created_at else "",
+        }
+        for app in apps
+    ]
+
+    csv_stream = generate_csv_stream(fieldnames, rows)
+
+    return StreamingResponse(
+        csv_stream,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="candidate_applications.csv"',
+            "Content-Type": "text/csv; charset=utf-8",
+        },
+    )
+
+
 @router.get(
     "/recruiter/applications/{application_id}",
     response_model=ApplicationResponse,
@@ -302,3 +369,94 @@ def update_application_status(
             )
 
     return application
+
+
+# --------------------------------------------------------------------------
+# Batch Applicant Operations (Phase 30B)
+# --------------------------------------------------------------------------
+@router.post(
+    "/applications/bulk-status",
+    response_model=ApplicationBulkStatusResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Batch update application statuses (Recruiter only)",
+    description="Updates lifecycle status for a batch of candidate applications atomically. Enforces server-side ownership checks across every application in the payload.",
+)
+@router.post(
+    "/recruiter/applications/bulk-status",
+    response_model=ApplicationBulkStatusResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
+def bulk_update_application_status(
+    payload: ApplicationBulkStatusUpdate = ...,
+    current_user: User = Depends(require_role(UserRole.RECRUITER)),
+    db: Session = Depends(get_db),
+):
+    """
+    Bulk update candidate applications:
+    - Empty list rejected by schema (422).
+    - Checks ownership of EVERY application against current recruiter's job postings (403 if unowned).
+    - Checks that all requested application IDs exist (404 if missing).
+    - Atomically updates status for all applications.
+    - Sends in-app notifications for each affected student.
+    - Reversible transactional execution.
+    """
+    unique_ids: Set[int] = set(payload.application_ids)
+    if not unique_ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Application IDs list cannot be empty",
+        )
+
+    # Query all requested applications with their associated job posting
+    apps = db.scalars(
+        select(Application)
+        .options(
+            joinedload(Application.job_posting),
+            joinedload(Application.student),
+        )
+        .where(Application.id.in_(unique_ids))
+    ).all()
+
+    found_map = {app.id: app for app in apps}
+
+    # Verify that all requested IDs were found
+    missing_ids = [app_id for app_id in unique_ids if app_id not in found_map]
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Applications not found: {missing_ids}",
+        )
+
+    # Server-side authorization check: EVERY application must belong to the recruiter
+    for app in apps:
+        if not app.job_posting or app.job_posting.recruiter_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions to update one or more specified applications",
+            )
+
+    # Perform atomic updates and trigger in-app notifications
+    for app in apps:
+        old_status = app.status
+        app.status = payload.status
+
+        NotificationService.create_notification(
+            db,
+            user_id=app.student_id,
+            notification_type=NotificationType.APPLICATION_STATUS_CHANGED,
+            title="Application Status Updated",
+            message=f"Your application for '{app.job_posting.title}' has been updated to {payload.status.value}.",
+        )
+
+    db.commit()
+
+    # Refresh instances for response serialization
+    for app in apps:
+        db.refresh(app)
+
+    return ApplicationBulkStatusResponse(
+        updated_count=len(apps),
+        status=payload.status,
+        items=apps,
+    )

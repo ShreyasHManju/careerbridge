@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
@@ -10,6 +11,7 @@ from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
 from app.models.notification import NotificationType
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.user import User, UserRole
+from app.services.export_service import generate_csv_stream
 from app.services.notification_service import NotificationService
 from app.schemas.admin import (
     AdminJobStatusUpdate,
@@ -74,6 +76,64 @@ def list_users(
         page_size=page_size,
         total=total,
         total_pages=total_pages,
+    )
+
+
+@router.get(
+    "/users/export",
+    summary="Export users list as CSV (Admin only)",
+    description="Administrative endpoint to export user account data to CSV with safe formula-injection protection. Excludes password hashes and private authentication tokens.",
+)
+def export_users_csv(
+    role: Optional[UserRole] = Query(None, description="Filter by user role"),
+    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    conditions = []
+    if role is not None:
+        conditions.append(User.role == role)
+    if is_active is not None:
+        conditions.append(User.is_active == is_active)
+
+    users = db.scalars(
+        select(User)
+        .where(*conditions)
+        .order_by(User.created_at.desc(), User.id.desc())
+    ).all()
+
+    fieldnames = [
+        "user_id",
+        "email",
+        "role",
+        "is_active",
+        "is_verified",
+        "created_at",
+        "updated_at",
+    ]
+
+    rows = [
+        {
+            "user_id": u.id,
+            "email": u.email,
+            "role": u.role.value if hasattr(u.role, "value") else str(u.role),
+            "is_active": u.is_active,
+            "is_verified": u.is_verified,
+            "created_at": u.created_at.isoformat() if u.created_at else "",
+            "updated_at": u.updated_at.isoformat() if u.updated_at else "",
+        }
+        for u in users
+    ]
+
+    csv_stream = generate_csv_stream(fieldnames, rows)
+
+    return StreamingResponse(
+        csv_stream,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="admin_users.csv"',
+            "Content-Type": "text/csv; charset=utf-8",
+        },
     )
 
 

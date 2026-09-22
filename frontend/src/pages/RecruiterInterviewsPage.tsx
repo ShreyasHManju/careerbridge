@@ -4,6 +4,7 @@ import {
   updateInterview,
   cancelInterview,
 } from '@/api/interviews';
+import { exportRecruiterInterviews } from '@/api/export';
 import { Interview, InterviewFilterStatus } from '@/types/interview';
 import { InterviewCard } from '@/components/interviews/InterviewCard';
 import { RescheduleInterviewModal } from '@/components/interviews/RescheduleInterviewModal';
@@ -17,6 +18,7 @@ export const RecruiterInterviewsPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
   const [mutatingInterviewId, setMutatingInterviewId] = useState<number | null>(null);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   // Filters
   const [activeTab, setActiveTab] = useState<InterviewTab>('upcoming');
@@ -163,6 +165,19 @@ export const RecruiterInterviewsPage: React.FC = () => {
     });
   }, [interviews, activeTab, statusFilter, searchQuery]);
 
+  const handleExportInterviews = async () => {
+    setIsExporting(true);
+    try {
+      await exportRecruiterInterviews();
+      setActionSuccessMessage('Interviews exported to CSV successfully.');
+    } catch (err: unknown) {
+      const apiError = err as ApiErrorResponse;
+      setErrorMessage(apiError?.message || 'Failed to export interviews CSV.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="cb-page-container" data-testid="recruiter-interviews-page">
       {/* Page Header */}
@@ -172,6 +187,18 @@ export const RecruiterInterviewsPage: React.FC = () => {
           <p className="cb-page-subtitle">
             Manage your candidate interview pipeline, reschedule sessions, and track meeting statuses.
           </p>
+        </div>
+        <div className="cb-page-header-actions">
+          <button
+            type="button"
+            className="cb-btn cb-btn-secondary cb-btn-sm cb-export-btn"
+            onClick={handleExportInterviews}
+            disabled={isExporting || interviews.length === 0}
+            data-testid="export-interviews-btn"
+            aria-label="Export scheduled interviews as CSV"
+          >
+            {isExporting ? 'Exporting...' : '📥 Export CSV'}
+          </button>
         </div>
       </header>
 

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Notification } from '@/types/notification';
+import { Notification, NotificationPreference, NotificationFrequency } from '@/types/notification';
 import {
   getNotifications,
   getUnreadCount,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  getNotificationPreferences,
+  updateNotificationPreferences,
 } from '@/api/notifications';
 import { ApiErrorResponse } from '@/types/api';
 
@@ -12,15 +14,22 @@ interface NotificationDrawerProps {
   className?: string;
 }
 
+type DrawerTab = 'all' | 'unread' | 'preferences';
+
 export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ className = '' }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<DrawerTab>('all');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isMarkingAll, setIsMarkingAll] = useState<boolean>(false);
   const [markingReadId, setMarkingReadId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Preference state
+  const [preference, setPreference] = useState<NotificationPreference | null>(null);
+  const [isSavingPref, setIsSavingPref] = useState<boolean>(false);
+  const [prefSuccess, setPrefSuccess] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const bellButtonRef = useRef<HTMLButtonElement>(null);
@@ -57,17 +66,36 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
     }
   }, []);
 
+  // Fetch preferences
+  const fetchPreferences = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await getNotificationPreferences();
+      setPreference(res);
+    } catch (err) {
+      const apiErr = err as ApiErrorResponse;
+      setError(apiErr?.message || 'Failed to load notification preferences.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   // On initial mount, fetch unread count
   useEffect(() => {
     fetchUnreadCount();
   }, [fetchUnreadCount]);
 
-  // When drawer opens or filter changes, fetch list
+  // When drawer opens or active tab changes
   useEffect(() => {
     if (isOpen) {
-      fetchNotificationsList(unreadOnly);
+      if (activeTab === 'preferences') {
+        fetchPreferences();
+      } else {
+        fetchNotificationsList(activeTab === 'unread');
+      }
     }
-  }, [isOpen, unreadOnly, fetchNotificationsList]);
+  }, [isOpen, activeTab, fetchNotificationsList, fetchPreferences]);
 
   // Handle click outside and Escape key
   useEffect(() => {
@@ -104,7 +132,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
     setError(null);
     try {
       const updated = await markNotificationAsRead(id);
-      if (unreadOnly) {
+      if (activeTab === 'unread') {
         setNotifications((prev) => prev.filter((item) => item.id !== id));
       } else {
         setNotifications((prev) =>
@@ -126,14 +154,47 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
     setError(null);
     try {
       await markAllNotificationsAsRead();
-      // Re-fetch backend state to ensure backend is the sole source of truth
-      await fetchNotificationsList(unreadOnly);
+      await fetchNotificationsList(activeTab === 'unread');
       await fetchUnreadCount();
     } catch (err) {
       const apiErr = err as ApiErrorResponse;
       setError(apiErr?.message || 'Failed to mark all notifications as read.');
     } finally {
       setIsMarkingAll(false);
+    }
+  };
+
+  const handlePreferenceChange = async (frequency: NotificationFrequency) => {
+    setIsSavingPref(true);
+    setPrefSuccess(null);
+    setError(null);
+
+    try {
+      const updated = await updateNotificationPreferences({ frequency });
+      setPreference(updated);
+      setPrefSuccess(`Preferences saved: "${frequency === 'instant' ? 'Instant Delivery' : 'Daily Digest'}" active.`);
+    } catch (err) {
+      const apiErr = err as ApiErrorResponse;
+      setError(apiErr?.message || 'Failed to update notification preferences.');
+    } finally {
+      setIsSavingPref(false);
+    }
+  };
+
+  const handleEmailToggle = async (enabled: boolean) => {
+    setIsSavingPref(true);
+    setPrefSuccess(null);
+    setError(null);
+
+    try {
+      const updated = await updateNotificationPreferences({ email_notifications: enabled });
+      setPreference(updated);
+      setPrefSuccess(`Email notifications ${enabled ? 'enabled' : 'disabled'}.`);
+    } catch (err) {
+      const apiErr = err as ApiErrorResponse;
+      setError(apiErr?.message || 'Failed to update email preferences.');
+    } finally {
+      setIsSavingPref(false);
     }
   };
 
@@ -202,14 +263,14 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
               <h3 id="cb-notifications-heading" className="cb-notification-heading">
                 Notifications
               </h3>
-              {unreadCount > 0 && (
+              {unreadCount > 0 && activeTab !== 'preferences' && (
                 <span className="cb-notification-count-tag" data-testid="unread-count-tag">
                   {unreadCount} unread
                 </span>
               )}
             </div>
             <div className="cb-notification-header-actions">
-              {unreadCount > 0 && (
+              {unreadCount > 0 && activeTab !== 'preferences' && (
                 <button
                   type="button"
                   className="cb-btn-link cb-mark-all-btn"
@@ -244,37 +305,59 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
             </div>
           </div>
 
-          {/* Filter Bar */}
-          <div className="cb-notification-filter-bar">
+          {/* Filter Bar / Tabs */}
+          <div className="cb-notification-filter-bar" role="tablist">
             <button
               type="button"
-              className={`cb-notification-filter-tab ${!unreadOnly ? 'active' : ''}`}
-              onClick={() => setUnreadOnly(false)}
-              aria-pressed={!unreadOnly}
+              role="tab"
+              className={`cb-notification-filter-tab ${activeTab === 'all' ? 'active' : ''}`}
+              onClick={() => setActiveTab('all')}
+              aria-selected={activeTab === 'all'}
             >
               All
             </button>
             <button
               type="button"
-              className={`cb-notification-filter-tab ${unreadOnly ? 'active' : ''}`}
-              onClick={() => setUnreadOnly(true)}
-              aria-pressed={unreadOnly}
+              role="tab"
+              className={`cb-notification-filter-tab ${activeTab === 'unread' ? 'active' : ''}`}
+              onClick={() => setActiveTab('unread')}
+              aria-selected={activeTab === 'unread'}
             >
               Unread {unreadCount > 0 && `(${unreadCount})`}
             </button>
+            <button
+              type="button"
+              role="tab"
+              className={`cb-notification-filter-tab ${activeTab === 'preferences' ? 'active' : ''}`}
+              onClick={() => setActiveTab('preferences')}
+              aria-selected={activeTab === 'preferences'}
+              data-testid="notification-preferences-tab"
+            >
+              ⚙️ Preferences
+            </button>
           </div>
 
-          {/* Error Banner */}
+          {/* Feedback Banners */}
           {error && (
             <div className="cb-notification-error" role="alert">
               <span>{error}</span>
               <button
                 type="button"
                 className="cb-btn cb-btn-secondary cb-btn-xs"
-                onClick={() => fetchNotificationsList(unreadOnly)}
+                onClick={() =>
+                  activeTab === 'preferences'
+                    ? fetchPreferences()
+                    : fetchNotificationsList(activeTab === 'unread')
+                }
               >
                 Retry
               </button>
+            </div>
+          )}
+
+          {prefSuccess && activeTab === 'preferences' && (
+            <div className="cb-alert cb-alert-success cb-notification-success-alert" role="status">
+              {prefSuccess}
             </div>
           )}
 
@@ -283,7 +366,69 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
             {isLoading ? (
               <div className="cb-notification-loading" role="status" aria-live="polite">
                 <div className="cb-spinner cb-spinner-sm" aria-hidden="true" />
-                <p>Loading notifications...</p>
+                <p>Loading...</p>
+              </div>
+            ) : activeTab === 'preferences' ? (
+              /* Notification Preferences Settings Panel */
+              <div className="cb-notification-preferences-panel" data-testid="preferences-panel">
+                <div className="cb-pref-section">
+                  <h4 className="cb-pref-section-title">Delivery Frequency</h4>
+                  <p className="cb-pref-section-desc">
+                    Choose how often you receive status and update notifications.
+                  </p>
+
+                  <div className="cb-pref-options">
+                    <label className="cb-radio-label">
+                      <input
+                        type="radio"
+                        name="notification-frequency"
+                        value="instant"
+                        checked={preference?.frequency === 'instant'}
+                        onChange={() => handlePreferenceChange('instant')}
+                        disabled={isSavingPref}
+                        data-testid="freq-instant-radio"
+                      />
+                      <div className="cb-radio-text">
+                        <span className="cb-radio-title">⚡ Instant</span>
+                        <span className="cb-radio-sub">Receive notifications immediately in real time.</span>
+                      </div>
+                    </label>
+
+                    <label className="cb-radio-label">
+                      <input
+                        type="radio"
+                        name="notification-frequency"
+                        value="digest"
+                        checked={preference?.frequency === 'digest'}
+                        onChange={() => handlePreferenceChange('digest')}
+                        disabled={isSavingPref}
+                        data-testid="freq-digest-radio"
+                      />
+                      <div className="cb-radio-text">
+                        <span className="cb-radio-title">📬 Daily Digest</span>
+                        <span className="cb-radio-sub">Consolidate periodic updates into a digest.</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="cb-pref-section">
+                  <h4 className="cb-pref-section-title">Email Notifications</h4>
+                  <p className="cb-pref-section-desc">
+                    Send transactional confirmation and status update emails.
+                  </p>
+                  <label className="cb-checkbox-wrapper cb-pref-email-toggle">
+                    <input
+                      type="checkbox"
+                      className="cb-checkbox"
+                      checked={preference?.email_notifications ?? true}
+                      onChange={(e) => handleEmailToggle(e.target.checked)}
+                      disabled={isSavingPref}
+                      data-testid="email-notif-checkbox"
+                    />
+                    <span>Enable transactional email notifications</span>
+                  </label>
+                </div>
               </div>
             ) : notifications.length === 0 ? (
               <div className="cb-notification-empty">
@@ -303,10 +448,10 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
                   <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
                 </svg>
                 <p className="cb-empty-title">
-                  {unreadOnly ? 'No unread notifications' : 'No notifications yet'}
+                  {activeTab === 'unread' ? 'No unread notifications' : 'No notifications yet'}
                 </p>
                 <p className="cb-empty-desc">
-                  {unreadOnly
+                  {activeTab === 'unread'
                     ? 'You have caught up with all your notifications.'
                     : 'We will notify you here when application or interview updates occur.'}
                 </p>

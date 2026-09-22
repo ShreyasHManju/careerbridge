@@ -10,6 +10,9 @@ interface RecruiterApplicationCardProps {
   onStatusChange: (applicationId: number, newStatus: ApplicationStatus) => Promise<void>;
   onScheduleInterview?: (application: Application, job: JobPosting | null) => void;
   isUpdating?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (applicationId: number) => void;
+  selectable?: boolean;
 }
 
 const ALL_STATUSES: { value: ApplicationStatus; label: string }[] = [
@@ -26,6 +29,9 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
   onStatusChange,
   onScheduleInterview,
   isUpdating = false,
+  isSelected = false,
+  onToggleSelect,
+  selectable = true,
 }) => {
   const [selectedStatus, setSelectedStatus] = useState<ApplicationStatus>(application.status);
   const [localUpdating, setLocalUpdating] = useState<boolean>(false);
@@ -74,13 +80,31 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
 
   return (
     <article
-      className="cb-recruiter-app-card cb-card"
+      className={`cb-recruiter-app-card cb-card ${isSelected ? 'cb-card-selected' : ''}`}
       data-testid={`recruiter-app-card-${application.id}`}
       aria-label={`Application #${application.id} for ${jobTitle} from Candidate #${application.student_id}`}
     >
       <div className="cb-app-card-header">
         <div className="cb-app-card-title-group">
           <div className="cb-recruiter-card-subheading">
+            {selectable && onToggleSelect && (
+              <label
+                className="cb-checkbox-wrapper cb-app-select-label"
+                htmlFor={`select-app-${application.id}`}
+              >
+                <input
+                  id={`select-app-${application.id}`}
+                  type="checkbox"
+                  className="cb-checkbox cb-app-select-checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggleSelect(application.id)}
+                  aria-label={`Select Application #${application.id}`}
+                  aria-checked={isSelected}
+                  data-testid={`select-app-checkbox-${application.id}`}
+                />
+                <span className="sr-only">Select Application #{application.id}</span>
+              </label>
+            )}
             <span className="cb-app-id-pill">Application #{application.id}</span>
             <span className="cb-candidate-id-pill">Candidate #{application.student_id}</span>
           </div>

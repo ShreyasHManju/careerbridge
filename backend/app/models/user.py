@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.job_posting import JobPosting
     from app.models.message import Message
     from app.models.notification import Notification
+    from app.models.notification_preference import NotificationPreference
     from app.models.profile_image import ProfileImage
     from app.models.recruiter_profile import RecruiterProfile
     from app.models.resume import Resume
@@ -115,6 +116,14 @@ class User(Base):
     notifications: Mapped[list["Notification"]] = relationship(
         "Notification",
         back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-one relationship with NotificationPreference
+    notification_preference: Mapped[Optional["NotificationPreference"]] = relationship(
+        "NotificationPreference",
+        back_populates="user",
+        uselist=False,
         cascade="all, delete-orphan",
     )
 

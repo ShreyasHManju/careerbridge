@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.application import ApplicationStatus
@@ -26,6 +26,21 @@ class ApplicationUpdate(BaseModel):
     )
 
 
+class ApplicationBulkStatusUpdate(BaseModel):
+    """
+    Schema for a recruiter updating multiple applications in a single atomic batch action.
+    """
+    application_ids: List[int] = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="List of target application IDs to transition (1 to 100 items)",
+    )
+    status: ApplicationStatus = Field(
+        ..., description="Target application status (applied, reviewing, shortlisted, rejected, accepted)"
+    )
+
+
 class ApplicationResponse(BaseModel):
     """
     Safe public response schema for Application.
@@ -40,3 +55,12 @@ class ApplicationResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ApplicationBulkStatusResponse(BaseModel):
+    """
+    Response schema for bulk application status update.
+    """
+    updated_count: int = Field(..., description="Number of applications updated")
+    status: ApplicationStatus = Field(..., description="The new status applied")
+    items: List[ApplicationResponse] = Field(..., description="List of updated application objects")
