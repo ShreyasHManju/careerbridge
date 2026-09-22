@@ -703,3 +703,85 @@ CareerBridge incorporates a layered, asynchronous transactional email delivery a
 2. **Transactional Database Integrity**: Database mutations (such as application submission or interview creation) commit prior to background dispatch. If SMTP delivery encounters a network timeout or provider outage, the background job catches the exception and logs an error without rolling back or failing the underlying HTTP transaction.
 3. **HTML Injection Defense**: User-controlled inputs (such as candidate names, job titles, or company names) are escaped via Python's standard `html.escape()` before insertion into HTML email templates.
 4. **Credential & Token Protection**: Passwords, bcrypt password hashes, and raw credentials are never included in email templates or recorded in delivery logs. SMTP passwords in `SMTPEmailProvider` are masked in string representations.
+
+---
+
+## 19. Aggregated Role Dashboards Architecture (Phase 22)
+
+CareerBridge delivers high-performance, real-time aggregated dashboards specifically tailored to Student, Recruiter, and Administrator personas:
+
+```text
+                  +----------------------------------------------+
+                  |         React Client / AppHome Landing       |
+                  |  - Role-based automatic dashboard dispatch   |
+                  |  - Loading skeletons, empty & retry states   |
+                  +----------------------+-----------------------+
+                                         |
+                                         | REST GET with Bearer JWT
+                                         v
+                  +----------------------------------------------+
+                  |           FastAPI Dashboard Router           |
+                  |  - GET /api/v1/dashboard/student (Student)   |
+                  |  - GET /api/v1/dashboard/recruiter (Recruiter)|
+                  |  - GET /api/v1/dashboard/admin (Admin)       |
+                  +----------------------+-----------------------+
+                                         |
+                                         | Enforces RBAC & User Scoping
+                                         v
+                  +----------------------------------------------+
+                  |              DashboardService                |
+                  | - Database-side SQL aggregations             |
+                  | - func.count, func.sum(case(...)) single-pass|
+                  | - Time-window filters for upcoming interviews|
+                  | - Year-scoped monthly registration grouping  |
+                  +----------------------+-----------------------+
+                                         |
+                                         | Parameterized SQL Queries
+                                         v
+                  +----------------------------------------------+
+                  |                  PostgreSQL                  |
+                  |  (applications, jobs, interviews, users)     |
+                  +----------------------------------------------+
+```
+
+### Dashboard Specifications by Role
+
+#### 1. Student Dashboard (`GET /api/v1/dashboard/student`)
+- **Access Control**: Strictly restricted to `student` role; authenticated via `require_role(UserRole.STUDENT)`.
+- **Metrics Computed**:
+  - `total_applications`: Count of all applications submitted by `current_user.id`.
+  - `applications_under_review`: Applications in `reviewing` status.
+  - `shortlisted_applications`: Applications in `shortlisted` status.
+  - `accepted_applications`: Applications in `accepted` status.
+  - `saved_internships`: Total bookmarked opportunities in `saved_jobs` for the student.
+  - `upcoming_interviews`: Count of interviews in `scheduled` or `rescheduled` status with `scheduled_at >= now_utc`.
+- **Query Strategy**: Single-pass SQL conditional aggregation over `applications` table using `func.sum(case(...))` + indexed queries for saved jobs and interviews.
+
+#### 2. Recruiter Dashboard (`GET /api/v1/dashboard/recruiter`)
+- **Access Control**: Strictly restricted to `recruiter` role; authenticated via `require_role(UserRole.RECRUITER)`.
+- **Metrics Computed**:
+  - `active_internships`: Count of active job postings owned by `current_user.id` (`is_active = true`).
+  - `total_applications`: Total candidate applications received across all postings owned by this recruiter.
+  - `applications_awaiting_review`: Applications currently in initial `applied` status.
+  - `shortlisted_candidates`: Applications advanced to `shortlisted` status.
+  - `scheduled_interviews`: Active interviews (`scheduled` or `rescheduled`) associated with recruiter's postings.
+- **Tenant Isolation**: All queries enforce `JobPosting.recruiter_id == current_user.id`, preventing cross-organization metrics leakage.
+
+#### 3. Administrator Dashboard (`GET /api/v1/dashboard/admin`)
+- **Access Control**: Strictly restricted to `admin` role; authenticated via `require_role(UserRole.ADMIN)`.
+- **Metrics Computed**:
+  - `total_students`: Platform-wide count of user accounts with `role = 'student'`.
+  - `total_companies`: Platform-wide count of user accounts with `role = 'recruiter'`.
+  - `verified_companies`: Verified recruiter profiles (`is_verified = true`).
+  - `published_internships`: Total open opportunities across the platform (`is_active = true`).
+  - `total_applications`: Total application submissions across all jobs.
+  - `application_success_rate`: Percentage of accepted applications (`accepted / total * 100`, protected by zero-division checks).
+  - `monthly_registrations`: Array of `{ month: 'YYYY-MM', count: N }` aggregated from user registration timestamps.
+- **Period/Year Filtering**: Supports optional `period_year` query parameter (`2000 <= period_year <= 2100`) to filter registration activity for specific calendar years.
+
+### Frontend Component Architecture
+
+1. **`AppHome.tsx`**: Dynamic landing container evaluating authentication context and rendering the appropriate dashboard view.
+2. **`StudentDashboardView.tsx`**: Stat cards with status distribution, quick links to discovery/applications/interviews, empty states, and manual refresh controls.
+3. **`RecruiterDashboardView.tsx`**: Pipeline summary cards, prominent "Review Queue" action alert banner for unreviewed applicants, and shortcuts to job management and scheduling.
+4. **`AdminDashboardView.tsx`**: Platform KPI cards, success rate badge, interactive calendar year picker with validation, and formatted monthly registration volume list.
