@@ -276,6 +276,13 @@ export const JobDetailPage: React.FC = () => {
             >
               {isSaving ? 'Saving...' : isSaved ? '★ Saved to Bookmarks' : '☆ Save Opportunity'}
             </button>
+            <Link
+              to={`/app/messages?userId=${job.recruiter_id}`}
+              className="cb-btn cb-btn-secondary"
+              data-testid="detail-message-recruiter-btn"
+            >
+              💬 Message Recruiter
+            </Link>
           </div>
         )}
 

@@ -187,8 +187,8 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
       )}
 
       {/* Recruiter Action Row */}
-      {onScheduleInterview && isInterviewEligible && (
-        <div className="cb-app-card-bottom-actions">
+      <div className="cb-app-card-bottom-actions">
+        {onScheduleInterview && isInterviewEligible && (
           <button
             type="button"
             className="cb-btn cb-btn-outline-primary cb-btn-sm"
@@ -197,8 +197,15 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
           >
             📅 Schedule Interview
           </button>
-        </div>
-      )}
+        )}
+        <Link
+          to={`/app/messages?userId=${application.student_id}`}
+          className="cb-btn cb-btn-secondary cb-btn-sm"
+          data-testid={`message-candidate-btn-${application.id}`}
+        >
+          💬 Message Candidate
+        </Link>
+      </div>
     </article>
   );
 };

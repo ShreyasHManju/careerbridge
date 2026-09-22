@@ -16,6 +16,7 @@ import { StudentApplicationsPage } from '@/pages/StudentApplicationsPage';
 import { RecruiterApplicationsPage } from '@/pages/RecruiterApplicationsPage';
 import { StudentInterviewsPage } from '@/pages/StudentInterviewsPage';
 import { RecruiterInterviewsPage } from '@/pages/RecruiterInterviewsPage';
+import { MessagesPage } from '@/pages/MessagesPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 export const App: React.FC = () => {
@@ -37,6 +38,8 @@ export const App: React.FC = () => {
           {/* Opportunity Discovery Routes (all authenticated roles) */}
           <Route path="/app/jobs" element={<JobDiscoveryPage />} />
           <Route path="/app/jobs/:jobId" element={<JobDetailPage />} />
+          {/* Direct & Real-Time Messaging Route (all authenticated roles) */}
+          <Route path="/app/messages" element={<MessagesPage />} />
           {/* Student-only domain routes */}
           <Route element={<ProtectedRoute allowedRoles={['student']} />}>
             <Route path="/app/student/profile" element={<StudentProfilePage />} />
