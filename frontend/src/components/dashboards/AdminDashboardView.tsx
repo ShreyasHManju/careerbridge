@@ -305,11 +305,35 @@ export const AdminDashboardView: React.FC = () => {
           Platform Governance & Moderation
         </h2>
         <div className="cb-action-grid">
-          <Link to="/app/jobs" className="cb-action-card" data-testid="quick-link-jobs">
+          <Link to="/app/admin/users" className="cb-action-card" data-testid="quick-link-admin-users">
+            <div className="cb-action-card-body">
+              <span className="cb-action-icon" aria-hidden="true">👥</span>
+              <div>
+                <h3 className="cb-action-title">User Account Administration</h3>
+                <p className="cb-action-desc">
+                  Review student and recruiter accounts, toggle activation, and export directory CSV.
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          <Link to="/app/admin/recruiters" className="cb-action-card" data-testid="quick-link-admin-recruiters">
+            <div className="cb-action-card-body">
+              <span className="cb-action-icon" aria-hidden="true">🏢</span>
+              <div>
+                <h3 className="cb-action-title">Recruiter Verification</h3>
+                <p className="cb-action-desc">
+                  Inspect hiring company profiles, assess credentials, and manage verification badges.
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          <Link to="/app/admin/jobs" className="cb-action-card" data-testid="quick-link-admin-jobs">
             <div className="cb-action-card-body">
               <span className="cb-action-icon" aria-hidden="true">🛡️</span>
               <div>
-                <h3 className="cb-action-title">Job Postings Directory</h3>
+                <h3 className="cb-action-title">Job Postings Moderation</h3>
                 <p className="cb-action-desc">
                   Inspect and moderate all active and inactive job postings across all hiring companies.
                 </p>

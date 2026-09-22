@@ -17,6 +17,9 @@ import { RecruiterApplicationsPage } from '@/pages/RecruiterApplicationsPage';
 import { StudentInterviewsPage } from '@/pages/StudentInterviewsPage';
 import { RecruiterInterviewsPage } from '@/pages/RecruiterInterviewsPage';
 import { MessagesPage } from '@/pages/MessagesPage';
+import { AdminUsersPage } from '@/pages/AdminUsersPage';
+import { AdminRecruitersPage } from '@/pages/AdminRecruitersPage';
+import { AdminJobsPage } from '@/pages/AdminJobsPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 export const App: React.FC = () => {
@@ -53,6 +56,12 @@ export const App: React.FC = () => {
             <Route path="/app/recruiter/jobs" element={<RecruiterJobsPage />} />
             <Route path="/app/recruiter/applications" element={<RecruiterApplicationsPage />} />
             <Route path="/app/recruiter/interviews" element={<RecruiterInterviewsPage />} />
+          </Route>
+          {/* Admin-only domain routes */}
+          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+            <Route path="/app/admin/users" element={<AdminUsersPage />} />
+            <Route path="/app/admin/recruiters" element={<AdminRecruitersPage />} />
+            <Route path="/app/admin/jobs" element={<AdminJobsPage />} />
           </Route>
         </Route>
       </Route>
