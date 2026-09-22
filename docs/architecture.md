@@ -785,3 +785,82 @@ CareerBridge delivers high-performance, real-time aggregated dashboards specific
 2. **`StudentDashboardView.tsx`**: Stat cards with status distribution, quick links to discovery/applications/interviews, empty states, and manual refresh controls.
 3. **`RecruiterDashboardView.tsx`**: Pipeline summary cards, prominent "Review Queue" action alert banner for unreviewed applicants, and shortcuts to job management and scheduling.
 4. **`AdminDashboardView.tsx`**: Platform KPI cards, success rate badge, interactive calendar year picker with validation, and formatted monthly registration volume list.
+
+---
+
+## 20. Validation, Error Handling & Resilience Architecture (Phase 23)
+
+CareerBridge implements a defense-in-depth validation and error handling system across both backend API layers and frontend client interfaces:
+
+```text
+  +-------------------------------------------------------------------------+
+  |                           Client-Side UI Layer                          |
+  |  - HTML5 & Controlled Input Validation (length, required, regex, email) |
+  |  - Pre-flight Form Validation & inline accessible error feedback        |
+  |  - Centralized Axios Interceptor extracting standardized ApiErrorResponse|
+  +------------------------------------+------------------------------------+
+                                       |
+                                       | HTTP Request
+                                       v
+  +-------------------------------------------------------------------------+
+  |                     Backend Ingestion & Security Gate                   |
+  |  - Sliding-window Rate Limiter (HTTP 429 Too Many Requests)             |
+  |  - Magic-Bytes Binary Header & Size Validation for File Uploads (413/422)|
+  |  - JWT Authentication & RBAC Verification (HTTP 401 / HTTP 403)         |
+  +------------------------------------+------------------------------------+
+                                       |
+                                       v
+  +-------------------------------------------------------------------------+
+  |                       FastAPI / Pydantic DTO Layer                      |
+  |  - Schema Data Types, Min/Max Constraints, Regex Enforcements           |
+  |  - RequestValidationError Handler formatting to standard error schema   |
+  +------------------------------------+------------------------------------+
+                                       |
+                                       v
+  +-------------------------------------------------------------------------+
+  |                       Service & Domain Logic Layer                      |
+  |  - Business Rule Invariant Checks (ownership, inactive jobs, conflicts) |
+  |  - Explicit Domain Exceptions / HTTPException (400, 404, 409)           |
+  +------------------------------------+------------------------------------+
+                                       |
+                                       v
+  +-------------------------------------------------------------------------+
+  |                      Database / Persistence Layer                       |
+  |  - Unique Constraints & Foreign Key Guarantees                          |
+  |  - IntegrityError Handler catching DB collisions -> HTTP 409 CONFLICT   |
+  |  - Global Catch-All Handler sanitizing unexpected exceptions -> HTTP 500|
+  +-------------------------------------------------------------------------+
+```
+
+### 1. Standardized API Error Response Contract
+All backend error responses (4xx, 5xx) strictly follow the unified envelope:
+```json
+{
+  "success": false,
+  "message": "Human-readable description of error or failure",
+  "error_code": "ERROR_CODE_IDENTIFIER",
+  "details": [
+    {
+      "field": "field_name",
+      "message": "Specific validation failure message"
+    }
+  ]
+}
+```
+
+### 2. Error Codes & HTTP Status Codes
+- `HTTP 400 Bad Request` -> `BAD_REQUEST`, `INVALID_CREDENTIALS`, `FILE_TOO_LARGE`, `INVALID_FILE_TYPE`
+- `HTTP 401 Unauthorized` -> `UNAUTHORIZED`, `INVALID_TOKEN`
+- `HTTP 403 Forbidden` -> `FORBIDDEN_ACCESS`
+- `HTTP 404 Not Found` -> `RESOURCE_NOT_FOUND`
+- `HTTP 409 Conflict` -> `CONFLICT_ERROR` (duplicate email, duplicate application, duplicate bookmark, interview schedule conflict)
+- `HTTP 413 Payload Too Large` -> `PAYLOAD_TOO_LARGE`
+- `HTTP 422 Unprocessable Entity` -> `VALIDATION_ERROR` (structured field-level errors)
+- `HTTP 429 Too Many Requests` -> `RATE_LIMIT_EXCEEDED` (includes `Retry-After` header)
+- `HTTP 500 Internal Server Error` -> `INTERNAL_SERVER_ERROR` (sanitized safe response without stack traces or SQL internals)
+
+### 3. Security & Information Leak Prevention
+- **No Information Leakage**: Stack traces, SQL syntax/query fragments, internal filesystem paths, and environment secrets are never serialized in error responses or printed to unmanaged standard outputs.
+- **Upload Protection**: File uploads validate binary magic byte signatures (PDF, JPEG, PNG) rather than trusting client MIME headers, and are stored with randomized UUID filenames inside controlled directories.
+- **Rate Limiting**: Authentication endpoints enforce in-memory sliding window rate limits to prevent brute-force attacks.
+- **Frontend Error Transformation**: The centralized Axios client interceptor extracts structured `message` and `details` fields, gracefully falling back to sanitized network error alerts without breaking application state.
