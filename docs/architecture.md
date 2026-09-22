@@ -628,4 +628,78 @@ CareerBridge follows an enterprise defense-in-depth model across transport, appl
 | **Information Disclosure via 500 Errors** | Server path, library version, and database schema leakage. | Centralized error handler captures unhandled exceptions and outputs sanitized JSON (`{"success": false, "message": "An unexpected internal server error occurred.", "error_code": "INTERNAL_SERVER_ERROR"}`) while recording full tracebacks only to server logs. |
 | **Audit Log Incompleteness** | Untracked attacks and malicious privilege escalation. | Structured security logging via `logging.getLogger("careerbridge.security")` for failed logins (masked PII), successful logins, RBAC rejections, and admin actions. |
 
+---
 
+## 18. Email Notification Foundation Architecture (Phase 21)
+
+CareerBridge incorporates a layered, asynchronous transactional email delivery architecture:
+
+```text
+                  +----------------------------------------------+
+                  | FastAPI HTTP Router (Auth/Apps/Interviews)   |
+                  +----------------------+-----------------------+
+                                         |
+                                         | 1. DB Commit & In-App Notification
+                                         v
+                  +----------------------------------------------+
+                  | FastAPI BackgroundTasks / dispatch_job       |
+                  | (Non-blocking background execution)          |
+                  +----------------------+-----------------------+
+                                         |
+                                         | 2. Invokes Registered Handler
+                                         v
+                  +----------------------------------------------+
+                  |                 EmailService                 |
+                  | - Recipient validation (RFC-compliant regex) |
+                  | - Template rendering (HTML-escaped & Text)   |
+                  | - Safe parameter substitution                |
+                  +----------------------+-----------------------+
+                                         |
+                                         | 3. Provider Delegation
+                                         v
+                  +----------------------------------------------+
+                  |             BaseEmailProvider                |
+                  +----------------------+-----------------------+
+                                         |
+                        +----------------+----------------+
+                        |                                 |
+                        v                                 v
+        +-------------------------------+ +-------------------------------+
+        |      LocalEmailProvider       | |       SMTPEmailProvider       |
+        | - In-memory captured records  | | - Standard library smtplib    |
+        | - Development & Automated CI  | | - STARTTLS & Authenticated    |
+        | - Zero external dependencies  | | - Multipart (text + HTML)     |
+        +-------------------------------+ +-------------------------------+
+```
+
+### Supported Transactional Email Events
+
+| Event Type | Trigger Point | Recipient | Content & Key Parameters |
+| :--- | :--- | :--- | :--- |
+| **Welcome Email** | User Registration (`POST /api/v1/users`) | New User | Account creation welcome, role confirmation, and direct link to dashboard. |
+| **Email Verification** | Verification Request | User | Secure verification link containing timed token. |
+| **Password Reset** | Password Reset Request | User | Secure password reset link containing timed token. |
+| **Application Confirmation** | Student Application Submission (`POST /api/v1/jobs/{id}/applications`) | Student | Job title, company name, application ID, and link to track application status. |
+| **Application Status Update** | Recruiter Status Change (`PATCH /api/v1/recruiter/applications/{id}`) | Student | Transition notification (e.g. `Reviewing`, `Shortlisted`, `Accepted`, `Rejected`) with job and company details. |
+| **Interview Invitation** | Recruiter Interview Scheduling (`POST /api/v1/applications/{id}/interviews`) | Student | Interview type, scheduled datetime, duration, location/meeting link, and notes. |
+
+### Configuration & Environment Variables
+
+| Variable | Type | Default | Purpose |
+| :--- | :--- | :--- | :--- |
+| `EMAIL_PROVIDER` | string | `local` | `local` (in-memory test provider) or `smtp` (production transactional email provider). |
+| `EMAIL_FROM` | string | `no-reply@careerbridge.io` | Default sender email address. |
+| `EMAIL_FROM_NAME` | string | `CareerBridge` | Sender display name. |
+| `SMTP_HOST` | string | `None` | Transactional SMTP server hostname. |
+| `SMTP_PORT` | int | `587` | SMTP port (e.g., 587 for STARTTLS, 465 for SSL). |
+| `SMTP_USERNAME` | string | `None` | SMTP authentication username. |
+| `SMTP_PASSWORD` | string | `None` | SMTP authentication password. |
+| `SMTP_USE_TLS` | bool | `True` | Whether to initiate STARTTLS encryption. |
+| `FRONTEND_URL` | string | `http://localhost:5173` | Base URL used for constructing portal, application, and interview deep links. |
+
+### Security & Fault-Isolation Guarantees
+
+1. **Non-Blocking Background Delivery**: Emails are queued through FastAPI's native `BackgroundTasks` via `app.services.background_jobs.dispatch_job()`. HTTP response latency is completely decoupled from network latency or SMTP socket operations.
+2. **Transactional Database Integrity**: Database mutations (such as application submission or interview creation) commit prior to background dispatch. If SMTP delivery encounters a network timeout or provider outage, the background job catches the exception and logs an error without rolling back or failing the underlying HTTP transaction.
+3. **HTML Injection Defense**: User-controlled inputs (such as candidate names, job titles, or company names) are escaped via Python's standard `html.escape()` before insertion into HTML email templates.
+4. **Credential & Token Protection**: Passwords, bcrypt password hashes, and raw credentials are never included in email templates or recorded in delivery logs. SMTP passwords in `SMTPEmailProvider` are masked in string representations.
