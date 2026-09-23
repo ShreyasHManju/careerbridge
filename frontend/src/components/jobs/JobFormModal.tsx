@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { JobPosting, JobPostingCreate, JobPostingUpdate, OpportunityType, EmploymentType } from '@/types/job';
 import { createJob, updateJob } from '@/api/jobs';
 import { ApiErrorResponse, ValidationErrorDetail } from '@/types/api';
+import { SkillTagInput } from '@/components/ui/SkillTagInput';
 
 interface JobFormModalProps {
   isOpen: boolean;
@@ -500,25 +501,25 @@ export const JobFormModal: React.FC<JobFormModalProps> = ({
 
           {/* Skills */}
           <div className="cb-form-group">
-            <label htmlFor="job-skills" className="cb-filter-label">
-              Required Skills
-            </label>
-            <input
+            <SkillTagInput
               id="job-skills"
-              name="skills"
-              type="text"
-              className={`cb-input ${fieldErrors.skills ? 'cb-input-error' : ''}`}
-              placeholder="e.g. React, TypeScript, Node.js, Python"
+              label="Required Skills"
               value={formData.skills}
-              onChange={handleChange}
+              onChange={(val) => {
+                setFormData((prev) => ({ ...prev, skills: val }));
+                if (fieldErrors.skills) {
+                  setFieldErrors((prev) => {
+                    const copy = { ...prev };
+                    delete copy.skills;
+                    return copy;
+                  });
+                }
+              }}
+              placeholder="e.g. React, TypeScript, Node.js, Python"
               disabled={isSubmitting}
-              maxLength={1000}
+              error={fieldErrors.skills}
+              helperText="Type or search skills and press Enter or comma."
             />
-            {fieldErrors.skills && (
-              <span className="cb-field-error" role="alert">
-                {fieldErrors.skills}
-              </span>
-            )}
           </div>
 
           {/* Qualifications & Experience */}

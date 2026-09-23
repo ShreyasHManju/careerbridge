@@ -1,8 +1,4 @@
-/**
- * Opportunity Discovery (Job & Internship) Type Definitions
- * Strictly aligned with backend schemas in app/schemas/job_posting.py,
- * app/schemas/saved_job.py, and app/schemas/application.py
- */
+import { Skill } from './skill';
 
 export type OpportunityType = 'internship' | 'job';
 export type EmploymentType = 'full_time' | 'part_time' | 'contract';
@@ -20,6 +16,7 @@ export interface JobPosting {
   is_remote: boolean;
   employment_type: EmploymentType;
   skills: string | null;
+  structured_skills?: Skill[] | null;
   minimum_qualification: string | null;
   experience_required: string | null;
   salary_min: number | null;

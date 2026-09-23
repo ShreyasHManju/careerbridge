@@ -11,6 +11,7 @@ from app.routers.rbac import router as rbac_router
 from app.routers.recruiter_profile import router as recruiter_profile_router
 from app.routers.resume import router as resume_router
 from app.routers.saved_jobs import router as saved_jobs_router
+from app.routers.skills import router as skills_router
 from app.routers.student_profile import router as student_profile_router
 from app.routers.users import router as users_router
 from app.routers.websocket_messaging import router as websocket_messaging_router
@@ -32,9 +33,5 @@ __all__ = [
     "messaging_router",
     "websocket_messaging_router",
     "dashboards_router",
+    "skills_router",
 ]
-
-
-
-
-

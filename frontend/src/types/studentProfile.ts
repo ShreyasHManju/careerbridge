@@ -1,7 +1,4 @@
-/**
- * CareerBridge Student Profile Types & Data Transfer Objects
- * Strictly aligned with FastAPI backend schemas in app/schemas/student_profile.py
- */
+import { Skill } from './skill';
 
 export interface StudentProfile {
   id: number;
@@ -14,6 +11,7 @@ export interface StudentProfile {
   graduation_year: number | null;
   bio: string | null;
   skills: string | null;
+  structured_skills?: Skill[] | null;
   github_url: string | null;
   linkedin_url: string | null;
   portfolio_url: string | null;

@@ -22,6 +22,7 @@ from app.routers import (
     recruiter_profile_router,
     resume_router,
     saved_jobs_router,
+    skills_router,
     student_profile_router,
     users_router,
     websocket_messaging_router,
@@ -262,6 +263,7 @@ app.include_router(websocket_messaging_router, prefix=settings.API_V1_STR)
 app.include_router(resume_router, prefix=settings.API_V1_STR)
 app.include_router(profile_image_router, prefix=settings.API_V1_STR)
 app.include_router(saved_jobs_router, prefix=settings.API_V1_STR)
+app.include_router(skills_router, prefix=settings.API_V1_STR)
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)
 app.include_router(dashboards_router, prefix=settings.API_V1_STR)

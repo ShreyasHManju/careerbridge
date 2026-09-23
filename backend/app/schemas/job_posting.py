@@ -4,6 +4,7 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.job_posting import EmploymentType, OpportunityType
+from app.schemas.skill import SkillResponse
 
 
 class JobSortBy(str, enum.Enum):
@@ -90,6 +91,7 @@ class JobPostingResponse(BaseModel):
     is_remote: bool
     employment_type: EmploymentType
     skills: Optional[str] = None
+    structured_skills: Optional[List[SkillResponse]] = None
     minimum_qualification: Optional[str] = None
     experience_required: Optional[str] = None
     salary_min: Optional[int] = None

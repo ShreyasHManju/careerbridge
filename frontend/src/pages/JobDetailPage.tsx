@@ -177,12 +177,15 @@ export const JobDetailPage: React.FC = () => {
   const deadlineDisplay = formatDate(job.application_deadline);
   const postedDateDisplay = formatDate(job.created_at);
 
-  const skillsList = job.skills
-    ? job.skills
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-    : [];
+  const skillsList =
+    job.structured_skills && job.structured_skills.length > 0
+      ? job.structured_skills.map((s) => s.name)
+      : job.skills
+      ? job.skills
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
 
   return (
     <div className="cb-job-detail-container" data-testid="job-detail-container">

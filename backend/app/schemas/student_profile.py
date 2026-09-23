@@ -1,6 +1,8 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.skill import SkillResponse
 
 
 class StudentProfileCreate(BaseModel):
@@ -42,7 +44,7 @@ class StudentProfileUpdate(BaseModel):
 class StudentProfileResponse(BaseModel):
     """
     Safe public response schema for StudentProfile.
-    Excludes sensitive internal credentials.
+    Excludes sensitive internal credentials while preserving legacy skills string and optional structured skills.
     """
     id: int
     user_id: int
@@ -54,6 +56,7 @@ class StudentProfileResponse(BaseModel):
     graduation_year: Optional[int] = None
     bio: Optional[str] = None
     skills: Optional[str] = None
+    structured_skills: Optional[List[SkillResponse]] = None
     github_url: Optional[str] = None
     linkedin_url: Optional[str] = None
     portfolio_url: Optional[str] = None

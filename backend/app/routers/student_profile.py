@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.database import get_db
 from app.core.deps import require_role
+from app.models.skill import StudentSkill
 from app.models.student_profile import StudentProfile
 from app.models.user import User, UserRole
 from app.schemas.student_profile import (
@@ -11,6 +12,7 @@ from app.schemas.student_profile import (
     StudentProfileResponse,
     StudentProfileUpdate,
 )
+from app.services.skill_service import sync_student_skills_from_text
 
 router = APIRouter(prefix="/student/profile", tags=["Student Profile"])
 
@@ -31,7 +33,9 @@ def get_student_profile(
     Ownership is strictly bound to current_user.id from the verified JWT.
     """
     profile = db.scalar(
-        select(StudentProfile).where(StudentProfile.user_id == current_user.id)
+        select(StudentProfile)
+        .options(selectinload(StudentProfile.student_skills).joinedload(StudentSkill.skill))
+        .where(StudentProfile.user_id == current_user.id)
     )
     if not profile:
         raise HTTPException(
@@ -64,6 +68,7 @@ def create_student_profile(
     Enforces:
     - 1-to-1 relationship: Returns 409 Conflict if profile already exists.
     - Ownership security: user_id is set to current_user.id, ignoring any client-provided IDs.
+    - Structured skill synchronization with legacy string preservation.
     """
     existing = db.scalar(
         select(StudentProfile).where(StudentProfile.user_id == current_user.id)
@@ -75,11 +80,14 @@ def create_student_profile(
         )
 
     profile_data = payload.model_dump()
+    raw_skills = profile_data.pop("skills", None)
     new_profile = StudentProfile(
         user_id=current_user.id,
         **profile_data,
     )
     db.add(new_profile)
+    db.flush()
+    sync_student_skills_from_text(db, new_profile, raw_skills)
     db.commit()
     db.refresh(new_profile)
     return new_profile
@@ -102,9 +110,12 @@ def update_student_profile(
     Enforces:
     - Returns 404 if profile does not exist.
     - Only unset fields are skipped; ownership (user_id) cannot be modified.
+    - Synchronizes structured skills whenever skills field is updated.
     """
     profile = db.scalar(
-        select(StudentProfile).where(StudentProfile.user_id == current_user.id)
+        select(StudentProfile)
+        .options(selectinload(StudentProfile.student_skills).joinedload(StudentSkill.skill))
+        .where(StudentProfile.user_id == current_user.id)
     )
     if not profile:
         raise HTTPException(
@@ -115,9 +126,14 @@ def update_student_profile(
     update_data = payload.model_dump(exclude_unset=True)
     # Explicitly defend against any user_id alteration attempt
     update_data.pop("user_id", None)
+    has_skills_update = "skills" in payload.model_fields_set
+    raw_skills = update_data.pop("skills", None)
 
     for field, value in update_data.items():
         setattr(profile, field, value)
+
+    if has_skills_update:
+        sync_student_skills_from_text(db, profile, raw_skills)
 
     db.commit()
     db.refresh(profile)

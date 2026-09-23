@@ -10,6 +10,7 @@ import {
   StudentProfileUpdateRequest,
 } from '@/types/studentProfile';
 import { ApiErrorResponse, ValidationErrorDetail } from '@/types/api';
+import { SkillTagInput } from '@/components/ui/SkillTagInput';
 
 interface ProfileFormData {
   full_name: string;
@@ -538,25 +539,25 @@ export const StudentProfilePage: React.FC = () => {
             </div>
 
             <div className="cb-form-group">
-              <label htmlFor="skills">Skills</label>
-              <textarea
+              <SkillTagInput
                 id="skills"
-                name="skills"
-                rows={2}
+                label="Skills"
                 value={formData.skills}
-                onChange={handleChange}
-                placeholder="e.g. Python, React, TypeScript, FastAPI, PostgreSQL, Git"
+                onChange={(val) => {
+                  setFormData((prev) => ({ ...prev, skills: val }));
+                  if (fieldErrors.skills) {
+                    setFieldErrors((prev) => {
+                      const copy = { ...prev };
+                      delete copy.skills;
+                      return copy;
+                    });
+                  }
+                }}
+                placeholder="e.g. Python, React, TypeScript, FastAPI, PostgreSQL"
                 disabled={isSubmitting}
-                className="cb-input"
-                style={{ resize: 'vertical' }}
+                error={fieldErrors.skills}
+                helperText="Type or search skills and press Enter or comma (max 1000 characters)."
               />
-              {fieldErrors.skills ? (
-                <small className="cb-input-hint" style={{ color: 'var(--cb-danger)' }} role="alert">
-                  {fieldErrors.skills}
-                </small>
-              ) : (
-                <small className="cb-input-hint">Comma-separated list of technical and soft skills (max 1000 characters).</small>
-              )}
             </div>
           </div>
 

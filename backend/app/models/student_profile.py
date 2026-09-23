@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.skill import Skill, StudentSkill
     from app.models.user import User
 
 
@@ -50,6 +51,18 @@ class StudentProfile(Base):
 
     # One-to-one relationship back to owning User
     user: Mapped["User"] = relationship("User", back_populates="student_profile")
+
+    # One-to-many relationship with StudentSkill
+    student_skills: Mapped[list["StudentSkill"]] = relationship(
+        "StudentSkill",
+        back_populates="student_profile",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def structured_skills(self) -> list["Skill"]:
+        """Return list of canonical Skill objects associated with this student profile."""
+        return [ss.skill for ss in self.student_skills if ss.skill is not None]
 
     def __repr__(self) -> str:
         return f"<StudentProfile id={self.id} user_id={self.user_id} full_name={self.full_name}>"

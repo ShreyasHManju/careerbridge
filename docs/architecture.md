@@ -864,3 +864,54 @@ All backend error responses (4xx, 5xx) strictly follow the unified envelope:
 - **Upload Protection**: File uploads validate binary magic byte signatures (PDF, JPEG, PNG) rather than trusting client MIME headers, and are stored with randomized UUID filenames inside controlled directories.
 - **Rate Limiting**: Authentication endpoints enforce in-memory sliding window rate limits to prevent brute-force attacks.
 - **Frontend Error Transformation**: The centralized Axios client interceptor extracts structured `message` and `details` fields, gracefully falling back to sanitized network error alerts without breaking application state.
+
+---
+
+## 26. CareerBridge 2.0-A — Structured Skills Foundation Architecture
+
+Milestone 2.0-A establishes a normalized, canonical skills foundation across CareerBridge while maintaining 100% backward compatibility with legacy comma-separated text fields and existing API contracts.
+
+### 1. Database Architecture
+The structured skills layer consists of three normalized tables:
+
+1. **`skills`** (Canonical Skill Catalog)
+   - `id`: Integer primary key (autoincrement)
+   - `name`: VARCHAR(100), unique index, normalized name
+   - `slug`: VARCHAR(100), unique index, deterministic URL-safe identifier
+   - `category`: VARCHAR(50), nullable classification metadata
+   - `is_verified`: Boolean, default true
+   - `created_at`: TIMESTAMP WITH TIME ZONE
+
+2. **`student_skills`** (Student Profile Association)
+   - `id`: Integer primary key
+   - `student_profile_id`: FK -> `student_profiles.id` (ON DELETE CASCADE)
+   - `skill_id`: FK -> `skills.id` (ON DELETE CASCADE)
+   - `proficiency`: VARCHAR(50), nullable (reserved for future milestone expansion)
+   - `created_at`: TIMESTAMP WITH TIME ZONE
+   - Unique Constraint: `uq_student_skill (student_profile_id, skill_id)`
+
+3. **`job_skills`** (Job Posting Association)
+   - `id`: Integer primary key
+   - `job_posting_id`: FK -> `job_postings.id` (ON DELETE CASCADE)
+   - `skill_id`: FK -> `skills.id` (ON DELETE CASCADE)
+   - `is_required`: Boolean, default true
+   - `created_at`: TIMESTAMP WITH TIME ZONE
+   - Unique Constraint: `uq_job_skill (job_posting_id, skill_id)`
+
+### 2. Backward Compatibility & Dual Synchronization Strategy
+- **Additive Data Model**: The original `student_profiles.skills` and `job_postings.skills` text columns are strictly preserved.
+- **Bidirectional Synchronization**:
+  - Whenever a student profile or job posting is created or updated with a comma-delimited skills text, the centralized `SkillService` parses and deduplicates the tokens, resolves or creates canonical `Skill` rows, and synchronizes the association rows in `student_skills` / `job_skills`.
+  - The legacy text column is maintained as a deterministic, comma-separated string representation.
+- **Additive API Responses**:
+  - Endpoints continue returning the legacy `skills: string | null` field.
+  - Endpoints additively include `structured_skills: List[SkillResponse]` containing canonical skill objects (`id`, `name`, `slug`, `category`, `is_verified`).
+- **Search Compatibility**: Existing substring and keyword filters on `skills` remain fully operational.
+
+### 3. Normalization & Slug Generation
+- Slug generation uses deterministic character filtering: lowercase alphanumeric sequences joined with hyphens (`re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")`).
+- Deduplication prevents case-variant duplicates (e.g. `React` and `react` map to canonical slug `react`).
+
+### 4. Canonical Search API & Frontend Integration
+- **`GET /api/v1/skills`**: Provides fast, bounded, case-insensitive autocomplete and category filtering for canonical skills.
+- **`SkillTagInput`**: A reusable, accessible React component providing tag chips with individual deletion, interactive keyboard navigation, and autocomplete suggestions while seamlessly synchronizing with existing form submission payloads.

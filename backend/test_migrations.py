@@ -368,7 +368,46 @@ def test_migrations():
     pref_fks = inspector.get_foreign_keys("notification_preferences")
     assert any(fk.get("referred_table") == "users" for fk in pref_fks), "FK to users missing on notification_preferences!"
 
-    print("[16/16] Verifying alembic_version table in PostgreSQL")
+    print("[16/19] Verifying 'skills' table columns, indexes, and constraints")
+    skill_columns = {col["name"]: col for col in inspector.get_columns("skills")}
+    for c in ["id", "name", "slug", "category", "is_verified", "created_at"]:
+        assert c in skill_columns, f"Column '{c}' missing from 'skills' table"
+    skill_indexes = inspector.get_indexes("skills")
+    skill_idx_names = [idx["name"] for idx in skill_indexes]
+    assert any("slug" in name for name in skill_idx_names), "Index on 'slug' missing on skills table!"
+    assert any("name" in name for name in skill_idx_names), "Index on 'name' missing on skills table!"
+
+    print("[17/19] Verifying 'student_skills' table columns, indexes, FKs, and constraints")
+    ss_columns = {col["name"]: col for col in inspector.get_columns("student_skills")}
+    for c in ["id", "student_profile_id", "skill_id", "proficiency", "created_at"]:
+        assert c in ss_columns, f"Column '{c}' missing from 'student_skills' table"
+    ss_fks = inspector.get_foreign_keys("student_skills")
+    ss_ref_tables = {fk.get("referred_table") for fk in ss_fks}
+    assert "student_profiles" in ss_ref_tables, "FK to student_profiles missing on student_skills!"
+    assert "skills" in ss_ref_tables, "FK to skills missing on student_skills!"
+    ss_uqs = inspector.get_unique_constraints("student_skills")
+    has_ss_uq = any(
+        set(uc.get("column_names", [])) == {"student_profile_id", "skill_id"}
+        for uc in ss_uqs
+    )
+    assert has_ss_uq, "Unique constraint on ('student_profile_id', 'skill_id') missing on student_skills!"
+
+    print("[18/19] Verifying 'job_skills' table columns, indexes, FKs, and constraints")
+    js_columns = {col["name"]: col for col in inspector.get_columns("job_skills")}
+    for c in ["id", "job_posting_id", "skill_id", "is_required", "created_at"]:
+        assert c in js_columns, f"Column '{c}' missing from 'job_skills' table"
+    js_fks = inspector.get_foreign_keys("job_skills")
+    js_ref_tables = {fk.get("referred_table") for fk in js_fks}
+    assert "job_postings" in js_ref_tables, "FK to job_postings missing on job_skills!"
+    assert "skills" in js_ref_tables, "FK to skills missing on job_skills!"
+    js_uqs = inspector.get_unique_constraints("job_skills")
+    has_js_uq = any(
+        set(uc.get("column_names", [])) == {"job_posting_id", "skill_id"}
+        for uc in js_uqs
+    )
+    assert has_js_uq, "Unique constraint on ('job_posting_id', 'skill_id') missing on job_skills!"
+
+    print("[19/19] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")

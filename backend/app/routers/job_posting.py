@@ -2,11 +2,12 @@ import math
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy import and_, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_role
 from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
+from app.models.skill import JobSkill
 from app.models.user import User, UserRole
 from app.schemas.job_posting import (
     JobPostingCreate,
@@ -16,6 +17,7 @@ from app.schemas.job_posting import (
     JobSortBy,
     SortOrder,
 )
+from app.services.skill_service import sync_job_skills_from_text
 
 router = APIRouter(prefix="/jobs", tags=["Jobs & Internships"])
 
@@ -43,16 +45,21 @@ def create_job_posting(
     Enforces:
     - Recruiter-only access (require_role(UserRole.RECRUITER)).
     - Secure ownership: recruiter_id is derived strictly from current_user.id.
+    - Structured skill synchronization with legacy string preservation.
     """
     posting_data = payload.model_dump()
+    raw_skills = posting_data.pop("skills", None)
     new_posting = JobPosting(
         recruiter_id=current_user.id,
         **posting_data,
     )
     db.add(new_posting)
+    db.flush()
+    sync_job_skills_from_text(db, new_posting, raw_skills)
     db.commit()
     db.refresh(new_posting)
     return new_posting
+
 
 
 @router.get(
@@ -319,6 +326,8 @@ def update_job_posting(
     update_data = payload.model_dump(exclude_unset=True)
     # Strictly strip any attempt to modify ownership
     update_data.pop("recruiter_id", None)
+    has_skills_update = "skills" in payload.model_fields_set
+    raw_skills = update_data.pop("skills", None)
 
     # Cross-field salary consistency check for partial updates
     new_min = update_data.get("salary_min", posting.salary_min)
@@ -331,6 +340,9 @@ def update_job_posting(
 
     for field, value in update_data.items():
         setattr(posting, field, value)
+
+    if has_skills_update:
+        sync_job_skills_from_text(db, posting, raw_skills)
 
     db.commit()
     db.refresh(posting)

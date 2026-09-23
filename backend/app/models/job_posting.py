@@ -9,6 +9,7 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from app.models.application import Application
     from app.models.saved_job import SavedJob
+    from app.models.skill import JobSkill, Skill
     from app.models.user import User
 
 
@@ -103,6 +104,17 @@ class JobPosting(Base):
         cascade="all, delete-orphan",
     )
 
+    # One-to-many relationship with JobSkill
+    job_skills: Mapped[list["JobSkill"]] = relationship(
+        "JobSkill",
+        back_populates="job_posting",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def structured_skills(self) -> list["Skill"]:
+        """Return list of canonical Skill objects associated with this job posting."""
+        return [js.skill for js in self.job_skills if js.skill is not None]
+
     def __repr__(self) -> str:
         return f"<JobPosting id={self.id} title={self.title!r} company={self.company_name!r} recruiter_id={self.recruiter_id}>"
-
