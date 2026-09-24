@@ -52,7 +52,7 @@ function setupAuth(user: User | null) {
 }
 
 describe('AppLayout Navigation (Phase F-08 & 30B.2)', () => {
-  it('renders student navigation links including Saved Jobs (/app/saved-jobs), My Applications (/app/applications) and Interviews (/app/interviews)', () => {
+  it('renders student navigation links including Projects (/app/projects), Saved Jobs (/app/saved-jobs), My Applications (/app/applications) and Interviews (/app/interviews)', () => {
     setupAuth(mockStudentUser);
 
     render(
@@ -63,6 +63,7 @@ describe('AppLayout Navigation (Phase F-08 & 30B.2)', () => {
 
     expect(screen.getByRole('link', { name: /Home/i })).toHaveAttribute('href', '/app');
     expect(screen.getByRole('link', { name: /My Profile/i })).toHaveAttribute('href', '/app/student/profile');
+    expect(screen.getByRole('link', { name: /^Projects$/i })).toHaveAttribute('href', '/app/projects');
     expect(screen.getByRole('link', { name: /Opportunities/i })).toHaveAttribute('href', '/app/jobs');
     expect(screen.getByRole('link', { name: /Saved Jobs/i })).toHaveAttribute('href', '/app/saved-jobs');
     expect(screen.getByRole('link', { name: /My Applications/i })).toHaveAttribute('href', '/app/applications');
@@ -86,11 +87,12 @@ describe('AppLayout Navigation (Phase F-08 & 30B.2)', () => {
     expect(screen.getByRole('link', { name: /^Job Postings$/i })).toHaveAttribute('href', '/app/recruiter/jobs');
     expect(screen.getByRole('link', { name: /^Applications$/i })).toHaveAttribute('href', '/app/recruiter/applications');
     expect(screen.getByRole('link', { name: /Interviews/i })).toHaveAttribute('href', '/app/recruiter/interviews');
+    expect(screen.queryByRole('link', { name: /^Projects$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Saved Jobs/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /My Applications/i })).not.toBeInTheDocument();
   });
 
-  it('renders admin navigation without application, interview, job postings, or saved-job self-service links', () => {
+  it('renders admin navigation without project, application, interview, job postings, or saved-job self-service links', () => {
     setupAuth(mockAdminUser);
 
     render(
@@ -101,6 +103,7 @@ describe('AppLayout Navigation (Phase F-08 & 30B.2)', () => {
 
     expect(screen.getByRole('link', { name: /Home/i })).toHaveAttribute('href', '/app');
     expect(screen.getByRole('link', { name: /Opportunities/i })).toHaveAttribute('href', '/app/jobs');
+    expect(screen.queryByRole('link', { name: /^Projects$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Saved Jobs/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /My Applications/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Job Postings$/i })).not.toBeInTheDocument();

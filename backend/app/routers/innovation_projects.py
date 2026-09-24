@@ -12,7 +12,14 @@ from app.schemas.innovation_project import (
     InnovationProjectResponse,
     InnovationProjectUpdate,
 )
+from app.schemas.project_milestone import (
+    ProjectMilestoneCreate,
+    ProjectMilestoneListResponse,
+    ProjectMilestoneResponse,
+    ProjectMilestoneUpdate,
+)
 from app.services.innovation_project_service import InnovationProjectService
+from app.services.project_milestone_service import ProjectMilestoneService
 
 router = APIRouter(prefix="/innovation-projects", tags=["Innovation Projects"])
 
@@ -183,6 +190,104 @@ def delete_innovation_project(
     InnovationProjectService.delete_project(
         db=db,
         project_id=project_id,
+        student_id=current_user.id,
+    )
+    return None
+
+
+# =========================================================================
+# Project Milestones Sub-routes (Milestone 2.0-C)
+# =========================================================================
+
+@router.post(
+    "/{project_id}/milestones",
+    response_model=ProjectMilestoneResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new milestone for an innovation project",
+    description="Allows the owning student to add a measurable execution milestone to their project.",
+)
+def create_project_milestone(
+    project_id: int = Path(..., ge=1, description="Primary key identifier of the parent project"),
+    payload: ProjectMilestoneCreate = ...,
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: Session = Depends(get_db),
+):
+    """
+    Create a new milestone under the specified project. Enforces student ownership.
+    """
+    return ProjectMilestoneService.create_milestone(
+        db=db,
+        project_id=project_id,
+        student_id=current_user.id,
+        payload=payload,
+    )
+
+
+@router.get(
+    "/{project_id}/milestones",
+    response_model=ProjectMilestoneListResponse,
+    summary="List milestones for an innovation project",
+    description="Retrieves all milestones and execution progress for a project. Respects private project visibility guards.",
+)
+def list_project_milestones(
+    project_id: int = Path(..., ge=1, description="Primary key identifier of the parent project"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    List milestones for the specified project. Returns 404 for private projects if accessed by unauthorized users.
+    """
+    return ProjectMilestoneService.list_milestones(
+        db=db,
+        project_id=project_id,
+        current_user=current_user,
+    )
+
+
+@router.patch(
+    "/{project_id}/milestones/{milestone_id}",
+    response_model=ProjectMilestoneResponse,
+    summary="Update a project milestone",
+    description="Allows the owning student to update a milestone's title, description, status, due date, or order.",
+)
+def update_project_milestone(
+    project_id: int = Path(..., ge=1, description="Primary key identifier of the parent project"),
+    milestone_id: int = Path(..., ge=1, description="Primary key identifier of the milestone"),
+    payload: ProjectMilestoneUpdate = ...,
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: Session = Depends(get_db),
+):
+    """
+    Update a milestone under the specified project. Enforces student ownership and status transition rules.
+    """
+    return ProjectMilestoneService.update_milestone(
+        db=db,
+        project_id=project_id,
+        milestone_id=milestone_id,
+        student_id=current_user.id,
+        payload=payload,
+    )
+
+
+@router.delete(
+    "/{project_id}/milestones/{milestone_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a project milestone",
+    description="Allows the owning student to delete a milestone from their project.",
+)
+def delete_project_milestone(
+    project_id: int = Path(..., ge=1, description="Primary key identifier of the parent project"),
+    milestone_id: int = Path(..., ge=1, description="Primary key identifier of the milestone"),
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete a milestone from the specified project. Enforces student ownership.
+    """
+    ProjectMilestoneService.delete_milestone(
+        db=db,
+        project_id=project_id,
+        milestone_id=milestone_id,
         student_id=current_user.id,
     )
     return None

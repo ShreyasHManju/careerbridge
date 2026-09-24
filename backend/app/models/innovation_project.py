@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.project_milestone import ProjectMilestone
     from app.models.skill import Skill
     from app.models.user import User
 
@@ -106,11 +107,41 @@ class InnovationProject(Base):
         back_populates="innovation_project",
         cascade="all, delete-orphan",
     )
+    milestones: Mapped[list["ProjectMilestone"]] = relationship(
+        "ProjectMilestone",
+        back_populates="innovation_project",
+        cascade="all, delete-orphan",
+        order_by="ProjectMilestone.display_order.asc()",
+    )
 
     @property
     def structured_skills(self) -> list["Skill"]:
         """Return list of canonical Skill objects associated with this innovation project."""
         return [ps.skill for ps in self.project_skills if ps.skill is not None]
+
+    @property
+    def total_milestones(self) -> int:
+        """Total count of milestones defined for this project."""
+        return len(self.milestones) if self.milestones else 0
+
+    @property
+    def completed_milestones(self) -> int:
+        """Count of completed milestones for this project."""
+        if not self.milestones:
+            return 0
+        return sum(
+            1
+            for m in self.milestones
+            if (hasattr(m.status, "value") and m.status.value == "completed") or m.status == "completed"
+        )
+
+    @property
+    def progress_percentage(self) -> int:
+        """Calculated integer progress percentage (0-100) based on completed milestones."""
+        total = self.total_milestones
+        if total == 0:
+            return 0
+        return round((self.completed_milestones / total) * 100)
 
     def __repr__(self) -> str:
         return f"<InnovationProject id={self.id} title={self.title!r} student_id={self.student_id}>"

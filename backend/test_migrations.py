@@ -31,7 +31,8 @@ def test_migrations():
     assert "messages" in Base.metadata.tables, "Table 'messages' missing from Base.metadata"
     assert "innovation_projects" in Base.metadata.tables, "Table 'innovation_projects' missing from Base.metadata"
     assert "project_skills" in Base.metadata.tables, "Table 'project_skills' missing from Base.metadata"
-    print("  -> Base.metadata contains innovation projects tables.")
+    assert "project_milestones" in Base.metadata.tables, "Table 'project_milestones' missing from Base.metadata"
+    print("  -> Base.metadata contains innovation projects and milestones tables.")
 
     print("[3/11] Verifying database schema after migration")
     inspector = inspect(engine)
@@ -56,6 +57,7 @@ def test_migrations():
     assert "job_skills" in tables, "Table 'job_skills' not found in database!"
     assert "innovation_projects" in tables, "Table 'innovation_projects' not found in database!"
     assert "project_skills" in tables, "Table 'project_skills' not found in database!"
+    assert "project_milestones" in tables, "Table 'project_milestones' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
 
     print("[4/9] Verifying 'users' table columns and indexes")
@@ -445,7 +447,21 @@ def test_migrations():
     )
     assert has_ps_uq, "Unique constraint on ('innovation_project_id', 'skill_id') missing on project_skills!"
 
-    print("[21/21] Verifying alembic_version table in PostgreSQL")
+    print("[21/22] Verifying 'project_milestones' table columns, indexes, FKs, and constraints")
+    pm_columns = {col["name"]: col for col in inspector.get_columns("project_milestones")}
+    expected_pm_cols = [
+        "id", "innovation_project_id", "title", "description", "status",
+        "display_order", "due_date", "completed_at", "created_at", "updated_at"
+    ]
+    for c in expected_pm_cols:
+        assert c in pm_columns, f"Column '{c}' missing from 'project_milestones' table"
+    pm_fks = inspector.get_foreign_keys("project_milestones")
+    assert any(fk.get("referred_table") == "innovation_projects" for fk in pm_fks), "FK to innovation_projects missing on project_milestones!"
+    pm_indexes = inspector.get_indexes("project_milestones")
+    pm_idx_names = [idx["name"] for idx in pm_indexes]
+    assert any("innovation_project_id" in name for name in pm_idx_names), "Index on innovation_project_id missing on project_milestones!"
+
+    print("[22/22] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")

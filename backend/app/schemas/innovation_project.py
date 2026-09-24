@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.innovation_project import ProjectStatus, ProjectType, ProjectVisibility
 from app.schemas.skill import SkillResponse
+from app.schemas.project_milestone import ProjectMilestoneResponse
 
 URL_REGEX = re.compile(
     r"^https?://"
@@ -86,6 +87,10 @@ class InnovationProjectResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     owner_name: Optional[str] = None
+    milestones: Optional[List[ProjectMilestoneResponse]] = None
+    total_milestones: Optional[int] = None
+    completed_milestones: Optional[int] = None
+    progress_percentage: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

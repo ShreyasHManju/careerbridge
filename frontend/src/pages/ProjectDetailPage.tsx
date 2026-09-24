@@ -2,15 +2,26 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/auth/useAuth';
 import {
+  createProjectMilestone,
   deleteProject,
+  deleteProjectMilestone,
   getProjectById,
+  getProjectMilestones,
   updateProject,
+  updateProjectMilestone,
 } from '@/api/innovationProjects';
 import {
   InnovationProject,
   InnovationProjectUpdate,
+  MilestoneStatus,
+  ProjectMilestone,
+  ProjectMilestoneCreate,
+  ProjectMilestoneUpdate,
 } from '@/types/innovationProject';
 import { InnovationProjectForm } from '@/components/projects/InnovationProjectForm';
+import { ProjectMilestoneProgress } from '@/components/projects/ProjectMilestoneProgress';
+import { ProjectMilestoneList } from '@/components/projects/ProjectMilestoneList';
+import { ProjectMilestoneModal } from '@/components/projects/ProjectMilestoneModal';
 
 export const ProjectDetailPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -24,6 +35,42 @@ export const ProjectDetailPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Milestone Integration State
+  const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
+  const [milestoneStats, setMilestoneStats] = useState<{
+    total: number;
+    completed: number;
+    progressPercentage: number;
+  }>({ total: 0, completed: 0, progressPercentage: 0 });
+  const [milestonesLoading, setMilestonesLoading] = useState(false);
+  const [milestonesError, setMilestonesError] = useState<string | null>(null);
+
+  const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
+  const [editingMilestone, setEditingMilestone] = useState<ProjectMilestone | null>(null);
+  const [isMilestoneSaving, setIsMilestoneSaving] = useState(false);
+  const [deletingMilestone, setDeletingMilestone] = useState<ProjectMilestone | null>(null);
+  const [isMilestoneDeleting, setIsMilestoneDeleting] = useState(false);
+
+  const fetchMilestones = async (pId: number) => {
+    setMilestonesLoading(true);
+    setMilestonesError(null);
+    try {
+      const res = await getProjectMilestones(pId);
+      setMilestones(res.items);
+      setMilestoneStats({
+        total: res.total,
+        completed: res.completed,
+        progressPercentage: res.progress_percentage,
+      });
+    } catch (err: any) {
+      setMilestonesError(
+        err.response?.data?.detail || err.message || 'Failed to load milestones.'
+      );
+    } finally {
+      setMilestonesLoading(false);
+    }
+  };
+
   const fetchProject = async () => {
     if (!projectId || isNaN(Number(projectId))) {
       setError('Invalid project ID.');
@@ -36,6 +83,7 @@ export const ProjectDetailPage: React.FC = () => {
     try {
       const data = await getProjectById(Number(projectId));
       setProject(data);
+      await fetchMilestones(data.id);
     } catch (err: any) {
       if (err.response?.status === 404) {
         setError('Innovation project not found or you do not have permission to view it.');
@@ -72,6 +120,52 @@ export const ProjectDetailPage: React.FC = () => {
       navigate('/app/projects');
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Failed to delete project.');
+    }
+  };
+
+  const handleSaveMilestone = async (
+    payload: ProjectMilestoneCreate | ProjectMilestoneUpdate
+  ) => {
+    if (!project) return;
+    setIsMilestoneSaving(true);
+    try {
+      if (editingMilestone) {
+        await updateProjectMilestone(project.id, editingMilestone.id, payload);
+      } else {
+        await createProjectMilestone(project.id, payload as ProjectMilestoneCreate);
+      }
+      await fetchMilestones(project.id);
+      setIsMilestoneModalOpen(false);
+      setEditingMilestone(null);
+    } finally {
+      setIsMilestoneSaving(false);
+    }
+  };
+
+  const handleToggleMilestoneStatus = async (
+    milestone: ProjectMilestone,
+    newStatus: MilestoneStatus
+  ) => {
+    if (!project || !isOwner) return;
+    try {
+      await updateProjectMilestone(project.id, milestone.id, { status: newStatus });
+      await fetchMilestones(project.id);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to update milestone status.');
+    }
+  };
+
+  const handleDeleteMilestone = async () => {
+    if (!project || !deletingMilestone) return;
+    setIsMilestoneDeleting(true);
+    try {
+      await deleteProjectMilestone(project.id, deletingMilestone.id);
+      await fetchMilestones(project.id);
+      setDeletingMilestone(null);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to delete milestone.');
+    } finally {
+      setIsMilestoneDeleting(false);
     }
   };
 
@@ -220,6 +314,76 @@ export const ProjectDetailPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Execution Milestones & Progress Section */}
+        <div
+          className="cb-detail-section cb-detail-milestones-section"
+          data-testid="project-milestones-section"
+        >
+          <div className="cb-detail-section-header">
+            <div className="cb-section-title-wrap">
+              <h3>Execution Milestones & Progress</h3>
+              <p className="cb-section-subtitle">
+                Track verified development goals, deliverables, and execution timelines.
+              </p>
+            </div>
+            {isOwner && (
+              <button
+                type="button"
+                className="cb-btn cb-btn-primary cb-btn-sm"
+                onClick={() => {
+                  setEditingMilestone(null);
+                  setIsMilestoneModalOpen(true);
+                }}
+                aria-label="Add Milestone"
+              >
+                + Add Milestone
+              </button>
+            )}
+          </div>
+
+          {milestonesLoading ? (
+            <div className="cb-milestones-loading" data-testid="milestones-loading">
+              <div className="cb-spinner" />
+              <p>Loading project milestones...</p>
+            </div>
+          ) : milestonesError ? (
+            <div className="cb-milestones-error" data-testid="milestones-error">
+              <p className="cb-error-text">{milestonesError}</p>
+              <button
+                type="button"
+                className="cb-btn cb-btn-secondary cb-btn-sm"
+                onClick={() => fetchMilestones(project.id)}
+              >
+                Retry Loading Milestones
+              </button>
+            </div>
+          ) : (
+            <>
+              <ProjectMilestoneProgress
+                total={milestoneStats.total}
+                completed={milestoneStats.completed}
+                progressPercentage={milestoneStats.progressPercentage}
+              />
+              <ProjectMilestoneList
+                milestones={milestones}
+                isOwner={!!isOwner}
+                onAddMilestone={() => {
+                  setEditingMilestone(null);
+                  setIsMilestoneModalOpen(true);
+                }}
+                onEditMilestone={(m) => {
+                  setEditingMilestone(m);
+                  setIsMilestoneModalOpen(true);
+                }}
+                onDeleteMilestone={(m) => {
+                  setDeletingMilestone(m);
+                }}
+                onToggleStatus={handleToggleMilestoneStatus}
+              />
+            </>
+          )}
+        </div>
+
         <div className="cb-detail-footer">
           <span className="cb-timestamp">
             Created: {new Date(project.created_at).toLocaleDateString()}
@@ -230,7 +394,7 @@ export const ProjectDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Edit Modal */}
+      {/* Edit Project Modal */}
       {isEditModalOpen && (
         <div className="cb-modal-overlay" role="dialog" aria-modal="true">
           <div className="cb-modal cb-modal-lg">
@@ -257,7 +421,7 @@ export const ProjectDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Project Confirmation Modal */}
       {isDeleting && (
         <div className="cb-modal-overlay" role="alertdialog" aria-modal="true">
           <div className="cb-modal cb-modal-sm">
@@ -290,6 +454,61 @@ export const ProjectDetailPage: React.FC = () => {
                 onClick={handleDelete}
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Milestone Modal (Create / Edit) */}
+      <ProjectMilestoneModal
+        isOpen={isMilestoneModalOpen}
+        initialData={editingMilestone}
+        onSubmit={handleSaveMilestone}
+        onClose={() => {
+          setIsMilestoneModalOpen(false);
+          setEditingMilestone(null);
+        }}
+        isLoading={isMilestoneSaving}
+      />
+
+      {/* Milestone Deletion Confirmation Dialog */}
+      {deletingMilestone && (
+        <div className="cb-modal-overlay" role="alertdialog" aria-modal="true">
+          <div className="cb-modal cb-modal-sm">
+            <div className="cb-modal-header">
+              <h2>Confirm Milestone Deletion</h2>
+              <button
+                type="button"
+                className="cb-modal-close"
+                onClick={() => setDeletingMilestone(null)}
+                disabled={isMilestoneDeleting}
+              >
+                &times;
+              </button>
+            </div>
+            <div className="cb-modal-body">
+              <p>
+                Are you sure you want to delete milestone{' '}
+                <strong>"{deletingMilestone.title}"</strong>?
+              </p>
+            </div>
+            <div className="cb-modal-footer">
+              <button
+                type="button"
+                className="cb-btn cb-btn-secondary"
+                onClick={() => setDeletingMilestone(null)}
+                disabled={isMilestoneDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="cb-btn cb-btn-danger"
+                onClick={handleDeleteMilestone}
+                disabled={isMilestoneDeleting}
+              >
+                {isMilestoneDeleting ? 'Deleting...' : 'Delete Milestone'}
               </button>
             </div>
           </div>

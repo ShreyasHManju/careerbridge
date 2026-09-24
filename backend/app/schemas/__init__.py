@@ -67,6 +67,12 @@ from app.schemas.innovation_project import (
     InnovationProjectResponse,
     InnovationProjectPaginationResponse,
 )
+from app.schemas.project_milestone import (
+    ProjectMilestoneCreate,
+    ProjectMilestoneUpdate,
+    ProjectMilestoneResponse,
+    ProjectMilestoneListResponse,
+)
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 
 __all__ = [
@@ -88,6 +94,10 @@ __all__ = [
     "InnovationProjectUpdate",
     "InnovationProjectResponse",
     "InnovationProjectPaginationResponse",
+    "ProjectMilestoneCreate",
+    "ProjectMilestoneUpdate",
+    "ProjectMilestoneResponse",
+    "ProjectMilestoneListResponse",
     "RecruiterProfileCreate",
     "RecruiterProfileUpdate",
     "RecruiterProfileResponse",

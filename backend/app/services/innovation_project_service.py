@@ -101,7 +101,10 @@ class InnovationProjectService:
         """
         project = db.scalar(
             select(InnovationProject)
-            .options(selectinload(InnovationProject.project_skills).joinedload(ProjectSkill.skill))
+            .options(
+                selectinload(InnovationProject.project_skills).joinedload(ProjectSkill.skill),
+                selectinload(InnovationProject.milestones),
+            )
             .where(InnovationProject.id == project_id)
         )
         if not project:
@@ -128,7 +131,10 @@ class InnovationProjectService:
         """
         stmt = (
             select(InnovationProject)
-            .options(selectinload(InnovationProject.project_skills).joinedload(ProjectSkill.skill))
+            .options(
+                selectinload(InnovationProject.project_skills).joinedload(ProjectSkill.skill),
+                selectinload(InnovationProject.milestones),
+            )
             .where(InnovationProject.student_id == student_id)
         )
         if status_filter is not None:
@@ -179,7 +185,10 @@ class InnovationProjectService:
 
         stmt = (
             select(InnovationProject)
-            .options(selectinload(InnovationProject.project_skills).joinedload(ProjectSkill.skill))
+            .options(
+                selectinload(InnovationProject.project_skills).joinedload(ProjectSkill.skill),
+                selectinload(InnovationProject.milestones),
+            )
             .where(*filters)
             .order_by(InnovationProject.created_at.desc(), InnovationProject.id.desc())
             .offset(offset)
