@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from app.models.application import Application
     from app.models.conversation import ConversationParticipant
     from app.models.interview import Interview
+    from app.models.innovation_project import InnovationProject
     from app.models.job_posting import JobPosting
     from app.models.message import Message
     from app.models.notification import Notification
@@ -108,6 +109,13 @@ class User(Base):
     # One-to-many relationship with SavedJob (as student)
     saved_jobs: Mapped[list["SavedJob"]] = relationship(
         "SavedJob",
+        back_populates="student",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-many relationship with InnovationProject (as student)
+    innovation_projects: Mapped[list["InnovationProject"]] = relationship(
+        "InnovationProject",
         back_populates="student",
         cascade="all, delete-orphan",
     )

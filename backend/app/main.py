@@ -13,6 +13,7 @@ from app.routers import (
     applications_router,
     auth_router,
     dashboards_router,
+    innovation_projects_router,
     interviews_router,
     job_posting_router,
     messaging_router,
@@ -135,6 +136,10 @@ TAGS_METADATA = [
     {
         "name": "Jobs & Internships",
         "description": "Job and internship postings, discovery search, filtering, and recruiter management.",
+    },
+    {
+        "name": "Innovation Projects",
+        "description": "Student real-world innovation projects, skills integration, and project discovery.",
     },
     {
         "name": "Applications",
@@ -264,6 +269,7 @@ app.include_router(resume_router, prefix=settings.API_V1_STR)
 app.include_router(profile_image_router, prefix=settings.API_V1_STR)
 app.include_router(saved_jobs_router, prefix=settings.API_V1_STR)
 app.include_router(skills_router, prefix=settings.API_V1_STR)
+app.include_router(innovation_projects_router, prefix=settings.API_V1_STR)
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)
 app.include_router(dashboards_router, prefix=settings.API_V1_STR)

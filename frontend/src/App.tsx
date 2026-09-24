@@ -7,6 +7,9 @@ import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { AppHome } from '@/pages/AppHome';
 import { StudentProfilePage } from '@/pages/StudentProfilePage';
+import { StudentProjectsPage } from '@/pages/StudentProjectsPage';
+import { ProjectsPage } from '@/pages/ProjectsPage';
+import { ProjectDetailPage } from '@/pages/ProjectDetailPage';
 import { SavedJobsPage } from '@/pages/SavedJobsPage';
 import { RecruiterProfilePage } from '@/pages/RecruiterProfilePage';
 import { RecruiterJobsPage } from '@/pages/RecruiterJobsPage';
@@ -41,11 +44,15 @@ export const App: React.FC = () => {
           {/* Opportunity Discovery Routes (all authenticated roles) */}
           <Route path="/app/jobs" element={<JobDiscoveryPage />} />
           <Route path="/app/jobs/:jobId" element={<JobDetailPage />} />
+          {/* Innovation Projects Discovery & Detail Routes (all authenticated roles) */}
+          <Route path="/app/explore-projects" element={<ProjectsPage />} />
+          <Route path="/app/projects/:projectId" element={<ProjectDetailPage />} />
           {/* Direct & Real-Time Messaging Route (all authenticated roles) */}
           <Route path="/app/messages" element={<MessagesPage />} />
           {/* Student-only domain routes */}
           <Route element={<ProtectedRoute allowedRoles={['student']} />}>
             <Route path="/app/student/profile" element={<StudentProfilePage />} />
+            <Route path="/app/projects" element={<StudentProjectsPage />} />
             <Route path="/app/saved-jobs" element={<SavedJobsPage />} />
             <Route path="/app/applications" element={<StudentApplicationsPage />} />
             <Route path="/app/interviews" element={<StudentInterviewsPage />} />

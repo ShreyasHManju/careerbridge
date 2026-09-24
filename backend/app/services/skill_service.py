@@ -217,3 +217,49 @@ def search_canonical_skills(
     stmt = stmt.order_by(Skill.name.asc()).limit(bounded_limit)
 
     return list(db.scalars(stmt).all())
+
+
+def sync_project_skills_from_text(
+    db: Session,
+    project,
+    skills_text: Optional[str],
+) -> List:
+    """
+    Synchronize an innovation project's structured project_skills associations with a skills text string.
+    - Parses and normalizes the input string.
+    - Creates or retrieves canonical Skill records.
+    - Adds missing ProjectSkill association rows.
+    - Removes obsolete ProjectSkill association rows.
+    - Updates project.skills with the deterministic canonical representation.
+    """
+    from app.models.innovation_project import ProjectSkill
+    skill_names = parse_skills_text(skills_text)
+    if not skill_names:
+        project.project_skills.clear()
+        project.skills = None
+        return []
+
+    canonical_skills = [
+        s for s in (get_or_create_skill(db, name) for name in skill_names) if s is not None
+    ]
+    target_skill_ids = {s.id for s in canonical_skills}
+
+    # Remove associations no longer present
+    for ass in list(project.project_skills):
+        if ass.skill_id not in target_skill_ids:
+            project.project_skills.remove(ass)
+
+    # Add new associations
+    existing_skill_ids = {ass.skill_id for ass in project.project_skills}
+    for skill in canonical_skills:
+        if skill.id not in existing_skill_ids:
+            project.project_skills.append(
+                ProjectSkill(
+                    innovation_project_id=project.id,
+                    skill_id=skill.id,
+                )
+            )
+
+    # Maintain deterministic legacy string
+    project.skills = format_skills_string([s.name for s in canonical_skills])
+    return project.project_skills

@@ -29,7 +29,9 @@ def test_migrations():
     assert "conversations" in Base.metadata.tables, "Table 'conversations' missing from Base.metadata"
     assert "conversation_participants" in Base.metadata.tables, "Table 'conversation_participants' missing from Base.metadata"
     assert "messages" in Base.metadata.tables, "Table 'messages' missing from Base.metadata"
-    print("  -> Base.metadata contains messaging tables.")
+    assert "innovation_projects" in Base.metadata.tables, "Table 'innovation_projects' missing from Base.metadata"
+    assert "project_skills" in Base.metadata.tables, "Table 'project_skills' missing from Base.metadata"
+    print("  -> Base.metadata contains innovation projects tables.")
 
     print("[3/11] Verifying database schema after migration")
     inspector = inspect(engine)
@@ -49,6 +51,11 @@ def test_migrations():
     assert "conversations" in tables, "Table 'conversations' not found in database!"
     assert "conversation_participants" in tables, "Table 'conversation_participants' not found in database!"
     assert "messages" in tables, "Table 'messages' not found in database!"
+    assert "skills" in tables, "Table 'skills' not found in database!"
+    assert "student_skills" in tables, "Table 'student_skills' not found in database!"
+    assert "job_skills" in tables, "Table 'job_skills' not found in database!"
+    assert "innovation_projects" in tables, "Table 'innovation_projects' not found in database!"
+    assert "project_skills" in tables, "Table 'project_skills' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
 
     print("[4/9] Verifying 'users' table columns and indexes")
@@ -407,14 +414,42 @@ def test_migrations():
     )
     assert has_js_uq, "Unique constraint on ('job_posting_id', 'skill_id') missing on job_skills!"
 
-    print("[19/19] Verifying alembic_version table in PostgreSQL")
+    print("[19/21] Verifying 'innovation_projects' table columns, indexes, FKs, and constraints")
+    ip_columns = {col["name"]: col for col in inspector.get_columns("innovation_projects")}
+    expected_ip_cols = [
+        "id", "student_id", "title", "slug", "short_description", "description",
+        "project_type", "status", "visibility", "skills", "repository_url",
+        "live_demo_url", "created_at", "updated_at"
+    ]
+    for c in expected_ip_cols:
+        assert c in ip_columns, f"Column '{c}' missing from 'innovation_projects' table"
+    ip_fks = inspector.get_foreign_keys("innovation_projects")
+    assert any(fk.get("referred_table") == "users" for fk in ip_fks), "FK to users missing on innovation_projects!"
+    ip_indexes = inspector.get_indexes("innovation_projects")
+    ip_idx_names = [idx["name"] for idx in ip_indexes]
+    assert any("student_id" in name for name in ip_idx_names), "Index on student_id missing on innovation_projects!"
+    assert any("slug" in name for name in ip_idx_names), "Index on slug missing on innovation_projects!"
+
+    print("[20/21] Verifying 'project_skills' table columns, indexes, FKs, and constraints")
+    ps_columns = {col["name"]: col for col in inspector.get_columns("project_skills")}
+    for c in ["id", "innovation_project_id", "skill_id", "created_at"]:
+        assert c in ps_columns, f"Column '{c}' missing from 'project_skills' table"
+    ps_fks = inspector.get_foreign_keys("project_skills")
+    ps_ref_tables = {fk.get("referred_table") for fk in ps_fks}
+    assert "innovation_projects" in ps_ref_tables, "FK to innovation_projects missing on project_skills!"
+    assert "skills" in ps_ref_tables, "FK to skills missing on project_skills!"
+    ps_uqs = inspector.get_unique_constraints("project_skills")
+    has_ps_uq = any(
+        set(uc.get("column_names", [])) == {"innovation_project_id", "skill_id"}
+        for uc in ps_uqs
+    )
+    assert has_ps_uq, "Unique constraint on ('innovation_project_id', 'skill_id') missing on project_skills!"
+
+    print("[21/21] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")
         assert db_version == head_revision, f"Database version ({db_version}) != Alembic head ({head_revision})"
-
-
-
 
     print("\n==========================================================")
     print("ALL BACKEND ALEMBIC MIGRATION TESTS PASSED SUCCESSFULLY!")

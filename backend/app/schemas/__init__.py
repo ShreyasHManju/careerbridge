@@ -54,6 +54,19 @@ from app.schemas.student_profile import (
     StudentProfileResponse,
     StudentProfileUpdate,
 )
+from app.schemas.skill import (
+    SkillBase,
+    SkillCreate,
+    SkillResponse,
+    StudentSkillResponse,
+    JobSkillResponse,
+)
+from app.schemas.innovation_project import (
+    InnovationProjectCreate,
+    InnovationProjectUpdate,
+    InnovationProjectResponse,
+    InnovationProjectPaginationResponse,
+)
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 
 __all__ = [
@@ -66,6 +79,15 @@ __all__ = [
     "StudentProfileCreate",
     "StudentProfileUpdate",
     "StudentProfileResponse",
+    "SkillBase",
+    "SkillCreate",
+    "SkillResponse",
+    "StudentSkillResponse",
+    "JobSkillResponse",
+    "InnovationProjectCreate",
+    "InnovationProjectUpdate",
+    "InnovationProjectResponse",
+    "InnovationProjectPaginationResponse",
     "RecruiterProfileCreate",
     "RecruiterProfileUpdate",
     "RecruiterProfileResponse",

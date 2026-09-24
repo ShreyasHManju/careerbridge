@@ -2,6 +2,7 @@ from app.routers.admin import router as admin_router
 from app.routers.applications import router as applications_router
 from app.routers.auth import router as auth_router
 from app.routers.dashboards import router as dashboards_router
+from app.routers.innovation_projects import router as innovation_projects_router
 from app.routers.interviews import router as interviews_router
 from app.routers.job_posting import router as job_posting_router
 from app.routers.messaging import router as messaging_router
@@ -34,4 +35,5 @@ __all__ = [
     "websocket_messaging_router",
     "dashboards_router",
     "skills_router",
+    "innovation_projects_router",
 ]

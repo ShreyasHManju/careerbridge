@@ -13,6 +13,7 @@ from app.models.interview import Interview, InterviewType, InterviewStatus
 from app.models.conversation import Conversation, ConversationParticipant
 from app.models.message import Message
 from app.models.skill import Skill, StudentSkill, JobSkill
+from app.models.innovation_project import InnovationProject, ProjectSkill, ProjectType, ProjectStatus, ProjectVisibility
 
 __all__ = [
     "Base",
@@ -41,4 +42,9 @@ __all__ = [
     "Skill",
     "StudentSkill",
     "JobSkill",
+    "InnovationProject",
+    "ProjectSkill",
+    "ProjectType",
+    "ProjectStatus",
+    "ProjectVisibility",
 ]
