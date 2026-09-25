@@ -19,6 +19,9 @@ import { StudentApplicationsPage } from '@/pages/StudentApplicationsPage';
 import { RecruiterApplicationsPage } from '@/pages/RecruiterApplicationsPage';
 import { StudentInterviewsPage } from '@/pages/StudentInterviewsPage';
 import { RecruiterInterviewsPage } from '@/pages/RecruiterInterviewsPage';
+import { StudentExperiencesPage } from '@/pages/StudentExperiencesPage';
+import { RecruiterExperienceVerificationPage } from '@/pages/RecruiterExperienceVerificationPage';
+import { AdminExperienceVerificationPage } from '@/pages/AdminExperienceVerificationPage';
 import { MessagesPage } from '@/pages/MessagesPage';
 import { AdminUsersPage } from '@/pages/AdminUsersPage';
 import { AdminRecruitersPage } from '@/pages/AdminRecruitersPage';
@@ -53,6 +56,7 @@ export const App: React.FC = () => {
           <Route element={<ProtectedRoute allowedRoles={['student']} />}>
             <Route path="/app/student/profile" element={<StudentProfilePage />} />
             <Route path="/app/projects" element={<StudentProjectsPage />} />
+            <Route path="/app/experiences" element={<StudentExperiencesPage />} />
             <Route path="/app/saved-jobs" element={<SavedJobsPage />} />
             <Route path="/app/applications" element={<StudentApplicationsPage />} />
             <Route path="/app/interviews" element={<StudentInterviewsPage />} />
@@ -63,12 +67,14 @@ export const App: React.FC = () => {
             <Route path="/app/recruiter/jobs" element={<RecruiterJobsPage />} />
             <Route path="/app/recruiter/applications" element={<RecruiterApplicationsPage />} />
             <Route path="/app/recruiter/interviews" element={<RecruiterInterviewsPage />} />
+            <Route path="/app/recruiter/experiences/verification" element={<RecruiterExperienceVerificationPage />} />
           </Route>
           {/* Admin-only domain routes */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/app/admin/users" element={<AdminUsersPage />} />
             <Route path="/app/admin/recruiters" element={<AdminRecruitersPage />} />
             <Route path="/app/admin/jobs" element={<AdminJobsPage />} />
+            <Route path="/app/admin/experiences/verification" element={<AdminExperienceVerificationPage />} />
           </Route>
         </Route>
       </Route>

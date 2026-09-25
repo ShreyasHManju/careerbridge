@@ -73,6 +73,13 @@ from app.schemas.project_milestone import (
     ProjectMilestoneResponse,
     ProjectMilestoneListResponse,
 )
+from app.schemas.experience_record import (
+    ExperienceRecordCreate,
+    ExperienceRecordUpdate,
+    ExperienceRecordResponse,
+    ExperienceRecordListResponse,
+    ExperienceVerificationDecision,
+)
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 
 __all__ = [
@@ -98,6 +105,11 @@ __all__ = [
     "ProjectMilestoneUpdate",
     "ProjectMilestoneResponse",
     "ProjectMilestoneListResponse",
+    "ExperienceRecordCreate",
+    "ExperienceRecordUpdate",
+    "ExperienceRecordResponse",
+    "ExperienceRecordListResponse",
+    "ExperienceVerificationDecision",
     "RecruiterProfileCreate",
     "RecruiterProfileUpdate",
     "RecruiterProfileResponse",

@@ -34,6 +34,9 @@ export const AppLayout: React.FC = () => {
           {user?.role === 'student' && (
             <Link to="/app/projects" className="cb-nav-link">Projects</Link>
           )}
+          {user?.role === 'student' && (
+            <Link to="/app/experiences" className="cb-nav-link">Experiences</Link>
+          )}
           {user?.role === 'recruiter' && (
             <Link to="/app/recruiter/profile" className="cb-nav-link">Company Profile</Link>
           )}
@@ -56,6 +59,9 @@ export const AppLayout: React.FC = () => {
           {user?.role === 'recruiter' && (
             <Link to="/app/recruiter/interviews" className="cb-nav-link">Interviews</Link>
           )}
+          {user?.role === 'recruiter' && (
+            <Link to="/app/recruiter/experiences/verification" className="cb-nav-link">Experience Verification</Link>
+          )}
           {user?.role === 'admin' && (
             <Link to="/app/admin/users" className="cb-nav-link">User Management</Link>
           )}
@@ -64,6 +70,9 @@ export const AppLayout: React.FC = () => {
           )}
           {user?.role === 'admin' && (
             <Link to="/app/admin/jobs" className="cb-nav-link">Job Moderation</Link>
+          )}
+          {user?.role === 'admin' && (
+            <Link to="/app/admin/experiences/verification" className="cb-nav-link">Experience Verification</Link>
           )}
           <Link to="/app/messages" className="cb-nav-link">Messages</Link>
         </nav>

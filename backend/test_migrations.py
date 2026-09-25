@@ -32,7 +32,9 @@ def test_migrations():
     assert "innovation_projects" in Base.metadata.tables, "Table 'innovation_projects' missing from Base.metadata"
     assert "project_skills" in Base.metadata.tables, "Table 'project_skills' missing from Base.metadata"
     assert "project_milestones" in Base.metadata.tables, "Table 'project_milestones' missing from Base.metadata"
-    print("  -> Base.metadata contains innovation projects and milestones tables.")
+    assert "experience_records" in Base.metadata.tables, "Table 'experience_records' missing from Base.metadata"
+    assert "experience_skills" in Base.metadata.tables, "Table 'experience_skills' missing from Base.metadata"
+    print("  -> Base.metadata contains innovation projects, milestones, and experience records tables.")
 
     print("[3/11] Verifying database schema after migration")
     inspector = inspect(engine)
@@ -58,6 +60,8 @@ def test_migrations():
     assert "innovation_projects" in tables, "Table 'innovation_projects' not found in database!"
     assert "project_skills" in tables, "Table 'project_skills' not found in database!"
     assert "project_milestones" in tables, "Table 'project_milestones' not found in database!"
+    assert "experience_records" in tables, "Table 'experience_records' not found in database!"
+    assert "experience_skills" in tables, "Table 'experience_skills' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
 
     print("[4/9] Verifying 'users' table columns and indexes")
@@ -447,7 +451,7 @@ def test_migrations():
     )
     assert has_ps_uq, "Unique constraint on ('innovation_project_id', 'skill_id') missing on project_skills!"
 
-    print("[21/22] Verifying 'project_milestones' table columns, indexes, FKs, and constraints")
+    print("[21/24] Verifying 'project_milestones' table columns, indexes, FKs, and constraints")
     pm_columns = {col["name"]: col for col in inspector.get_columns("project_milestones")}
     expected_pm_cols = [
         "id", "innovation_project_id", "title", "description", "status",
@@ -461,7 +465,41 @@ def test_migrations():
     pm_idx_names = [idx["name"] for idx in pm_indexes]
     assert any("innovation_project_id" in name for name in pm_idx_names), "Index on innovation_project_id missing on project_milestones!"
 
-    print("[22/22] Verifying alembic_version table in PostgreSQL")
+    print("[22/24] Verifying 'experience_records' table columns, indexes, FKs, and constraints")
+    er_columns = {col["name"]: col for col in inspector.get_columns("experience_records")}
+    expected_er_cols = [
+        "id", "student_id", "title", "organization_name", "experience_type",
+        "start_date", "end_date", "is_current", "description", "status",
+        "verification_source", "innovation_project_id", "verifier_id",
+        "verified_at", "verification_notes", "created_at", "updated_at"
+    ]
+    for c in expected_er_cols:
+        assert c in er_columns, f"Column '{c}' missing from 'experience_records' table"
+    er_fks = inspector.get_foreign_keys("experience_records")
+    er_ref_tables = {fk.get("referred_table") for fk in er_fks}
+    assert "users" in er_ref_tables, "FK to users missing on experience_records!"
+    assert "innovation_projects" in er_ref_tables, "FK to innovation_projects missing on experience_records!"
+    er_indexes = inspector.get_indexes("experience_records")
+    er_idx_names = [idx["name"] for idx in er_indexes]
+    assert any("student_id" in name for name in er_idx_names), "Index on student_id missing on experience_records!"
+    assert any("status" in name for name in er_idx_names), "Index on status missing on experience_records!"
+
+    print("[23/24] Verifying 'experience_skills' table columns, indexes, FKs, and constraints")
+    es_columns = {col["name"]: col for col in inspector.get_columns("experience_skills")}
+    for c in ["id", "experience_record_id", "skill_id", "created_at"]:
+        assert c in es_columns, f"Column '{c}' missing from 'experience_skills' table"
+    es_fks = inspector.get_foreign_keys("experience_skills")
+    es_ref_tables = {fk.get("referred_table") for fk in es_fks}
+    assert "experience_records" in es_ref_tables, "FK to experience_records missing on experience_skills!"
+    assert "skills" in es_ref_tables, "FK to skills missing on experience_skills!"
+    es_uqs = inspector.get_unique_constraints("experience_skills")
+    has_es_uq = any(
+        set(uc.get("column_names", [])) == {"experience_record_id", "skill_id"}
+        for uc in es_uqs
+    )
+    assert has_es_uq, "Unique constraint on ('experience_record_id', 'skill_id') missing on experience_skills!"
+
+    print("[24/24] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")

@@ -13,6 +13,7 @@ from app.routers import (
     applications_router,
     auth_router,
     dashboards_router,
+    experience_records_router,
     innovation_projects_router,
     interviews_router,
     job_posting_router,
@@ -270,6 +271,7 @@ app.include_router(profile_image_router, prefix=settings.API_V1_STR)
 app.include_router(saved_jobs_router, prefix=settings.API_V1_STR)
 app.include_router(skills_router, prefix=settings.API_V1_STR)
 app.include_router(innovation_projects_router, prefix=settings.API_V1_STR)
+app.include_router(experience_records_router, prefix=settings.API_V1_STR)
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)
 app.include_router(dashboards_router, prefix=settings.API_V1_STR)

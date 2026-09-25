@@ -263,3 +263,45 @@ def sync_project_skills_from_text(
     # Maintain deterministic legacy string
     project.skills = format_skills_string([s.name for s in canonical_skills])
     return project.project_skills
+
+
+def sync_experience_skills_from_text(
+    db: Session,
+    experience_record,
+    skills_text: Optional[str],
+) -> List:
+    """
+    Synchronize an experience record's structured experience_skills associations with a skills text string.
+    - Parses and normalizes the input string.
+    - Creates or retrieves canonical Skill records.
+    - Adds missing ExperienceSkill association rows.
+    - Removes obsolete ExperienceSkill association rows.
+    """
+    from app.models.experience_record import ExperienceSkill
+    skill_names = parse_skills_text(skills_text)
+    if not skill_names:
+        experience_record.experience_skills.clear()
+        return []
+
+    canonical_skills = [
+        s for s in (get_or_create_skill(db, name) for name in skill_names) if s is not None
+    ]
+    target_skill_ids = {s.id for s in canonical_skills}
+
+    # Remove associations no longer present
+    for ass in list(experience_record.experience_skills):
+        if ass.skill_id not in target_skill_ids:
+            experience_record.experience_skills.remove(ass)
+
+    # Add new associations
+    existing_skill_ids = {ass.skill_id for ass in experience_record.experience_skills}
+    for skill in canonical_skills:
+        if skill.id not in existing_skill_ids:
+            experience_record.experience_skills.append(
+                ExperienceSkill(
+                    experience_record_id=experience_record.id,
+                    skill_id=skill.id,
+                )
+            )
+
+    return experience_record.experience_skills

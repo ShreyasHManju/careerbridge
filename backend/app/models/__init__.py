@@ -15,6 +15,7 @@ from app.models.message import Message
 from app.models.skill import Skill, StudentSkill, JobSkill
 from app.models.innovation_project import InnovationProject, ProjectSkill, ProjectType, ProjectStatus, ProjectVisibility
 from app.models.project_milestone import ProjectMilestone, MilestoneStatus
+from app.models.experience_record import ExperienceRecord, ExperienceSkill, ExperienceType, VerificationStatus, VerificationSource
 
 __all__ = [
     "Base",
@@ -50,4 +51,9 @@ __all__ = [
     "ProjectVisibility",
     "ProjectMilestone",
     "MilestoneStatus",
+    "ExperienceRecord",
+    "ExperienceSkill",
+    "ExperienceType",
+    "VerificationStatus",
+    "VerificationSource",
 ]
