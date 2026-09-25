@@ -188,10 +188,20 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
 
       {/* Recruiter Action Row */}
       <div className="cb-app-card-bottom-actions">
+        {application.student_id ? (
+          <Link
+            to={`/app/recruiter/passport/${application.student_id}`}
+            className="cb-btn cb-btn-outline-primary cb-btn-sm"
+            aria-label={`View Experience Passport for Candidate #${application.student_id}`}
+            data-testid={`view-passport-btn-${application.id}`}
+          >
+            🎓 View Passport
+          </Link>
+        ) : null}
         {onScheduleInterview && isInterviewEligible && (
           <button
             type="button"
-            className="cb-btn cb-btn-outline-primary cb-btn-sm"
+            className="cb-btn cb-btn-outline cb-btn-sm"
             onClick={() => onScheduleInterview(application, job || null)}
             data-testid={`schedule-interview-btn-${application.id}`}
           >

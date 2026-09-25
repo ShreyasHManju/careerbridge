@@ -22,6 +22,7 @@ import { RecruiterInterviewsPage } from '@/pages/RecruiterInterviewsPage';
 import { StudentExperiencesPage } from '@/pages/StudentExperiencesPage';
 import { RecruiterExperienceVerificationPage } from '@/pages/RecruiterExperienceVerificationPage';
 import { AdminExperienceVerificationPage } from '@/pages/AdminExperienceVerificationPage';
+import { PassportPage } from '@/pages/PassportPage';
 import { MessagesPage } from '@/pages/MessagesPage';
 import { AdminUsersPage } from '@/pages/AdminUsersPage';
 import { AdminRecruitersPage } from '@/pages/AdminRecruitersPage';
@@ -50,11 +51,14 @@ export const App: React.FC = () => {
           {/* Innovation Projects Discovery & Detail Routes (all authenticated roles) */}
           <Route path="/app/explore-projects" element={<ProjectsPage />} />
           <Route path="/app/projects/:projectId" element={<ProjectDetailPage />} />
+          {/* Experience Passport Read-Only Detail Route (all authenticated roles) */}
+          <Route path="/app/passport/:studentId" element={<PassportPage />} />
           {/* Direct & Real-Time Messaging Route (all authenticated roles) */}
           <Route path="/app/messages" element={<MessagesPage />} />
           {/* Student-only domain routes */}
           <Route element={<ProtectedRoute allowedRoles={['student']} />}>
             <Route path="/app/student/profile" element={<StudentProfilePage />} />
+            <Route path="/app/passport" element={<PassportPage />} />
             <Route path="/app/projects" element={<StudentProjectsPage />} />
             <Route path="/app/experiences" element={<StudentExperiencesPage />} />
             <Route path="/app/saved-jobs" element={<SavedJobsPage />} />
@@ -68,6 +72,7 @@ export const App: React.FC = () => {
             <Route path="/app/recruiter/applications" element={<RecruiterApplicationsPage />} />
             <Route path="/app/recruiter/interviews" element={<RecruiterInterviewsPage />} />
             <Route path="/app/recruiter/experiences/verification" element={<RecruiterExperienceVerificationPage />} />
+            <Route path="/app/recruiter/passport/:studentId" element={<PassportPage />} />
           </Route>
           {/* Admin-only domain routes */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>

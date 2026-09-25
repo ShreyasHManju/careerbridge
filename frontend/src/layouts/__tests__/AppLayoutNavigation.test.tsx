@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppLayout } from '../AppLayout';
 import * as useAuthModule from '@/auth/useAuth';
+import * as notificationsApi from '@/api/notifications';
 import { User } from '@/types/auth';
 
 const studentUser: User = {
@@ -54,6 +55,7 @@ const setupAuthMock = (user: User | null) => {
 describe('AppLayout Role-Aware Navigation', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(notificationsApi, 'getUnreadCount').mockResolvedValue({ unread_count: 0 });
   });
 
   it('renders "Experiences" link pointing to /app/experiences for student', () => {
@@ -105,5 +107,41 @@ describe('AppLayout Role-Aware Navigation', () => {
 
     // Admin should not see student-only "Experiences" link
     expect(screen.queryByRole('link', { name: 'Experiences' })).not.toBeInTheDocument();
+  });
+
+  it('renders "Passport" link pointing to /app/passport for student', () => {
+    setupAuthMock(studentUser);
+
+    render(
+      <MemoryRouter>
+        <AppLayout />
+      </MemoryRouter>
+    );
+
+    const passportLink = screen.getByRole('link', { name: 'Passport' });
+    expect(passportLink).toBeInTheDocument();
+    expect(passportLink).toHaveAttribute('href', '/app/passport');
+  });
+
+  it('does not expose student "Passport" link to recruiter or admin', () => {
+    setupAuthMock(recruiterUser);
+
+    const { unmount } = render(
+      <MemoryRouter>
+        <AppLayout />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByRole('link', { name: 'Passport' })).not.toBeInTheDocument();
+    unmount();
+
+    setupAuthMock(adminUser);
+    render(
+      <MemoryRouter>
+        <AppLayout />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByRole('link', { name: 'Passport' })).not.toBeInTheDocument();
   });
 });

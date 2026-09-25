@@ -80,6 +80,16 @@ from app.schemas.experience_record import (
     ExperienceRecordListResponse,
     ExperienceVerificationDecision,
 )
+from app.schemas.passport import (
+    PassportIdentity,
+    PassportSummary,
+    PassportSkillItem,
+    PassportExperienceItem,
+    PassportMilestoneItem,
+    PassportProjectItem,
+    PassportResumeInfo,
+    PassportResponse,
+)
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 
 __all__ = [
@@ -110,6 +120,14 @@ __all__ = [
     "ExperienceRecordResponse",
     "ExperienceRecordListResponse",
     "ExperienceVerificationDecision",
+    "PassportIdentity",
+    "PassportSummary",
+    "PassportSkillItem",
+    "PassportExperienceItem",
+    "PassportMilestoneItem",
+    "PassportProjectItem",
+    "PassportResumeInfo",
+    "PassportResponse",
     "RecruiterProfileCreate",
     "RecruiterProfileUpdate",
     "RecruiterProfileResponse",

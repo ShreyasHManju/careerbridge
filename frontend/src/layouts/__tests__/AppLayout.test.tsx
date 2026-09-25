@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppLayout } from '../AppLayout';
 import * as useAuthModule from '@/auth/useAuth';
+import * as notificationsApi from '@/api/notifications';
 import { User } from '@/types/auth';
 
 const mockStudentUser: User = {
@@ -52,6 +53,11 @@ function setupAuth(user: User | null) {
 }
 
 describe('AppLayout Navigation (Phase F-08 & 30B.2)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(notificationsApi, 'getUnreadCount').mockResolvedValue({ unread_count: 0 });
+  });
+
   it('renders student navigation links including Projects (/app/projects), Saved Jobs (/app/saved-jobs), My Applications (/app/applications) and Interviews (/app/interviews)', () => {
     setupAuth(mockStudentUser);
 
@@ -63,6 +69,7 @@ describe('AppLayout Navigation (Phase F-08 & 30B.2)', () => {
 
     expect(screen.getByRole('link', { name: /Home/i })).toHaveAttribute('href', '/app');
     expect(screen.getByRole('link', { name: /My Profile/i })).toHaveAttribute('href', '/app/student/profile');
+    expect(screen.getByRole('link', { name: /^Passport$/i })).toHaveAttribute('href', '/app/passport');
     expect(screen.getByRole('link', { name: /^Projects$/i })).toHaveAttribute('href', '/app/projects');
     expect(screen.getByRole('link', { name: /Opportunities/i })).toHaveAttribute('href', '/app/jobs');
     expect(screen.getByRole('link', { name: /Saved Jobs/i })).toHaveAttribute('href', '/app/saved-jobs');

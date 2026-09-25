@@ -160,4 +160,37 @@ describe('RecruiterApplicationCard Component', () => {
     const select = screen.getByLabelText(/Change status for Application #201/i);
     expect(select).toBeDisabled();
   });
+
+  it('renders "View Passport" link pointing to /app/recruiter/passport/:studentId when student_id exists', () => {
+    render(
+      <MemoryRouter>
+        <RecruiterApplicationCard
+          application={mockApplication}
+          job={mockJob}
+          onStatusChange={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    const passportLink = screen.getByTestId('view-passport-btn-201');
+    expect(passportLink).toBeInTheDocument();
+    expect(passportLink).toHaveAttribute('href', '/app/recruiter/passport/8');
+    expect(passportLink).toHaveTextContent('🎓 View Passport');
+  });
+
+  it('does NOT render "View Passport" link when student_id is missing or 0', () => {
+    const noStudentApp: Application = { ...mockApplication, student_id: 0 };
+
+    render(
+      <MemoryRouter>
+        <RecruiterApplicationCard
+          application={noStudentApp}
+          job={mockJob}
+          onStatusChange={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByTestId('view-passport-btn-201')).not.toBeInTheDocument();
+  });
 });
