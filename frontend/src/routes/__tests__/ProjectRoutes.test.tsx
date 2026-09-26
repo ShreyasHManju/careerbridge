@@ -110,7 +110,7 @@ describe('Project Routing & Role-Based Access (Phase 4)', () => {
     );
 
     expect(await screen.findByText('Explore Innovation Projects')).toBeInTheDocument();
-    expect(screen.getByText('Autonomous Drone Swarm')).toBeInTheDocument();
+    expect(await screen.findByText('Autonomous Drone Swarm')).toBeInTheDocument();
   });
 
   it('resolves project detail page for all authenticated roles on /app/projects/:projectId', async () => {
