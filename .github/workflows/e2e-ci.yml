@@ -94,6 +94,13 @@ jobs:
         env:
           CI: true
           E2E_BASE_URL: http://localhost:5173
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_test_password
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: internship_db
+          JWT_SECRET_KEY: ci_test_jwt_secret_for_github_actions_only
+          API_V1_STR: /api/v1
         run: npm run test:e2e
 
       - name: Upload Playwright report
