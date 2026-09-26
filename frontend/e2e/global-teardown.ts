@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 
 /**
@@ -8,9 +9,13 @@ import path from 'path';
 export default async function globalTeardown() {
   const backendDir = path.resolve(process.cwd(), '../backend');
   const cleanupScript = path.resolve(process.cwd(), 'e2e/cleanup_e2e_db.py');
-  const pythonPath = process.platform === 'win32'
+  const localVenvPython = process.platform === 'win32'
     ? path.join(backendDir, '.venv', 'Scripts', 'python.exe')
     : path.join(backendDir, '.venv', 'bin', 'python');
+
+  const pythonPath = fs.existsSync(localVenvPython)
+    ? localVenvPython
+    : 'python';
 
   try {
     execSync(`"${pythonPath}" "${cleanupScript}"`, {
