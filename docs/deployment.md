@@ -1,6 +1,9 @@
 # CareerBridge — Production Deployment & Operations Guide
 
-This document provides end-to-end, production-grade instructions for deploying, hardening, and operating the **CareerBridge** application on **Amazon Web Services (AWS) EC2** using **Ubuntu LTS**, **Docker Engine**, **Docker Compose**, **Nginx**, and **Let's Encrypt (Certbot)**.
+This document provides cloud-neutral production deployment instructions and operations procedures for **CareerBridge**. It covers:
+1. **Local Development**: Standard local Python virtualenv + Vite development workflow.
+2. **Local Production-Like Deployment**: Containerized FastAPI backend, PostgreSQL 16, and compiled production React bundle running locally with persistent Docker volumes.
+3. **Future Cloud Deployment**: Production deployment on any standard Linux host (e.g., AWS EC2, DigitalOcean, Hetzner, or self-hosted Ubuntu LTS) using Docker, Nginx reverse proxy, and Let's Encrypt (Certbot).
 
 ---
 
