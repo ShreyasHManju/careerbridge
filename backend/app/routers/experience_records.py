@@ -62,6 +62,28 @@ def create_my_experience(
     )
 
 
+@router.post(
+    "/students/me/experiences/from-project/{project_id}",
+    response_model=ExperienceRecordResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add verified innovation project as an experience record",
+    description="Transforms an owned innovation project with verified evidence into a verified experience record.",
+)
+def create_experience_from_verified_project(
+    project_id: int = Path(..., ge=1, description="Primary key of the innovation project"),
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: Session = Depends(get_db),
+):
+    """
+    Create a verified experience record directly from an owned innovation project with verified evidence.
+    """
+    return ExperienceRecordService.create_experience_from_verified_project(
+        db=db,
+        student_id=current_user.id,
+        project_id=project_id,
+    )
+
+
 @router.get(
     "/students/me/experiences/{experience_id}",
     response_model=ExperienceRecordResponse,

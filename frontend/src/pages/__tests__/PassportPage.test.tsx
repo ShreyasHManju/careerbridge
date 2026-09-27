@@ -27,6 +27,7 @@ const mockPopulatedPassport: PassportResponse = {
     public_projects_count: 1,
     canonical_skills_count: 1,
     completed_milestones_count: 1,
+    verified_evidence_count: 0,
   },
   verified_experiences: [
     {
@@ -73,6 +74,8 @@ const mockPopulatedPassport: PassportResponse = {
       total_milestones: 1,
       completed_milestones: 1,
       progress_percentage: 100,
+      verified_evidence: [],
+      verified_evidence_count: 0,
       milestones: [
         {
           id: 1,
@@ -118,6 +121,7 @@ const mockPopulatedPassport: PassportResponse = {
     file_size: 1048576,
     updated_at: '2026-09-21T00:00:00Z',
   },
+  verified_evidence: [],
   is_owner: true,
 };
 
@@ -143,11 +147,13 @@ const mockEmptyPassport: PassportResponse = {
     public_projects_count: 0,
     canonical_skills_count: 0,
     completed_milestones_count: 0,
+    verified_evidence_count: 0,
   },
   verified_experiences: [],
   projects: [],
   skills: [],
   milestones: [],
+  verified_evidence: [],
   resume: null,
   is_owner: true,
 };

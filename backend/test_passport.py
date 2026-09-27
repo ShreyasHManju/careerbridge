@@ -40,6 +40,8 @@ from app.models.innovation_project import (
     ProjectType,
     ProjectVisibility,
 )
+from app.models.project_evidence import EvidenceType, ProjectEvidence
+from app.models.project_evidence_verification import EvidenceVerification, EvidenceVerificationStatus
 from app.models.project_milestone import MilestoneStatus, ProjectMilestone
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.resume import Resume
@@ -503,6 +505,138 @@ def test_6_security_and_nonexistent_students():
     print("  [PASS] Unauthenticated request to /passport/{id} returns 401.")
 
 
+def test_7_passport_verified_evidence_aggregation_and_privacy():
+    """Verify verified evidence artifacts aggregation, presentation, and strict privacy boundaries."""
+    print("\n[Test 7] Testing Passport verified evidence aggregation and privacy boundaries...")
+    data = setup_users()
+    headers_s1 = {"Authorization": f"Bearer {data['token_s1']}"}
+    headers_s2 = {"Authorization": f"Bearer {data['token_s2']}"}
+    headers_r1 = {"Authorization": f"Bearer {data['token_r1']}"}
+    s1_id = data["s1_id"]
+    admin_id = data["a1_id"]
+
+    with SessionLocal() as db:
+        # Public Project
+        pub_proj = InnovationProject(
+            student_id=s1_id,
+            title="AI Search Engine",
+            slug="ai-search-engine",
+            description="Semantic search engine over technical documentation.",
+            project_type=ProjectType.SOFTWARE,
+            status=ProjectStatus.ACTIVE,
+            visibility=ProjectVisibility.PUBLIC,
+        )
+        # Private Project
+        priv_proj = InnovationProject(
+            student_id=s1_id,
+            title="Proprietary Trading Algorithm",
+            slug="proprietary-trading-algorithm",
+            description="High frequency algorithmic trading strategies.",
+            project_type=ProjectType.SOFTWARE,
+            status=ProjectStatus.ACTIVE,
+            visibility=ProjectVisibility.PRIVATE,
+        )
+        db.add_all([pub_proj, priv_proj])
+        db.flush()
+
+        # Public project evidence 1: Verified
+        ev_pub_verified = ProjectEvidence(
+            innovation_project_id=pub_proj.id,
+            title="Public Production Demo",
+            description="Working live deployment on AWS.",
+            evidence_type=EvidenceType.DEMO,
+            url="https://demo.search.dev",
+        )
+        # Public project evidence 2: Pending (unverified)
+        ev_pub_pending = ProjectEvidence(
+            innovation_project_id=pub_proj.id,
+            title="Benchmark Report",
+            description="Internal performance metrics draft.",
+            evidence_type=EvidenceType.DOCUMENT,
+            url="https://metrics.search.dev/benchmarks.pdf",
+        )
+        # Private project evidence 3: Verified (Belongs to private project)
+        ev_priv_verified = ProjectEvidence(
+            innovation_project_id=priv_proj.id,
+            title="Proprietary Alpha Backtest",
+            description="Backtest simulation results.",
+            evidence_type=EvidenceType.DOCUMENT,
+            url="https://secure.internal/backtest.pdf",
+        )
+        db.add_all([ev_pub_verified, ev_pub_pending, ev_priv_verified])
+        db.flush()
+
+        v1 = EvidenceVerification(
+            evidence_id=ev_pub_verified.id,
+            verifier_id=admin_id,
+            status=EvidenceVerificationStatus.VERIFIED,
+            verified_at=datetime.now(timezone.utc),
+            notes="Live demo verified.",
+        )
+        v2 = EvidenceVerification(
+            evidence_id=ev_pub_pending.id,
+            verifier_id=None,
+            status=EvidenceVerificationStatus.PENDING,
+        )
+        v3 = EvidenceVerification(
+            evidence_id=ev_priv_verified.id,
+            verifier_id=admin_id,
+            status=EvidenceVerificationStatus.VERIFIED,
+            verified_at=datetime.now(timezone.utc),
+            notes="Backtest confirmed.",
+        )
+        db.add_all([v1, v2, v3])
+        db.commit()
+
+    # 1. Recruiter checks Student 1's passport
+    res_rec = client.get(f"/api/v1/passport/{s1_id}", headers=headers_r1)
+    assert res_rec.status_code == 200
+    rec_body = res_rec.json()
+
+    # Recruiter must see only 1 project (the public one)
+    assert len(rec_body["projects"]) == 1
+    pub_p_data = rec_body["projects"][0]
+    assert pub_p_data["title"] == "AI Search Engine"
+
+    # In public project, only the verified evidence artifact appears
+    assert pub_p_data["verified_evidence_count"] == 1
+    assert len(pub_p_data["verified_evidence"]) == 1
+    assert pub_p_data["verified_evidence"][0]["title"] == "Public Production Demo"
+    assert pub_p_data["verified_evidence"][0]["url"] == "https://demo.search.dev"
+
+    # Overall passport verified_evidence list must only have the public verified item
+    assert len(rec_body["verified_evidence"]) == 1
+    assert rec_body["verified_evidence"][0]["title"] == "Public Production Demo"
+    assert rec_body["summary"]["verified_evidence_count"] == 1
+
+    # Ensure unverified evidence and private verified evidence never leak to recruiter
+    rec_text = res_rec.text
+    assert "Benchmark Report" not in rec_text
+    assert "Proprietary Alpha Backtest" not in rec_text
+    assert "secure.internal" not in rec_text
+    print("  [PASS] Recruiter passport view strictly isolates verified public evidence and omits unverified/private artifacts.")
+
+    # 2. Student 2 (another student) checks Student 1's passport -> Same privacy enforcement
+    res_s2 = client.get(f"/api/v1/passport/{s1_id}", headers=headers_s2)
+    assert res_s2.status_code == 200
+    assert len(res_s2.json()["projects"]) == 1
+    assert len(res_s2.json()["verified_evidence"]) == 1
+    assert "Proprietary Alpha Backtest" not in res_s2.text
+    print("  [PASS] Student 2 public passport view respects identical privacy boundaries.")
+
+    # 3. Student 1 (Owner) checks their own passport via /passport/me
+    res_owner = client.get("/api/v1/passport/me", headers=headers_s1)
+    assert res_owner.status_code == 200
+    owner_body = res_owner.json()
+    assert owner_body["is_owner"] is True
+    # Owner sees both public and private projects
+    assert len(owner_body["projects"]) == 2
+    # Total verified evidence across all projects owned by student
+    assert owner_body["summary"]["verified_evidence_count"] == 2
+    assert len(owner_body["verified_evidence"]) == 2
+    print("  [PASS] Owner passport view displays all verified evidence artifacts across all owned projects.")
+
+
 def run_all():
     print("=" * 70)
     print("CAREERBRIDGE 2.0-E — EXPERIENCE PASSPORT TEST SUITE")
@@ -513,6 +647,7 @@ def run_all():
     test_4_skills_provenance_and_summary_metrics()
     test_5_resume_metadata_exposure()
     test_6_security_and_nonexistent_students()
+    test_7_passport_verified_evidence_aggregation_and_privacy()
     cleanup_test_data()
     print("\n" + "=" * 70)
     print("ALL 2.0-E EXPERIENCE PASSPORT TESTS PASSED!")

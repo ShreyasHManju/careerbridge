@@ -27,6 +27,7 @@ export interface PassportSummary {
   public_projects_count: number;
   canonical_skills_count: number;
   completed_milestones_count: number;
+  verified_evidence_count: number;
 }
 
 export interface PassportSkillItem {
@@ -36,6 +37,18 @@ export interface PassportSkillItem {
   category: string | null;
   is_verified: boolean;
   sources: string[];
+}
+
+export interface PassportEvidenceItem {
+  id: number;
+  innovation_project_id: number;
+  milestone_id: number | null;
+  milestone_title: string | null;
+  title: string;
+  description: string | null;
+  evidence_type: string;
+  url: string;
+  verified_at: string | null;
 }
 
 export interface PassportExperienceItem {
@@ -85,6 +98,8 @@ export interface PassportProjectItem {
   completed_milestones: number;
   progress_percentage: number;
   milestones: PassportMilestoneItem[];
+  verified_evidence: PassportEvidenceItem[];
+  verified_evidence_count: number;
 }
 
 export interface PassportResumeInfo {
@@ -102,6 +117,7 @@ export interface PassportResponse {
   projects: PassportProjectItem[];
   skills: PassportSkillItem[];
   milestones: PassportMilestoneItem[];
+  verified_evidence: PassportEvidenceItem[];
   resume: PassportResumeInfo | null;
   is_owner: boolean;
 }

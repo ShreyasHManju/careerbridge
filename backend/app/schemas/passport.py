@@ -31,6 +31,7 @@ class PassportSummary(BaseModel):
     public_projects_count: int = Field(0, description="Total count of public active innovation projects")
     canonical_skills_count: int = Field(0, description="Count of distinct canonical skills backed by evidence")
     completed_milestones_count: int = Field(0, description="Total completed milestones across public projects")
+    verified_evidence_count: int = Field(0, description="Total count of verified evidence artifacts across public projects")
 
 
 class PassportSkillItem(BaseModel):
@@ -41,6 +42,21 @@ class PassportSkillItem(BaseModel):
     category: Optional[str] = None
     is_verified: bool = True
     sources: List[str] = Field(default_factory=list, description="Evidence provenance (experience, project, profile)")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PassportEvidenceItem(BaseModel):
+    """Verified project evidence artifact safe for public and recruiter presentation."""
+    id: int
+    innovation_project_id: int
+    milestone_id: Optional[int] = None
+    milestone_title: Optional[str] = None
+    title: str
+    description: Optional[str] = None
+    evidence_type: str
+    url: str
+    verified_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -82,7 +98,7 @@ class PassportMilestoneItem(BaseModel):
 
 
 class PassportProjectItem(BaseModel):
-    """Public innovation project with milestones and skills."""
+    """Public innovation project with milestones, skills, and verified evidence."""
     id: int
     title: str
     slug: str
@@ -99,6 +115,8 @@ class PassportProjectItem(BaseModel):
     completed_milestones: int = 0
     progress_percentage: int = 0
     milestones: List[PassportMilestoneItem] = Field(default_factory=list)
+    verified_evidence: List[PassportEvidenceItem] = Field(default_factory=list)
+    verified_evidence_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -122,7 +140,7 @@ class PassportResponse(BaseModel):
     projects: List[PassportProjectItem] = Field(default_factory=list)
     skills: List[PassportSkillItem] = Field(default_factory=list)
     milestones: List[PassportMilestoneItem] = Field(default_factory=list)
+    verified_evidence: List[PassportEvidenceItem] = Field(default_factory=list)
     resume: Optional[PassportResumeInfo] = None
     is_owner: bool = False
-
     model_config = ConfigDict(from_attributes=True)

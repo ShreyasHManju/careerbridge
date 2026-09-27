@@ -7,12 +7,15 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.experience_record import ExperienceRecord, VerificationStatus
 from app.models.innovation_project import InnovationProject, ProjectStatus, ProjectVisibility
 from app.models.profile_image import ProfileImage
+from app.models.project_evidence import ProjectEvidence
+from app.models.project_evidence_verification import EvidenceVerification, EvidenceVerificationStatus
 from app.models.project_milestone import MilestoneStatus, ProjectMilestone
 from app.models.resume import Resume
 from app.models.skill import Skill, StudentSkill
 from app.models.student_profile import StudentProfile
 from app.models.user import User, UserRole
 from app.schemas.passport import (
+    PassportEvidenceItem,
     PassportExperienceItem,
     PassportIdentity,
     PassportMilestoneItem,
@@ -153,13 +156,15 @@ class PassportService:
                 )
             )
 
-        # 4. Retrieve and Filter Innovation Projects & Milestones
+        # 4. Retrieve and Filter Innovation Projects, Milestones & Verified Evidence
         proj_stmt = (
             select(InnovationProject)
             .where(InnovationProject.student_id == target_student_id)
             .options(
                 selectinload(InnovationProject.project_skills).selectinload(InnovationProject.project_skills.property.mapper.class_.skill),
                 selectinload(InnovationProject.milestones),
+                selectinload(InnovationProject.evidence_items).selectinload(ProjectEvidence.verification),
+                selectinload(InnovationProject.evidence_items).selectinload(ProjectEvidence.milestone),
             )
             .order_by(InnovationProject.created_at.desc())
         )
@@ -174,6 +179,7 @@ class PassportService:
 
         passport_projects: List[PassportProjectItem] = []
         passport_milestones: List[PassportMilestoneItem] = []
+        all_verified_evidence: List[PassportEvidenceItem] = []
         completed_milestone_count = 0
 
         for proj in raw_projects:
@@ -215,6 +221,32 @@ class PassportService:
                 proj_milestones_items.append(m_item)
                 passport_milestones.append(m_item)
 
+            # Extract verified evidence items for this project
+            proj_verified_evidence: List[PassportEvidenceItem] = []
+            for ev in (proj.evidence_items or []):
+                is_ev_verified = (
+                    ev.verification is not None
+                    and (
+                        (hasattr(ev.verification.status, "value") and ev.verification.status.value == "verified")
+                        or ev.verification.status == "verified"
+                        or ev.verification.status == EvidenceVerificationStatus.VERIFIED
+                    )
+                )
+                if is_ev_verified:
+                    ev_item = PassportEvidenceItem(
+                        id=ev.id,
+                        innovation_project_id=proj.id,
+                        milestone_id=ev.milestone_id,
+                        milestone_title=ev.milestone.title if ev.milestone else None,
+                        title=ev.title,
+                        description=ev.description,
+                        evidence_type=ev.evidence_type.value if hasattr(ev.evidence_type, "value") else str(ev.evidence_type),
+                        url=ev.url,
+                        verified_at=ev.verification.verified_at if ev.verification else None,
+                    )
+                    proj_verified_evidence.append(ev_item)
+                    all_verified_evidence.append(ev_item)
+
             passport_projects.append(
                 PassportProjectItem(
                     id=proj.id,
@@ -233,6 +265,8 @@ class PassportService:
                     completed_milestones=proj.completed_milestones,
                     progress_percentage=proj.progress_percentage,
                     milestones=proj_milestones_items,
+                    verified_evidence=proj_verified_evidence,
+                    verified_evidence_count=len(proj_verified_evidence),
                 )
             )
 
@@ -312,6 +346,7 @@ class PassportService:
             public_projects_count=len([p for p in passport_projects if p.visibility == "public" and p.status == "active"]),
             canonical_skills_count=len(passport_skills),
             completed_milestones_count=completed_milestone_count,
+            verified_evidence_count=len(all_verified_evidence),
         )
 
         return PassportResponse(
@@ -321,6 +356,7 @@ class PassportService:
             projects=passport_projects,
             skills=passport_skills,
             milestones=passport_milestones,
+            verified_evidence=all_verified_evidence,
             resume=resume_info,
             is_owner=is_owner,
         )

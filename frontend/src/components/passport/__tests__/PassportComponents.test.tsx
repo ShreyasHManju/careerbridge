@@ -84,6 +84,7 @@ describe('Passport Component Prototypes', () => {
         public_projects_count: 2,
         canonical_skills_count: 5,
         completed_milestones_count: 4,
+        verified_evidence_count: 0,
       };
 
       render(<PassportSummary summary={summary} />);
@@ -100,6 +101,7 @@ describe('Passport Component Prototypes', () => {
         public_projects_count: 0,
         canonical_skills_count: 0,
         completed_milestones_count: 0,
+        verified_evidence_count: 0,
       };
 
       render(<PassportSummary summary={zeroSummary} />);
@@ -223,6 +225,8 @@ describe('Passport Component Prototypes', () => {
         total_milestones: 2,
         completed_milestones: 1,
         progress_percentage: 50,
+        verified_evidence: [],
+        verified_evidence_count: 0,
         milestones: [
           {
             id: 1,

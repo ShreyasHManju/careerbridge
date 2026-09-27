@@ -10,7 +10,9 @@ from app.models.experience_record import (
     VerificationSource,
     VerificationStatus,
 )
-from app.models.innovation_project import InnovationProject
+from app.models.innovation_project import InnovationProject, ProjectStatus
+from app.models.project_evidence import ProjectEvidence
+from app.models.project_evidence_verification import EvidenceVerification, EvidenceVerificationStatus
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.student_profile import StudentProfile
 from app.models.user import User, UserRole
@@ -466,3 +468,115 @@ class ExperienceRecordService:
         items = list(db.scalars(stmt).all())
         ExperienceRecordService._populate_derived_fields(items)
         return ExperienceRecordListResponse(items=items, total=len(items))
+
+    @staticmethod
+    def create_experience_from_verified_project(
+        db: Session,
+        student_id: int,
+        project_id: int,
+    ) -> ExperienceRecord:
+        """
+        Create a verified ExperienceRecord derived directly from an owned InnovationProject
+        that contains at least one verified evidence artifact.
+        Enforces:
+        - Student ownership of the project.
+        - Existence of verified evidence items (via R6 verification).
+        - Prevention of duplicate experience records for the same project.
+        - Canonical skill synchronization from project skills.
+        - Traceable verifier metadata from evidence verification.
+        """
+        # 1. Fetch project with student ownership, skills, and evidence verification
+        project = db.scalar(
+            select(InnovationProject)
+            .where(InnovationProject.id == project_id)
+            .options(
+                selectinload(InnovationProject.project_skills).selectinload(InnovationProject.project_skills.property.mapper.class_.skill),
+                selectinload(InnovationProject.evidence_items).selectinload(ProjectEvidence.verification).selectinload(EvidenceVerification.verifier),
+            )
+        )
+        if not project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Innovation project not found",
+            )
+
+        if project.student_id != student_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to convert another student's project into an experience record",
+            )
+
+        # 2. Check for duplicate experience record linked to this project for this student
+        existing_exp = db.scalar(
+            select(ExperienceRecord).where(
+                ExperienceRecord.student_id == student_id,
+                ExperienceRecord.innovation_project_id == project_id,
+            )
+        )
+        if existing_exp:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An experience record already exists for this innovation project",
+            )
+
+        # 3. Verify that the project has at least one verified evidence item
+        verified_evidences = []
+        for ev in (project.evidence_items or []):
+            if ev.verification and (
+                ev.verification.status == EvidenceVerificationStatus.VERIFIED
+                or getattr(ev.verification.status, "value", None) == "verified"
+                or str(ev.verification.status) == "verified"
+            ):
+                verified_evidences.append(ev)
+
+        if not verified_evidences:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot create verified experience: project has no verified evidence artifacts",
+            )
+
+        # 4. Extract latest verifier and timestamp
+        latest_evidence = max(
+            verified_evidences,
+            key=lambda e: (e.verification.verified_at or datetime.min.replace(tzinfo=timezone.utc), e.id),
+        )
+        verifier_id = latest_evidence.verification.verifier_id if latest_evidence.verification else None
+        verified_at = latest_evidence.verification.verified_at if latest_evidence.verification else datetime.now(timezone.utc)
+
+        # 5. Build ExperienceRecord
+        is_completed = (project.status == ProjectStatus.ARCHIVED or getattr(project.status, "value", None) == "archived")
+        start_date = project.created_at.date() if project.created_at else datetime.now(timezone.utc).date()
+        end_date = datetime.now(timezone.utc).date() if is_completed else None
+        is_current = not is_completed
+
+        desc = project.description
+        if not desc or len(desc.strip()) < 10:
+            desc = f"Verified execution of innovation project '{project.title}' with verified milestone evidence artifacts."
+
+        exp_record = ExperienceRecord(
+            student_id=student_id,
+            title=project.title,
+            organization_name="Innovation Project",
+            experience_type=ExperienceType.PROJECT,
+            start_date=start_date,
+            end_date=end_date,
+            is_current=is_current,
+            description=desc,
+            status=VerificationStatus.VERIFIED,
+            verification_source=VerificationSource.PLATFORM_PROJECT,
+            innovation_project_id=project.id,
+            verifier_id=verifier_id,
+            verified_at=verified_at,
+            verification_notes=f"Derived from verified project evidence ({len(verified_evidences)} verified artifact(s)).",
+        )
+        db.add(exp_record)
+        db.flush()
+
+        # 6. Copy canonical skills
+        if project.skills:
+            sync_experience_skills_from_text(db, exp_record, project.skills)
+
+        db.commit()
+        db.refresh(exp_record)
+        ExperienceRecordService._populate_derived_fields([exp_record])
+        return exp_record

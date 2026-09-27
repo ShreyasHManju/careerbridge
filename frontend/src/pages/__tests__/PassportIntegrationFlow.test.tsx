@@ -54,6 +54,7 @@ const mockComprehensivePassport: PassportResponse = {
     public_projects_count: 1,
     canonical_skills_count: 3,
     completed_milestones_count: 2,
+    verified_evidence_count: 0,
   },
   verified_experiences: [
     {
@@ -109,6 +110,8 @@ const mockComprehensivePassport: PassportResponse = {
       total_milestones: 2,
       completed_milestones: 2,
       progress_percentage: 100,
+      verified_evidence: [],
+      verified_evidence_count: 0,
       milestones: [
         {
           id: 301,
@@ -154,6 +157,7 @@ const mockComprehensivePassport: PassportResponse = {
     file_size: 1048576,
     updated_at: '2026-09-21T00:00:00Z',
   },
+  verified_evidence: [],
   is_owner: true,
 };
 

@@ -36,6 +36,13 @@ export const PassportSummary: React.FC<PassportSummaryProps> = ({ summary }) => 
           </span>
           <span className="cb-stat-lbl">Completed Milestones</span>
         </div>
+
+        <div className="cb-stat-pill" data-testid="stat-verified-evidence">
+          <span className="cb-stat-num" data-testid="stat-count-evidence">
+            {summary.verified_evidence_count || 0}
+          </span>
+          <span className="cb-stat-lbl">Verified Evidence</span>
+        </div>
       </div>
     </section>
   );

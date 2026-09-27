@@ -77,3 +77,12 @@ export const getStudentExperiences = async (
   );
   return response.data;
 };
+
+export const createExperienceFromVerifiedProject = async (
+  projectId: number
+): Promise<ExperienceRecord> => {
+  const response = await apiClient.post<ExperienceRecord>(
+    `/students/me/experiences/from-project/${projectId}`
+  );
+  return response.data;
+};

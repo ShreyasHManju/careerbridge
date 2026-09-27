@@ -40,6 +40,8 @@ from app.models.innovation_project import (
     ProjectType,
     ProjectVisibility,
 )
+from app.models.project_evidence import EvidenceType, ProjectEvidence
+from app.models.project_evidence_verification import EvidenceVerification, EvidenceVerificationStatus
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.skill import Skill
 from app.models.student_profile import StudentProfile
@@ -520,6 +522,118 @@ def test_7_privacy_rules_for_public_student_read():
     print("  [PASS] Admin sees all student experiences.")
 
 
+def test_8_create_experience_from_verified_project():
+    print("\n--- TEST 8: Create Experience From Verified Project ---")
+    cleanup_test_data()
+    token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
+    token2 = get_token(STUDENT2_EMAIL, UserRole.STUDENT)
+    admin_token = get_token(ADMIN_EMAIL, UserRole.ADMIN)
+    student1_id = get_user_id(STUDENT1_EMAIL)
+    admin_id = get_user_id(ADMIN_EMAIL)
+    headers1 = {"Authorization": f"Bearer {token1}"}
+    headers2 = {"Authorization": f"Bearer {token2}"}
+    headers_admin = {"Authorization": f"Bearer {admin_token}"}
+
+    # 1. Create an Innovation Project for Student 1
+    with SessionLocal() as db:
+        proj = InnovationProject(
+            student_id=student1_id,
+            title="Realtime Stream Processing Engine",
+            slug="realtime-stream-processing-engine",
+            description="A distributed stream processing engine built in Rust and Python with Kafka.",
+            project_type=ProjectType.SOFTWARE,
+            status=ProjectStatus.ACTIVE,
+            visibility=ProjectVisibility.PUBLIC,
+            skills="Rust, Python, Apache Kafka",
+        )
+        db.add(proj)
+        db.commit()
+        db.refresh(proj)
+        proj_id = proj.id
+
+    # 2. Attempt to add project as experience before any evidence is verified -> MUST FAIL WITH 400
+    res_no_ev = client.post(
+        f"/api/v1/students/me/experiences/from-project/{proj_id}",
+        headers=headers1,
+    )
+    assert res_no_ev.status_code == 400, f"Expected 400, got {res_no_ev.status_code}: {res_no_ev.text}"
+    assert "no verified evidence" in res_no_ev.json()["detail"]
+    print("  [PASS] Project without verified evidence cannot be added as verified experience.")
+
+    # 3. Add pending evidence item
+    with SessionLocal() as db:
+        ev = ProjectEvidence(
+            innovation_project_id=proj_id,
+            title="Architecture Whitepaper",
+            description="Detailed design document.",
+            evidence_type=EvidenceType.DOCUMENT,
+            url="https://github.com/alex/stream-engine/doc.pdf",
+        )
+        db.add(ev)
+        db.commit()
+        db.refresh(ev)
+        ev_id = ev.id
+
+        # Add pending verification
+        verif = EvidenceVerification(
+            evidence_id=ev_id,
+            verifier_id=None,
+            status=EvidenceVerificationStatus.PENDING,
+        )
+        db.add(verif)
+        db.commit()
+
+    # Still pending -> MUST FAIL WITH 400
+    res_pending = client.post(
+        f"/api/v1/students/me/experiences/from-project/{proj_id}",
+        headers=headers1,
+    )
+    assert res_pending.status_code == 400
+    print("  [PASS] Project with pending unverified evidence cannot be converted.")
+
+    # 4. Admin verifies the evidence artifact (R6 system)
+    with SessionLocal() as db:
+        v_rec = db.scalar(select(EvidenceVerification).where(EvidenceVerification.evidence_id == ev_id))
+        v_rec.status = EvidenceVerificationStatus.VERIFIED
+        v_rec.verifier_id = admin_id
+        v_rec.verified_at = datetime.now(timezone.utc)
+        v_rec.notes = "Verified by senior staff engineer."
+        db.commit()
+
+    # 5. Student 2 cannot add Student 1's project -> MUST FAIL WITH 403
+    res_s2_hack = client.post(
+        f"/api/v1/students/me/experiences/from-project/{proj_id}",
+        headers=headers2,
+    )
+    assert res_s2_hack.status_code == 403, f"Expected 403, got {res_s2_hack.status_code}"
+    print("  [PASS] Cross-student project conversion blocked with 403 Forbidden.")
+
+    # 6. Student 1 successfully adds verified project to Experience Records
+    res_create = client.post(
+        f"/api/v1/students/me/experiences/from-project/{proj_id}",
+        headers=headers1,
+    )
+    assert res_create.status_code == 201, f"Expected 201, got {res_create.status_code}: {res_create.text}"
+    exp_data = res_create.json()
+    assert exp_data["title"] == "Realtime Stream Processing Engine"
+    assert exp_data["status"] == "verified"
+    assert exp_data["verification_source"] == "platform_project"
+    assert exp_data["innovation_project_id"] == proj_id
+    assert exp_data["verifier_id"] == admin_id
+    assert exp_data["verified_at"] is not None
+    assert len(exp_data["structured_skills"]) >= 2
+    print("  [PASS] Student successfully created verified ExperienceRecord from verified project.")
+
+    # 7. Duplicate prevention: Attempting to add the same project again -> MUST FAIL WITH 400
+    res_dup = client.post(
+        f"/api/v1/students/me/experiences/from-project/{proj_id}",
+        headers=headers1,
+    )
+    assert res_dup.status_code == 400
+    assert "already exists" in res_dup.json()["detail"]
+    print("  [PASS] Duplicate experience record creation prevented with 400 Bad Request.")
+
+
 def run_all():
     print("=" * 70)
     print("CAREERBRIDGE 2.0-D — VERIFIED EXPERIENCE TEST SUITE")
@@ -531,6 +645,7 @@ def run_all():
     test_5_rejection_and_resubmission_flow()
     test_6_innovation_project_link_and_cascade()
     test_7_privacy_rules_for_public_student_read()
+    test_8_create_experience_from_verified_project()
     cleanup_test_data()
     print("\n" + "=" * 70)
     print("ALL 2.0-D VERIFIED EXPERIENCE TESTS PASSED!")

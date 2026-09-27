@@ -160,6 +160,57 @@ export const PassportProjects: React.FC<PassportProjectsProps> = ({ projects }) 
                 </ul>
               </div>
             )}
+
+            {/* Verified Evidence Artifacts */}
+            {proj.verified_evidence && proj.verified_evidence.length > 0 && (
+              <div
+                className="cb-passport-evidence-box"
+                data-testid={`proj-evidence-box-${proj.id}`}
+                style={{ marginTop: '1rem', borderTop: '1px solid var(--cb-border-subtle, #e2e8f0)', paddingTop: '0.75rem' }}
+              >
+                <div className="cb-passport-evidence-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <h4 className="cb-passport-evidence-title" style={{ fontSize: '0.9rem', fontWeight: 600, margin: 0 }}>
+                    Verified Evidence ({proj.verified_evidence.length})
+                  </h4>
+                  <span className="cb-badge cb-badge-success cb-badge-sm">
+                    Verified
+                  </span>
+                </div>
+
+                <ul className="cb-passport-evidence-items" aria-label={`Verified evidence for ${proj.title}`} style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  {proj.verified_evidence.map((ev) => (
+                    <li
+                      key={ev.id}
+                      className="cb-passport-evidence-row"
+                      data-testid={`evidence-item-${ev.id}`}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px dashed var(--cb-border-subtle, #e2e8f0)' }}
+                    >
+                      <div>
+                        <span style={{ fontWeight: 500, marginRight: '0.5rem' }}>{ev.title}</span>
+                        <span className="cb-badge cb-badge-neutral cb-badge-sm">
+                          {ev.evidence_type.toUpperCase()}
+                        </span>
+                        {ev.milestone_title && (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--cb-text-muted, #64748b)', marginLeft: '0.5rem' }}>
+                            (Milestone: {ev.milestone_title})
+                          </span>
+                        )}
+                      </div>
+                      <a
+                        href={ev.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="cb-btn cb-btn-outline cb-btn-sm"
+                        aria-label={`View evidence: ${ev.title}`}
+                        data-testid={`evidence-link-${ev.id}`}
+                      >
+                        View Artifact &rarr;
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         ))}
       </div>

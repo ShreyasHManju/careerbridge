@@ -60,11 +60,13 @@ const mockPassport: PassportResponse = {
     public_projects_count: 1,
     canonical_skills_count: 1,
     completed_milestones_count: 1,
+    verified_evidence_count: 0
   },
   verified_experiences: [],
   projects: [],
   skills: [],
   milestones: [],
+  verified_evidence: [],
   resume: null,
   is_owner: true,
 };
