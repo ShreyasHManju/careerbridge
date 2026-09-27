@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   getRecruiterApplications,
   updateApplicationStatus,
@@ -22,6 +23,17 @@ const ALL_STATUSES: { value: ApplicationStatus; label: string }[] = [
 ];
 
 export const RecruiterApplicationsPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const initialStatusParam = searchParams.get('status') as ApplicationFilterStatus | null;
+  const validStatuses: ApplicationFilterStatus[] = [
+    'all',
+    'applied',
+    'reviewing',
+    'shortlisted',
+    'accepted',
+    'rejected',
+  ];
+
   const [applications, setApplications] = useState<Application[]>([]);
   const [jobsMap, setJobsMap] = useState<Map<number, JobPosting>>(new Map());
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -42,7 +54,11 @@ export const RecruiterApplicationsPage: React.FC = () => {
   } | null>(null);
 
   // Client-side filter states
-  const [statusFilter, setStatusFilter] = useState<ApplicationFilterStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<ApplicationFilterStatus>(
+    initialStatusParam && validStatuses.includes(initialStatusParam)
+      ? initialStatusParam
+      : 'all'
+  );
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const fetchApplicationsAndJobs = useCallback(async () => {

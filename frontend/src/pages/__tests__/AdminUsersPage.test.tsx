@@ -1,10 +1,18 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AdminUsersPage } from '../AdminUsersPage';
 import * as adminApi from '@/api/admin';
 import * as exportApi from '@/api/export';
 import * as authHook from '@/auth/useAuth';
 import { AdminUser, AdminUserPaginationResponse } from '@/types/admin';
+
+const renderAdminUsers = () =>
+  render(
+    <MemoryRouter>
+      <AdminUsersPage />
+    </MemoryRouter>
+  );
 
 vi.mock('@/api/admin');
 vi.mock('@/api/export');
@@ -76,7 +84,7 @@ describe('AdminUsersPage Component', () => {
   it('renders loading state initially', () => {
     vi.spyOn(adminApi, 'getAdminUsers').mockReturnValue(new Promise(() => {}));
 
-    render(<AdminUsersPage />);
+    renderAdminUsers();
 
     expect(screen.getByText(/Loading user directory/i)).toBeInTheDocument();
   });
@@ -84,7 +92,7 @@ describe('AdminUsersPage Component', () => {
   it('renders user directory table with data and self-deactivation guard', async () => {
     vi.spyOn(adminApi, 'getAdminUsers').mockResolvedValue(mockPaginationResponse);
 
-    render(<AdminUsersPage />);
+    renderAdminUsers();
 
     await waitFor(() => {
       expect(screen.getByText('admin@careerbridge.io')).toBeInTheDocument();
@@ -105,7 +113,7 @@ describe('AdminUsersPage Component', () => {
   it('filters by email search', async () => {
     const fetchSpy = vi.spyOn(adminApi, 'getAdminUsers').mockResolvedValue(mockPaginationResponse);
 
-    render(<AdminUsersPage />);
+    renderAdminUsers();
 
     await waitFor(() => {
       expect(screen.getByText('student@example.com')).toBeInTheDocument();
@@ -125,7 +133,7 @@ describe('AdminUsersPage Component', () => {
   it('filters by role and status', async () => {
     const fetchSpy = vi.spyOn(adminApi, 'getAdminUsers').mockResolvedValue(mockPaginationResponse);
 
-    render(<AdminUsersPage />);
+    renderAdminUsers();
 
     await waitFor(() => {
       expect(screen.getByText('student@example.com')).toBeInTheDocument();
@@ -159,7 +167,7 @@ describe('AdminUsersPage Component', () => {
       is_active: false,
     });
 
-    render(<AdminUsersPage />);
+    renderAdminUsers();
 
     await waitFor(() => {
       expect(screen.getByText('student@example.com')).toBeInTheDocument();
@@ -181,7 +189,7 @@ describe('AdminUsersPage Component', () => {
     vi.spyOn(adminApi, 'getAdminUsers').mockResolvedValue(mockPaginationResponse);
     const exportSpy = vi.spyOn(exportApi, 'exportAdminUsers').mockResolvedValue(undefined);
 
-    render(<AdminUsersPage />);
+    renderAdminUsers();
 
     await waitFor(() => {
       expect(screen.getByText('admin@careerbridge.io')).toBeInTheDocument();
@@ -200,7 +208,7 @@ describe('AdminUsersPage Component', () => {
       detail: 'Failed to fetch users',
     });
 
-    render(<AdminUsersPage />);
+    renderAdminUsers();
 
     await waitFor(() => {
       expect(screen.getByText('Failed to fetch users')).toBeInTheDocument();
@@ -217,7 +225,7 @@ describe('AdminUsersPage Component', () => {
       total_pages: 0,
     });
 
-    render(<AdminUsersPage />);
+    renderAdminUsers();
 
     await waitFor(() => {
       expect(screen.getByTestId('users-empty-state')).toBeInTheDocument();

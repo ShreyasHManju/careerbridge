@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { getMyApplications } from '@/api/applications';
 import { getJobById } from '@/api/jobs';
 import { Application, ApplicationFilterStatus } from '@/types/application';
@@ -9,13 +9,28 @@ import { ApplicationFilterBar } from '@/components/applications/ApplicationFilte
 import { ApiErrorResponse } from '@/types/api';
 
 export const StudentApplicationsPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const initialStatusParam = searchParams.get('status') as ApplicationFilterStatus | null;
+  const validStatuses: ApplicationFilterStatus[] = [
+    'all',
+    'applied',
+    'reviewing',
+    'shortlisted',
+    'accepted',
+    'rejected',
+  ];
+
   const [applications, setApplications] = useState<Application[]>([]);
   const [jobsMap, setJobsMap] = useState<Map<number, JobPosting>>(new Map());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Client-side filter states
-  const [statusFilter, setStatusFilter] = useState<ApplicationFilterStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<ApplicationFilterStatus>(
+    initialStatusParam && validStatuses.includes(initialStatusParam)
+      ? initialStatusParam
+      : 'all'
+  );
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const fetchApplicationsAndJobs = useCallback(async () => {

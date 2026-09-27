@@ -93,46 +93,76 @@ export const StudentDashboardView: React.FC = () => {
         </h2>
         <div className="cb-stat-grid">
           {/* 1. Total Applications */}
-          <div className="cb-stat-card" data-testid="metric-total-applications">
+          <Link
+            to="/app/applications"
+            className="cb-stat-card cb-stat-card-link"
+            data-testid="metric-total-applications"
+            aria-label="View all submitted applications"
+          >
             <span className="cb-stat-label">Total Applications</span>
             <span className="cb-stat-value">{dashboard.total_applications}</span>
             <span className="cb-stat-desc">Submitted applications</span>
-          </div>
+          </Link>
 
           {/* 2. Under Review */}
-          <div className="cb-stat-card cb-stat-warning" data-testid="metric-applications-under-review">
+          <Link
+            to="/app/applications?status=reviewing"
+            className="cb-stat-card cb-stat-warning cb-stat-card-link"
+            data-testid="metric-applications-under-review"
+            aria-label="View applications under review"
+          >
             <span className="cb-stat-label">Under Review</span>
             <span className="cb-stat-value">{dashboard.applications_under_review}</span>
             <span className="cb-stat-desc">Being evaluated by recruiters</span>
-          </div>
+          </Link>
 
           {/* 3. Shortlisted */}
-          <div className="cb-stat-card cb-stat-info" data-testid="metric-shortlisted-applications">
+          <Link
+            to="/app/applications?status=shortlisted"
+            className="cb-stat-card cb-stat-info cb-stat-card-link"
+            data-testid="metric-shortlisted-applications"
+            aria-label="View shortlisted applications"
+          >
             <span className="cb-stat-label">Shortlisted</span>
             <span className="cb-stat-value">{dashboard.shortlisted_applications}</span>
             <span className="cb-stat-desc">Advanced to shortlist</span>
-          </div>
+          </Link>
 
           {/* 4. Accepted */}
-          <div className="cb-stat-card cb-stat-success" data-testid="metric-accepted-applications">
+          <Link
+            to="/app/applications?status=accepted"
+            className="cb-stat-card cb-stat-success cb-stat-card-link"
+            data-testid="metric-accepted-applications"
+            aria-label="View accepted application offers"
+          >
             <span className="cb-stat-label">Accepted Offers</span>
             <span className="cb-stat-value">{dashboard.accepted_applications}</span>
             <span className="cb-stat-desc">Accepted by employers</span>
-          </div>
+          </Link>
 
           {/* 5. Saved Internships */}
-          <div className="cb-stat-card" data-testid="metric-saved-internships">
+          <Link
+            to="/app/saved-jobs"
+            className="cb-stat-card cb-stat-card-link"
+            data-testid="metric-saved-internships"
+            aria-label="View bookmarked opportunities"
+          >
             <span className="cb-stat-label">Saved Opportunities</span>
             <span className="cb-stat-value">{dashboard.saved_internships}</span>
             <span className="cb-stat-desc">Bookmarked for later</span>
-          </div>
+          </Link>
 
           {/* 6. Upcoming Interviews */}
-          <div className="cb-stat-card cb-stat-primary" data-testid="metric-upcoming-interviews">
+          <Link
+            to="/app/interviews"
+            className="cb-stat-card cb-stat-primary cb-stat-card-link"
+            data-testid="metric-upcoming-interviews"
+            aria-label="View scheduled future interviews"
+          >
             <span className="cb-stat-label">Upcoming Interviews</span>
             <span className="cb-stat-value">{dashboard.upcoming_interviews}</span>
             <span className="cb-stat-desc">Scheduled future interviews</span>
-          </div>
+          </Link>
         </div>
       </section>
 

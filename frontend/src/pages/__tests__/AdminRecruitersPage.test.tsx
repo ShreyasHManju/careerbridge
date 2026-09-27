@@ -1,8 +1,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AdminRecruitersPage } from '../AdminRecruitersPage';
 import * as adminApi from '@/api/admin';
 import { AdminRecruiter, AdminRecruiterPaginationResponse } from '@/types/admin';
+
+const renderAdminRecruiters = () =>
+  render(
+    <MemoryRouter>
+      <AdminRecruitersPage />
+    </MemoryRouter>
+  );
 
 vi.mock('@/api/admin');
 
@@ -56,7 +64,7 @@ describe('AdminRecruitersPage Component', () => {
   it('renders loading state initially', () => {
     vi.spyOn(adminApi, 'getAdminRecruiters').mockReturnValue(new Promise(() => {}));
 
-    render(<AdminRecruitersPage />);
+    renderAdminRecruiters();
 
     expect(screen.getByText(/Loading recruiter organizations/i)).toBeInTheDocument();
   });
@@ -64,7 +72,7 @@ describe('AdminRecruitersPage Component', () => {
   it('renders recruiter list table with verification badges', async () => {
     vi.spyOn(adminApi, 'getAdminRecruiters').mockResolvedValue(mockPaginationResponse);
 
-    render(<AdminRecruitersPage />);
+    renderAdminRecruiters();
 
     await waitFor(() => {
       expect(screen.getByText('Nexus Tech')).toBeInTheDocument();
@@ -79,7 +87,7 @@ describe('AdminRecruitersPage Component', () => {
       .spyOn(adminApi, 'getAdminRecruiters')
       .mockResolvedValue(mockPaginationResponse);
 
-    render(<AdminRecruitersPage />);
+    renderAdminRecruiters();
 
     await waitFor(() => {
       expect(screen.getByText('Nexus Tech')).toBeInTheDocument();
@@ -113,7 +121,7 @@ describe('AdminRecruitersPage Component', () => {
       is_verified: true,
     });
 
-    render(<AdminRecruitersPage />);
+    renderAdminRecruiters();
 
     await waitFor(() => {
       expect(screen.getByText('Nexus Tech')).toBeInTheDocument();
@@ -136,7 +144,7 @@ describe('AdminRecruitersPage Component', () => {
       .mockRejectedValueOnce({ detail: 'Network error' })
       .mockResolvedValueOnce(mockPaginationResponse);
 
-    render(<AdminRecruitersPage />);
+    renderAdminRecruiters();
 
     await waitFor(() => {
       expect(screen.getByText('Network error')).toBeInTheDocument();

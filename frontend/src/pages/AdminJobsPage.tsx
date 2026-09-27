@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AdminJobQueryParams } from '@/types/admin';
 import { JobPosting } from '@/types/job';
 import * as adminApi from '@/api/admin';
@@ -6,6 +7,10 @@ import { JobModerationModal } from '@/components/admin/JobModerationModal';
 import { ApiErrorResponse } from '@/types/api';
 
 export const AdminJobsPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const initialIsActiveParam = searchParams.get('is_active');
+  const initialOppTypeParam = searchParams.get('opportunity_type');
+
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -13,11 +18,15 @@ export const AdminJobsPage: React.FC = () => {
   const pageSize = 10;
 
   const [search, setSearch] = useState<string>('');
-  const [opportunityType, setOpportunityType] = useState<'internship' | 'job' | ''>('');
+  const [opportunityType, setOpportunityType] = useState<'internship' | 'job' | ''>(
+    initialOppTypeParam === 'internship' || initialOppTypeParam === 'job' ? initialOppTypeParam : ''
+  );
   const [employmentType, setEmploymentType] = useState<
     'full_time' | 'part_time' | 'contract' | 'internship' | ''
   >('');
-  const [isActive, setIsActive] = useState<string>(''); // '' | 'true' | 'false'
+  const [isActive, setIsActive] = useState<string>(
+    initialIsActiveParam === 'true' || initialIsActiveParam === 'false' ? initialIsActiveParam : ''
+  ); // '' | 'true' | 'false'
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);

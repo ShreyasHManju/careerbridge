@@ -1,9 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { NotificationDrawer } from '../NotificationDrawer';
+import { MemoryRouter } from 'react-router-dom';
+import { NotificationDrawer, getNotificationDestination } from '../NotificationDrawer';
 import * as notificationsApi from '@/api/notifications';
-import { Notification } from '@/types/notification';
+import * as useAuthModule from '@/auth/useAuth';
+import { Notification, NotificationPreference } from '@/types/notification';
+
+const renderDrawer = (props = {}) => {
+  return render(
+    <MemoryRouter>
+      <NotificationDrawer {...props} />
+    </MemoryRouter>
+  );
+};
 
 const mockUnreadNotification: Notification = {
   id: 101,
@@ -30,12 +40,33 @@ const mockReadNotification: Notification = {
 describe('NotificationDrawer Component', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      user: {
+        id: 1,
+        email: 'user@example.com',
+        role: 'student',
+        is_active: true,
+        is_verified: true,
+        created_at: '',
+        updated_at: '',
+      },
+      isAuthenticated: true,
+      isLoading: false,
+      token: 'valid-token',
+      error: null,
+      login: vi.fn(),
+      register: vi.fn(),
+      logout: vi.fn(),
+      clearAuthentication: vi.fn(),
+      initializeSession: vi.fn(),
+      clearError: vi.fn(),
+    });
   });
 
   it('renders notification bell button with unread count badge and accessibility attributes on mount', async () => {
     vi.spyOn(notificationsApi, 'getUnreadCount').mockResolvedValue({ unread_count: 2 });
 
-    render(<NotificationDrawer />);
+    renderDrawer();
 
     const bellBtn = await screen.findByRole('button', { name: /Notifications \(2 unread\)/i });
     expect(bellBtn).toBeInTheDocument();
@@ -48,7 +79,7 @@ describe('NotificationDrawer Component', () => {
   it('renders 99+ badge when unread count exceeds 99', async () => {
     vi.spyOn(notificationsApi, 'getUnreadCount').mockResolvedValue({ unread_count: 120 });
 
-    render(<NotificationDrawer />);
+    renderDrawer();
 
     const bellBtn = await screen.findByRole('button', { name: /Notifications \(120 unread\)/i });
     expect(bellBtn).toBeInTheDocument();
@@ -66,7 +97,7 @@ describe('NotificationDrawer Component', () => {
       total_pages: 1,
     });
 
-    render(<NotificationDrawer />);
+    renderDrawer();
 
     const bellBtn = screen.getByRole('button', { name: /Notifications/i });
     await user.click(bellBtn);
@@ -96,7 +127,7 @@ describe('NotificationDrawer Component', () => {
       total_pages: 0,
     });
 
-    render(<NotificationDrawer />);
+    renderDrawer();
 
     const bellBtn = screen.getByRole('button', { name: /Notifications/i });
     await user.click(bellBtn);
@@ -135,7 +166,7 @@ describe('NotificationDrawer Component', () => {
       total_pages: 1,
     });
 
-    render(<NotificationDrawer />);
+    renderDrawer();
 
     await user.click(screen.getByRole('button', { name: /Notifications/i }));
     await screen.findByText('Application Received');
@@ -172,7 +203,7 @@ describe('NotificationDrawer Component', () => {
       read_at: '2026-09-20T09:00:00Z',
     });
 
-    render(<NotificationDrawer />);
+    renderDrawer();
 
     await user.click(screen.getByRole('button', { name: /Notifications/i }));
     await screen.findByText('Application Received');
@@ -218,7 +249,7 @@ describe('NotificationDrawer Component', () => {
       read_at: '2026-09-20T09:00:00Z',
     });
 
-    render(<NotificationDrawer />);
+    renderDrawer();
 
     await user.click(screen.getByRole('button', { name: /Notifications/i }));
     await screen.findByText('Application Received');
@@ -274,7 +305,7 @@ describe('NotificationDrawer Component', () => {
       marked_read_count: 1,
     });
 
-    render(<NotificationDrawer />);
+    renderDrawer();
 
     await user.click(screen.getByRole('button', { name: /Notifications/i }));
     await screen.findByText('Application Received');
@@ -305,7 +336,7 @@ describe('NotificationDrawer Component', () => {
       total_pages: 0,
     });
 
-    render(<NotificationDrawer />);
+    renderDrawer();
 
     await user.click(screen.getByRole('button', { name: /Notifications/i }));
 
@@ -330,7 +361,7 @@ describe('NotificationDrawer Component', () => {
         total_pages: 1,
       });
 
-    render(<NotificationDrawer />);
+    renderDrawer();
 
     await user.click(screen.getByRole('button', { name: /Notifications/i }));
 
@@ -340,5 +371,92 @@ describe('NotificationDrawer Component', () => {
     await user.click(retryBtn);
 
     expect(await screen.findByText('Application Received')).toBeInTheDocument();
+  });
+
+  describe('Deep-linking destination logic', () => {
+    it('returns correct destinations based on notification type and role', () => {
+      expect(getNotificationDestination('application_submitted', 'recruiter')).toBe('/app/recruiter/applications');
+      expect(getNotificationDestination('application_submitted', 'student')).toBe('/app/applications');
+      expect(getNotificationDestination('application_status_changed', 'student')).toBe('/app/applications');
+      expect(getNotificationDestination('application_status_changed', 'recruiter')).toBe('/app/recruiter/applications');
+      expect(getNotificationDestination('recruiter_verification_changed', 'recruiter')).toBe('/app/recruiter/profile');
+      expect(getNotificationDestination('job_moderation_changed', 'recruiter')).toBe('/app/recruiter/jobs');
+      expect(getNotificationDestination('interview_scheduled', 'student')).toBe('/app/interviews');
+      expect(getNotificationDestination('interview_scheduled', 'recruiter')).toBe('/app/recruiter/interviews');
+      expect(getNotificationDestination('message_received', 'student')).toBe('/app/messages');
+    });
+
+    it('returns null and remains safe for unknown/unsupported notification types', () => {
+      expect(getNotificationDestination('unknown_future_type', 'student')).toBeNull();
+      expect(getNotificationDestination('', 'recruiter')).toBeNull();
+    });
+  });
+
+  describe('Notification Preferences UI', () => {
+    const mockPref: NotificationPreference = {
+      id: 1,
+      user_id: 1,
+      email_notifications: true,
+      frequency: 'instant',
+      created_at: '2026-09-01T00:00:00Z',
+      updated_at: '2026-09-01T00:00:00Z',
+    };
+
+    it('loads and displays preferences when preferences tab is clicked', async () => {
+      const user = userEvent.setup();
+      vi.spyOn(notificationsApi, 'getUnreadCount').mockResolvedValue({ unread_count: 0 });
+      const getPrefSpy = vi.spyOn(notificationsApi, 'getNotificationPreferences').mockResolvedValue(mockPref);
+
+      renderDrawer();
+
+      await user.click(screen.getByRole('button', { name: /Notifications/i }));
+      const prefTab = screen.getByTestId('notification-preferences-tab');
+      await user.click(prefTab);
+
+      expect(getPrefSpy).toHaveBeenCalled();
+      expect(await screen.findByTestId('preferences-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('freq-instant-radio')).toBeChecked();
+      expect(screen.getByTestId('email-notif-checkbox')).toBeChecked();
+    });
+
+    it('updates frequency and email preference settings with success feedback', async () => {
+      const user = userEvent.setup();
+      vi.spyOn(notificationsApi, 'getUnreadCount').mockResolvedValue({ unread_count: 0 });
+      vi.spyOn(notificationsApi, 'getNotificationPreferences').mockResolvedValue(mockPref);
+      const updatePrefSpy = vi.spyOn(notificationsApi, 'updateNotificationPreferences').mockResolvedValue({
+        ...mockPref,
+        frequency: 'digest',
+      });
+
+      renderDrawer();
+
+      await user.click(screen.getByRole('button', { name: /Notifications/i }));
+      await user.click(screen.getByTestId('notification-preferences-tab'));
+
+      const digestRadio = await screen.findByTestId('freq-digest-radio');
+      await user.click(digestRadio);
+
+      expect(updatePrefSpy).toHaveBeenCalledWith({ frequency: 'digest' });
+      expect(await screen.findByText(/Preferences saved: "Daily Digest" active/i)).toBeInTheDocument();
+    });
+
+    it('handles preference update error gracefully', async () => {
+      const user = userEvent.setup();
+      vi.spyOn(notificationsApi, 'getUnreadCount').mockResolvedValue({ unread_count: 0 });
+      vi.spyOn(notificationsApi, 'getNotificationPreferences').mockResolvedValue(mockPref);
+      vi.spyOn(notificationsApi, 'updateNotificationPreferences').mockRejectedValue({
+        message: 'Network error updating preferences',
+      });
+
+      renderDrawer();
+
+      await user.click(screen.getByRole('button', { name: /Notifications/i }));
+      await user.click(screen.getByTestId('notification-preferences-tab'));
+
+      const digestRadio = await screen.findByTestId('freq-digest-radio');
+      await user.click(digestRadio);
+
+      expect(await screen.findByText('Network error updating preferences')).toBeInTheDocument();
+    });
   });
 });

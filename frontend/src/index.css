@@ -713,6 +713,18 @@ body {
   border: 1px solid #cbd5e1;
 }
 
+.cb-badge-applied {
+  background-color: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.cb-badge-saved {
+  background-color: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
 .cb-job-description {
   font-size: 0.9rem;
   color: var(--cb-text-muted);
@@ -3724,4 +3736,35 @@ body {
   .cb-verification-action-buttons button {
     width: 100%;
   }
+}
+
+/* Actionable Dashboard Stat Card Links (Phase 30B) */
+a.cb-stat-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--cb-transition, 0.2s ease), box-shadow var(--cb-transition, 0.2s ease), border-color var(--cb-transition, 0.2s ease);
+  cursor: pointer;
+}
+
+a.cb-stat-card-link:hover,
+a.cb-stat-card-link:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: var(--cb-primary, #2563eb);
+}
+
+/* Actionable Notification Items (Phase 30B) */
+.cb-notification-item.cb-notification-actionable {
+  cursor: pointer;
+}
+
+.cb-notification-item.cb-notification-actionable:hover {
+  background-color: var(--cb-bg-subtle, #f8fafc);
+}
+
+.cb-notification-item.cb-notification-actionable:focus-visible {
+  outline: 2px solid var(--cb-primary, #2563eb);
+  outline-offset: -2px;
 }

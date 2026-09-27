@@ -166,10 +166,12 @@ export const InterviewCard: React.FC<InterviewCardProps> = ({
         </div>
       )}
 
-      {/* Recruiter Action Controls */}
-      {role === 'recruiter' && isActionable && (
+      {/* Action Controls */}
+      {((role === 'recruiter' && isActionable) ||
+        (role === 'recruiter' && interview.student_id) ||
+        (role === 'student' && interview.recruiter_id)) && (
         <footer className="cb-interview-card-actions">
-          {onReschedule && (
+          {role === 'recruiter' && isActionable && onReschedule && (
             <button
               type="button"
               className="cb-btn cb-btn-secondary cb-btn-sm"
@@ -180,7 +182,7 @@ export const InterviewCard: React.FC<InterviewCardProps> = ({
             </button>
           )}
 
-          {onMarkComplete && (
+          {role === 'recruiter' && isActionable && onMarkComplete && (
             <button
               type="button"
               className="cb-btn cb-btn-outline-success cb-btn-sm"
@@ -191,7 +193,7 @@ export const InterviewCard: React.FC<InterviewCardProps> = ({
             </button>
           )}
 
-          {onCancel && (
+          {role === 'recruiter' && isActionable && onCancel && (
             <button
               type="button"
               className="cb-btn cb-btn-outline-danger cb-btn-sm"
@@ -201,6 +203,26 @@ export const InterviewCard: React.FC<InterviewCardProps> = ({
               Cancel Interview
             </button>
           )}
+
+          {role === 'recruiter' && interview.student_id ? (
+            <Link
+              to={`/app/messages?recipientId=${interview.student_id}`}
+              className="cb-btn cb-btn-secondary cb-btn-sm"
+              data-testid={`interview-message-candidate-btn-${interview.id}`}
+            >
+              💬 Message Candidate
+            </Link>
+          ) : null}
+
+          {role === 'student' && interview.recruiter_id ? (
+            <Link
+              to={`/app/messages?recipientId=${interview.recruiter_id}`}
+              className="cb-btn cb-btn-secondary cb-btn-sm"
+              data-testid={`interview-message-recruiter-btn-${interview.id}`}
+            >
+              💬 Message Hiring Team
+            </Link>
+          ) : null}
         </footer>
       )}
     </article>

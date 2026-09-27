@@ -1,8 +1,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AdminJobsPage } from '../AdminJobsPage';
 import * as adminApi from '@/api/admin';
 import { JobPostingPagination, JobPosting } from '@/types/job';
+
+const renderAdminJobs = () =>
+  render(
+    <MemoryRouter>
+      <AdminJobsPage />
+    </MemoryRouter>
+  );
 
 vi.mock('@/api/admin');
 
@@ -64,7 +72,7 @@ describe('AdminJobsPage Component', () => {
   it('renders loading state initially', () => {
     vi.spyOn(adminApi, 'getAdminJobs').mockReturnValue(new Promise(() => {}));
 
-    render(<AdminJobsPage />);
+    renderAdminJobs();
 
     expect(screen.getByText(/Loading job postings for moderation/i)).toBeInTheDocument();
   });
@@ -72,7 +80,7 @@ describe('AdminJobsPage Component', () => {
   it('renders active and inactive job postings in table', async () => {
     vi.spyOn(adminApi, 'getAdminJobs').mockResolvedValue(mockPaginationResponse);
 
-    render(<AdminJobsPage />);
+    renderAdminJobs();
 
     await waitFor(() => {
       expect(screen.getByText('Full Stack Engineer')).toBeInTheDocument();
@@ -85,7 +93,7 @@ describe('AdminJobsPage Component', () => {
   it('filters by search, opportunity type, employment type, and active status', async () => {
     const fetchSpy = vi.spyOn(adminApi, 'getAdminJobs').mockResolvedValue(mockPaginationResponse);
 
-    render(<AdminJobsPage />);
+    renderAdminJobs();
 
     await waitFor(() => {
       expect(screen.getByText('Full Stack Engineer')).toBeInTheDocument();
@@ -139,7 +147,7 @@ describe('AdminJobsPage Component', () => {
       is_active: false,
     });
 
-    render(<AdminJobsPage />);
+    renderAdminJobs();
 
     await waitFor(() => {
       expect(screen.getByText('Full Stack Engineer')).toBeInTheDocument();

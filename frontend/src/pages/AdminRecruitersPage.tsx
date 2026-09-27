@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AdminRecruiter, AdminRecruiterQueryParams } from '@/types/admin';
 import * as adminApi from '@/api/admin';
 import { RecruiterVerificationModal } from '@/components/admin/RecruiterVerificationModal';
 import { ApiErrorResponse } from '@/types/api';
 
 export const AdminRecruitersPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const initialVerifiedParam = searchParams.get('is_verified');
+
   const [recruiters, setRecruiters] = useState<AdminRecruiter[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -12,7 +16,9 @@ export const AdminRecruitersPage: React.FC = () => {
   const pageSize = 10;
 
   const [search, setSearch] = useState<string>('');
-  const [isVerified, setIsVerified] = useState<string>(''); // '' | 'true' | 'false'
+  const [isVerified, setIsVerified] = useState<string>(
+    initialVerifiedParam === 'true' || initialVerifiedParam === 'false' ? initialVerifiedParam : ''
+  );
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);

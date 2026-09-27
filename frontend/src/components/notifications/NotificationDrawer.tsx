@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/auth/useAuth';
 import { Notification, NotificationPreference, NotificationFrequency } from '@/types/notification';
 import {
   getNotifications,
@@ -10,6 +12,27 @@ import {
 } from '@/api/notifications';
 import { ApiErrorResponse } from '@/types/api';
 
+export const getNotificationDestination = (type: string, role?: string): string | null => {
+  switch (type) {
+    case 'application_submitted':
+      return role === 'recruiter' ? '/app/recruiter/applications' : '/app/applications';
+    case 'application_status_changed':
+      return role === 'student' ? '/app/applications' : '/app/recruiter/applications';
+    case 'recruiter_verification_changed':
+      return '/app/recruiter/profile';
+    case 'job_moderation_changed':
+      return '/app/recruiter/jobs';
+    case 'interview_scheduled':
+    case 'interview_rescheduled':
+    case 'interview_cancelled':
+      return role === 'student' ? '/app/interviews' : '/app/recruiter/interviews';
+    case 'message_received':
+      return '/app/messages';
+    default:
+      return null;
+  }
+};
+
 interface NotificationDrawerProps {
   className?: string;
 }
@@ -17,7 +40,10 @@ interface NotificationDrawerProps {
 type DrawerTab = 'all' | 'unread' | 'preferences';
 
 export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ className = '' }) => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState<boolean>(false);
+
   const [activeTab, setActiveTab] = useState<DrawerTab>('all');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -210,6 +236,17 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
       });
     } catch {
       return dateString;
+    }
+  };
+
+  const handleItemClick = (item: Notification) => {
+    const destination = getNotificationDestination(item.notification_type, user?.role);
+    if (!item.is_read) {
+      handleMarkAsRead(item.id);
+    }
+    if (destination) {
+      navigate(destination);
+      setIsOpen(false);
     }
   };
 
@@ -458,40 +495,56 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
               </div>
             ) : (
               <ul className="cb-notification-list" role="list">
-                {notifications.map((item) => (
-                  <li
-                    key={item.id}
-                    className={`cb-notification-item ${item.is_read ? 'cb-read' : 'cb-unread'}`}
-                  >
-                    <div className="cb-notification-item-content">
-                      <div className="cb-notification-item-header">
-                        <span className="cb-notification-item-title">{item.title}</span>
-                        {!item.is_read ? (
-                          <span className="cb-status-badge cb-badge-unread">Unread</span>
-                        ) : (
-                          <span className="cb-status-badge cb-badge-read">Read</span>
-                        )}
+                {notifications.map((item) => {
+                  const dest = getNotificationDestination(item.notification_type, user?.role);
+                  return (
+                    <li
+                      key={item.id}
+                      className={`cb-notification-item ${item.is_read ? 'cb-read' : 'cb-unread'} ${dest ? 'cb-notification-actionable' : ''}`}
+                      onClick={() => handleItemClick(item)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleItemClick(item);
+                        }
+                      }}
+                      tabIndex={dest ? 0 : undefined}
+                      role={dest ? 'button' : undefined}
+                      data-testid={`notification-item-${item.id}`}
+                    >
+                      <div className="cb-notification-item-content">
+                        <div className="cb-notification-item-header">
+                          <span className="cb-notification-item-title">{item.title}</span>
+                          {!item.is_read ? (
+                            <span className="cb-status-badge cb-badge-unread">Unread</span>
+                          ) : (
+                            <span className="cb-status-badge cb-badge-read">Read</span>
+                          )}
+                        </div>
+                        <p className="cb-notification-item-message">{item.message}</p>
+                        <div className="cb-notification-item-footer">
+                          <time className="cb-notification-time" dateTime={item.created_at}>
+                            {formatTimestamp(item.created_at)}
+                          </time>
+                          {!item.is_read && (
+                            <button
+                              type="button"
+                              className="cb-btn-link cb-item-mark-read-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsRead(item.id);
+                              }}
+                              disabled={markingReadId === item.id}
+                              aria-label={`Mark "${item.title}" as read`}
+                            >
+                              {markingReadId === item.id ? 'Marking...' : 'Mark as read'}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p className="cb-notification-item-message">{item.message}</p>
-                      <div className="cb-notification-item-footer">
-                        <time className="cb-notification-time" dateTime={item.created_at}>
-                          {formatTimestamp(item.created_at)}
-                        </time>
-                        {!item.is_read && (
-                          <button
-                            type="button"
-                            className="cb-btn-link cb-item-mark-read-btn"
-                            onClick={() => handleMarkAsRead(item.id)}
-                            disabled={markingReadId === item.id}
-                            aria-label={`Mark "${item.title}" as read`}
-                          >
-                            {markingReadId === item.id ? 'Marking...' : 'Mark as read'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

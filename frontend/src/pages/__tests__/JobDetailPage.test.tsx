@@ -260,4 +260,16 @@ describe('JobDetailPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Cloud Infrastructure Intern' })).toBeInTheDocument();
     expect(screen.getByTestId('detail-save-btn')).toHaveTextContent('☆ Save Opportunity');
   });
+
+  it('renders contextual Message Hiring Team button with recipientId for student', async () => {
+    vi.spyOn(jobsApi, 'getJobById').mockResolvedValueOnce(mockJob);
+    renderWithRouter();
+
+    await waitFor(() => {
+      const msgBtn = screen.getByTestId('detail-message-recruiter-btn');
+      expect(msgBtn).toBeInTheDocument();
+      expect(msgBtn).toHaveAttribute('href', '/app/messages?recipientId=15');
+      expect(msgBtn).toHaveTextContent('Message Hiring Team');
+    });
+  });
 });

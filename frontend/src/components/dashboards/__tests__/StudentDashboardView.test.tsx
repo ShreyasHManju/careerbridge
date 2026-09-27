@@ -184,4 +184,23 @@ describe('StudentDashboardView Component (Phase 22)', () => {
 
     expect(apiSpy).toHaveBeenCalledTimes(2);
   });
+
+  it('renders metric cards as accessible links with appropriate destinations and query filters', async () => {
+    vi.spyOn(dashboardsApi, 'getStudentDashboard').mockResolvedValue(mockPopulatedDashboard);
+
+    render(
+      <MemoryRouter>
+        <StudentDashboardView />
+      </MemoryRouter>
+    );
+
+    await screen.findByTestId('student-dashboard-view');
+
+    expect(screen.getByTestId('metric-total-applications')).toHaveAttribute('href', '/app/applications');
+    expect(screen.getByTestId('metric-applications-under-review')).toHaveAttribute('href', '/app/applications?status=reviewing');
+    expect(screen.getByTestId('metric-shortlisted-applications')).toHaveAttribute('href', '/app/applications?status=shortlisted');
+    expect(screen.getByTestId('metric-accepted-applications')).toHaveAttribute('href', '/app/applications?status=accepted');
+    expect(screen.getByTestId('metric-saved-internships')).toHaveAttribute('href', '/app/saved-jobs');
+    expect(screen.getByTestId('metric-upcoming-interviews')).toHaveAttribute('href', '/app/interviews');
+  });
 });

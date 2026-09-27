@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/auth/useAuth';
 import { getJobs } from '@/api/jobs';
+import { getMyApplications } from '@/api/applications';
 import { getSavedJobs, saveJob, unsaveJob } from '@/api/savedJobs';
 import { JobPosting, JobFilters, JobPostingPagination } from '@/types/job';
 import { JobCard } from '@/components/jobs/JobCard';
@@ -26,13 +27,15 @@ export const JobDiscoveryPage: React.FC = () => {
 
   // Saved jobs tracking (Set of job_posting_id for O(1) checks, prevents N+1)
   const [savedJobIds, setSavedJobIds] = useState<Set<number>>(new Set());
+  // Applied jobs tracking (Set of job_posting_id for O(1) checks)
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<number>>(new Set());
   const [savingJobId, setSavingJobId] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Apply Modal state
   const [selectedJobToApply, setSelectedJobToApply] = useState<JobPosting | null>(null);
 
-  // Load saved jobs for students once on mount
+  // Load saved jobs and applied jobs for students once on mount
   useEffect(() => {
     if (isStudent) {
       getSavedJobs()
@@ -42,6 +45,15 @@ export const JobDiscoveryPage: React.FC = () => {
         })
         .catch(() => {
           // Non-critical; saved state can degrade gracefully
+        });
+
+      getMyApplications()
+        .then((apps) => {
+          const ids = new Set(apps.map((item) => item.job_posting_id));
+          setAppliedJobIds(ids);
+        })
+        .catch(() => {
+          // Non-critical; applied state can degrade gracefully
         });
     }
   }, [isStudent]);
@@ -224,6 +236,7 @@ export const JobDiscoveryPage: React.FC = () => {
                   job={job}
                   isSaved={savedJobIds.has(job.id)}
                   isSaving={savingJobId === job.id}
+                  isApplied={appliedJobIds.has(job.id)}
                   onToggleSave={handleToggleSave}
                   onApply={(j) => setSelectedJobToApply(j)}
                   userRole={user?.role}
@@ -269,6 +282,9 @@ export const JobDiscoveryPage: React.FC = () => {
         job={selectedJobToApply}
         onClose={() => setSelectedJobToApply(null)}
         onSuccess={() => {
+          if (selectedJobToApply) {
+            setAppliedJobIds((prev) => new Set(prev).add(selectedJobToApply.id));
+          }
           showToast('success', 'Application submitted successfully!');
         }}
       />

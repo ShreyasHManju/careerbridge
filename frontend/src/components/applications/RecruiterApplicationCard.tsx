@@ -208,13 +208,15 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
             📅 Schedule Interview
           </button>
         )}
-        <Link
-          to={`/app/messages?userId=${application.student_id}`}
-          className="cb-btn cb-btn-secondary cb-btn-sm"
-          data-testid={`message-candidate-btn-${application.id}`}
-        >
-          💬 Message Candidate
-        </Link>
+        {application.student_id ? (
+          <Link
+            to={`/app/messages?recipientId=${application.student_id}`}
+            className="cb-btn cb-btn-secondary cb-btn-sm"
+            data-testid={`message-candidate-btn-${application.id}`}
+          >
+            💬 Message Candidate
+          </Link>
+        ) : null}
       </div>
     </article>
   );

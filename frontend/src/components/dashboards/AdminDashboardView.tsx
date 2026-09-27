@@ -152,39 +152,64 @@ export const AdminDashboardView: React.FC = () => {
         </h2>
         <div className="cb-stat-grid">
           {/* 1. Total Students */}
-          <div className="cb-stat-card cb-stat-primary" data-testid="metric-total-students">
+          <Link
+            to="/app/admin/users?role=student"
+            className="cb-stat-card cb-stat-primary cb-stat-card-link"
+            data-testid="metric-total-students"
+            aria-label="View registered student accounts"
+          >
             <span className="cb-stat-label">Total Students</span>
             <span className="cb-stat-value">{dashboard.total_students}</span>
             <span className="cb-stat-desc">Registered student accounts</span>
-          </div>
+          </Link>
 
           {/* 2. Total Companies */}
-          <div className="cb-stat-card cb-stat-info" data-testid="metric-total-companies">
+          <Link
+            to="/app/admin/users?role=recruiter"
+            className="cb-stat-card cb-stat-info cb-stat-card-link"
+            data-testid="metric-total-companies"
+            aria-label="View registered recruiter accounts"
+          >
             <span className="cb-stat-label">Total Companies</span>
             <span className="cb-stat-value">{dashboard.total_companies}</span>
             <span className="cb-stat-desc">Registered recruiter accounts</span>
-          </div>
+          </Link>
 
           {/* 3. Verified Companies */}
-          <div className="cb-stat-card cb-stat-success" data-testid="metric-verified-companies">
+          <Link
+            to="/app/admin/recruiters?is_verified=true"
+            className="cb-stat-card cb-stat-success cb-stat-card-link"
+            data-testid="metric-verified-companies"
+            aria-label="View administratively verified organizations"
+          >
             <span className="cb-stat-label">Verified Organizations</span>
             <span className="cb-stat-value">{dashboard.verified_companies}</span>
             <span className="cb-stat-desc">Administratively verified</span>
-          </div>
+          </Link>
 
           {/* 4. Published Internships */}
-          <div className="cb-stat-card" data-testid="metric-published-internships">
+          <Link
+            to="/app/admin/jobs?is_active=true"
+            className="cb-stat-card cb-stat-card-link"
+            data-testid="metric-published-internships"
+            aria-label="View active published opportunities"
+          >
             <span className="cb-stat-label">Active Opportunities</span>
             <span className="cb-stat-value">{dashboard.published_internships}</span>
             <span className="cb-stat-desc">Currently published postings</span>
-          </div>
+          </Link>
 
           {/* 5. Total Applications */}
-          <div className="cb-stat-card" data-testid="metric-total-applications">
+          <Link
+            to="/app/admin/jobs"
+            className="cb-stat-card cb-stat-card-link"
+            data-testid="metric-total-applications"
+            aria-label="View platform-wide job postings"
+          >
             <span className="cb-stat-label">Total Applications</span>
             <span className="cb-stat-value">{dashboard.total_applications}</span>
             <span className="cb-stat-desc">Platform-wide submissions</span>
-          </div>
+          </Link>
 
           {/* 6. Application Success Rate */}
           <div className="cb-stat-card cb-stat-warning" data-testid="metric-application-success-rate">

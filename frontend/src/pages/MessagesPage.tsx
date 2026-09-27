@@ -52,7 +52,7 @@ export const MessagesPage: React.FC = () => {
   useEffect(() => {
     fetchConversations().then((loadedConvs) => {
       const convIdParam = searchParams.get('conversationId');
-      const userIdParam = searchParams.get('userId');
+      const userIdParam = searchParams.get('recipientId') || searchParams.get('userId');
 
       if (convIdParam) {
         const parsed = parseInt(convIdParam, 10);

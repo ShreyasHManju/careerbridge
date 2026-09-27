@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AdminUser, AdminUserQueryParams } from '@/types/admin';
 import * as adminApi from '@/api/admin';
 import { exportAdminUsers } from '@/api/export';
@@ -9,6 +10,9 @@ import { ApiErrorResponse } from '@/types/api';
 
 export const AdminUsersPage: React.FC = () => {
   const { user: currentUser } = useAuth();
+  const [searchParams] = useSearchParams();
+  const initialRoleParam = searchParams.get('role');
+  const initialIsActiveParam = searchParams.get('is_active');
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState<number>(0);
@@ -17,8 +21,14 @@ export const AdminUsersPage: React.FC = () => {
   const pageSize = 10;
 
   const [search, setSearch] = useState<string>('');
-  const [role, setRole] = useState<'student' | 'recruiter' | 'admin' | ''>('');
-  const [isActive, setIsActive] = useState<string>(''); // '' | 'true' | 'false'
+  const [role, setRole] = useState<'student' | 'recruiter' | 'admin' | ''>(
+    initialRoleParam === 'student' || initialRoleParam === 'recruiter' || initialRoleParam === 'admin'
+      ? initialRoleParam
+      : ''
+  );
+  const [isActive, setIsActive] = useState<string>(
+    initialIsActiveParam === 'true' || initialIsActiveParam === 'false' ? initialIsActiveParam : ''
+  );
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);

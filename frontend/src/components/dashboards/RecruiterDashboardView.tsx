@@ -113,39 +113,64 @@ export const RecruiterDashboardView: React.FC = () => {
         </h2>
         <div className="cb-stat-grid">
           {/* 1. Active Internships */}
-          <div className="cb-stat-card cb-stat-success" data-testid="metric-active-internships">
+          <Link
+            to="/app/recruiter/jobs"
+            className="cb-stat-card cb-stat-success cb-stat-card-link"
+            data-testid="metric-active-internships"
+            aria-label="View active published postings"
+          >
             <span className="cb-stat-label">Active Internships</span>
             <span className="cb-stat-value">{dashboard.active_internships}</span>
             <span className="cb-stat-desc">Published open postings</span>
-          </div>
+          </Link>
 
           {/* 2. Total Applications */}
-          <div className="cb-stat-card" data-testid="metric-total-applications">
+          <Link
+            to="/app/recruiter/applications"
+            className="cb-stat-card cb-stat-card-link"
+            data-testid="metric-total-applications"
+            aria-label="View all received candidate submissions"
+          >
             <span className="cb-stat-label">Total Applications</span>
             <span className="cb-stat-value">{dashboard.total_applications}</span>
             <span className="cb-stat-desc">Received candidate submissions</span>
-          </div>
+          </Link>
 
           {/* 3. Applications Awaiting Review */}
-          <div className="cb-stat-card cb-stat-warning" data-testid="metric-applications-awaiting-review">
+          <Link
+            to="/app/recruiter/applications?status=applied"
+            className="cb-stat-card cb-stat-warning cb-stat-card-link"
+            data-testid="metric-applications-awaiting-review"
+            aria-label="View candidate submissions awaiting review"
+          >
             <span className="cb-stat-label">Awaiting Review</span>
             <span className="cb-stat-value">{dashboard.applications_awaiting_review}</span>
             <span className="cb-stat-desc">Pending initial evaluation</span>
-          </div>
+          </Link>
 
           {/* 4. Shortlisted Candidates */}
-          <div className="cb-stat-card cb-stat-info" data-testid="metric-shortlisted-candidates">
+          <Link
+            to="/app/recruiter/applications?status=shortlisted"
+            className="cb-stat-card cb-stat-info cb-stat-card-link"
+            data-testid="metric-shortlisted-candidates"
+            aria-label="View shortlisted candidates"
+          >
             <span className="cb-stat-label">Shortlisted Candidates</span>
             <span className="cb-stat-value">{dashboard.shortlisted_candidates}</span>
             <span className="cb-stat-desc">Qualified for next rounds</span>
-          </div>
+          </Link>
 
           {/* 5. Scheduled Interviews */}
-          <div className="cb-stat-card cb-stat-primary" data-testid="metric-scheduled-interviews">
+          <Link
+            to="/app/recruiter/interviews"
+            className="cb-stat-card cb-stat-primary cb-stat-card-link"
+            data-testid="metric-scheduled-interviews"
+            aria-label="View scheduled upcoming interview rounds"
+          >
             <span className="cb-stat-label">Scheduled Interviews</span>
             <span className="cb-stat-value">{dashboard.scheduled_interviews}</span>
             <span className="cb-stat-desc">Active upcoming rounds</span>
-          </div>
+          </Link>
         </div>
       </section>
 

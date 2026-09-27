@@ -189,4 +189,22 @@ describe('RecruiterDashboardView Component (Phase 22)', () => {
     expect(screen.getByTestId('metric-active-internships')).toHaveTextContent('4');
     expect(apiSpy).toHaveBeenCalledTimes(2);
   });
+
+  it('renders metric cards as accessible links with appropriate destinations and query filters', async () => {
+    vi.spyOn(dashboardsApi, 'getRecruiterDashboard').mockResolvedValue(mockPopulatedDashboard);
+
+    render(
+      <MemoryRouter>
+        <RecruiterDashboardView />
+      </MemoryRouter>
+    );
+
+    await screen.findByTestId('recruiter-dashboard-view');
+
+    expect(screen.getByTestId('metric-active-internships')).toHaveAttribute('href', '/app/recruiter/jobs');
+    expect(screen.getByTestId('metric-total-applications')).toHaveAttribute('href', '/app/recruiter/applications');
+    expect(screen.getByTestId('metric-applications-awaiting-review')).toHaveAttribute('href', '/app/recruiter/applications?status=applied');
+    expect(screen.getByTestId('metric-shortlisted-candidates')).toHaveAttribute('href', '/app/recruiter/applications?status=shortlisted');
+    expect(screen.getByTestId('metric-scheduled-interviews')).toHaveAttribute('href', '/app/recruiter/interviews');
+  });
 });

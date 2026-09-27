@@ -6,6 +6,7 @@ interface JobCardProps {
   job: JobPosting;
   isSaved?: boolean;
   isSaving?: boolean;
+  isApplied?: boolean;
   onToggleSave?: (jobId: number) => void;
   onApply?: (job: JobPosting) => void;
   userRole?: string;
@@ -15,6 +16,7 @@ export const JobCard: React.FC<JobCardProps> = ({
   job,
   isSaved = false,
   isSaving = false,
+  isApplied = false,
   onToggleSave,
   onApply,
   userRole,
@@ -85,6 +87,16 @@ export const JobCard: React.FC<JobCardProps> = ({
         </div>
 
         <div className="cb-job-badges">
+          {isStudent && isApplied && (
+            <span className="cb-badge cb-badge-applied" data-testid={`applied-badge-${job.id}`}>
+              ✓ Applied
+            </span>
+          )}
+          {isStudent && isSaved && (
+            <span className="cb-badge cb-badge-saved" data-testid={`saved-badge-${job.id}`}>
+              ★ Saved
+            </span>
+          )}
           <span className={`cb-badge cb-badge-opp cb-badge-${job.opportunity_type}`}>
             {job.opportunity_type === 'internship' ? 'Internship' : 'Job'}
           </span>

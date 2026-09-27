@@ -204,4 +204,22 @@ describe('AdminDashboardView Component (Phase 22)', () => {
     expect(screen.getByTestId('metric-total-students')).toHaveTextContent('142');
     expect(apiSpy).toHaveBeenCalledTimes(2);
   });
+
+  it('renders metric cards as accessible links with appropriate destinations and query filters', async () => {
+    vi.spyOn(dashboardsApi, 'getAdminDashboard').mockResolvedValue(mockAdminDashboard);
+
+    render(
+      <MemoryRouter>
+        <AdminDashboardView />
+      </MemoryRouter>
+    );
+
+    await screen.findByTestId('admin-dashboard-view');
+
+    expect(screen.getByTestId('metric-total-students')).toHaveAttribute('href', '/app/admin/users?role=student');
+    expect(screen.getByTestId('metric-total-companies')).toHaveAttribute('href', '/app/admin/users?role=recruiter');
+    expect(screen.getByTestId('metric-verified-companies')).toHaveAttribute('href', '/app/admin/recruiters?is_verified=true');
+    expect(screen.getByTestId('metric-published-internships')).toHaveAttribute('href', '/app/admin/jobs?is_active=true');
+    expect(screen.getByTestId('metric-total-applications')).toHaveAttribute('href', '/app/admin/jobs');
+  });
 });
