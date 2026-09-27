@@ -367,8 +367,26 @@ def test_validation_excessive_notes_and_link():
 # --------------------------------------------------------------------------
 def test_application_status_rules_rejected_and_accepted():
     with SessionLocal() as db:
-        app_rejected = db.scalar(select(Application).where(Application.status == ApplicationStatus.REJECTED))
-        app_accepted = db.scalar(select(Application).where(Application.status == ApplicationStatus.ACCEPTED))
+        app_rejected = db.scalar(
+        select(Application)
+        .join(JobPosting)
+        .where(
+            JobPosting.title == "Frontend React Specialist",
+            Application.status == ApplicationStatus.REJECTED,
+            )
+        )
+        app_accepted = db.scalar(
+        select(Application)
+        .join(JobPosting)
+        .where(
+            JobPosting.title == "Frontend React Specialist",
+            Application.status == ApplicationStatus.ACCEPTED,
+            )
+        )
+
+        assert app_rejected is not None
+        assert app_accepted is not None
+
         rej_id = app_rejected.id
         acc_id = app_accepted.id
 
