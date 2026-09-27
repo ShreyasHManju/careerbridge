@@ -103,7 +103,7 @@ def get_token(email: str, role: UserRole) -> str:
         return create_access_token(subject=user.id)
 
 
-def test_project_creation_and_validation():
+def _test_project_creation_and_validation():
     print("[1/8] Testing project creation, validation, and structured skills attachment...")
     token = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers = {"Authorization": f"Bearer {token}"}
@@ -161,7 +161,7 @@ def test_project_creation_and_validation():
     return project_id
 
 
-def test_rbac_and_unauthorized_creation():
+def _test_rbac_and_unauthorized_creation():
     print("[2/8] Testing RBAC access controls on project creation...")
     recruiter_token = get_token(RECRUITER_EMAIL, UserRole.RECRUITER)
 
@@ -184,7 +184,7 @@ def test_rbac_and_unauthorized_creation():
     print("  -> RBAC access controls verified.")
 
 
-def test_student_projects_listing(project_id: int):
+def _test_student_projects_listing(project_id: int):
     print("[3/8] Testing student project listing (/my) with filters...")
     token = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers = {"Authorization": f"Bearer {token}"}
@@ -222,7 +222,7 @@ def test_student_projects_listing(project_id: int):
     return priv_id
 
 
-def test_visibility_guards(public_id: int, private_id: int):
+def _test_visibility_guards(public_id: int, private_id: int):
     print("[4/8] Testing visibility guards for public vs private projects...")
     student1_token = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     student2_token = get_token(STUDENT2_EMAIL, UserRole.STUDENT)
@@ -253,7 +253,7 @@ def test_visibility_guards(public_id: int, private_id: int):
     print("  -> Visibility guards verified.")
 
 
-def test_ownership_protection(public_id: int):
+def _test_ownership_protection(public_id: int):
     print("[5/8] Testing ownership protection on project modifications and deletions...")
     student2_token = get_token(STUDENT2_EMAIL, UserRole.STUDENT)
     recruiter_token = get_token(RECRUITER_EMAIL, UserRole.RECRUITER)
@@ -284,7 +284,7 @@ def test_ownership_protection(public_id: int):
     print("  -> Ownership protection verified.")
 
 
-def test_project_update_and_skill_sync(project_id: int):
+def _test_project_update_and_skill_sync(project_id: int):
     print("[6/8] Testing project partial update and structured skills resync...")
     token = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers = {"Authorization": f"Bearer {token}"}
@@ -320,7 +320,7 @@ def test_project_update_and_skill_sync(project_id: int):
     print("  -> Project update and skills resync verified.")
 
 
-def test_public_discovery_and_filtering(public_id: int):
+def _test_public_discovery_and_filtering(public_id: int):
     print("[7/8] Testing public project discovery, search, and pagination...")
     token = get_token(STUDENT2_EMAIL, UserRole.STUDENT)
     headers = {"Authorization": f"Bearer {token}"}
@@ -351,7 +351,7 @@ def test_public_discovery_and_filtering(public_id: int):
     print("  -> Public project discovery and filtering verified.")
 
 
-def test_project_deletion_and_cascade(project_id: int):
+def _test_project_deletion_and_cascade(project_id: int):
     print("[8/8] Testing project deletion and cascading join row removal...")
     token = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers = {"Authorization": f"Bearer {token}"}
@@ -374,20 +374,20 @@ def test_project_deletion_and_cascade(project_id: int):
     print("  -> Project deletion and cascade verified.")
 
 
-def run_all_tests():
+def test_innovation_projects_workflow():
     print("\n=========================================================")
     print("STARTING MILESTONE 2.0-B INNOVATION PROJECTS TEST SUITE...")
     print("=========================================================\n")
     cleanup_test_data()
     try:
-        public_id = test_project_creation_and_validation()
-        test_rbac_and_unauthorized_creation()
-        private_id = test_student_projects_listing(public_id)
-        test_visibility_guards(public_id, private_id)
-        test_ownership_protection(public_id)
-        test_project_update_and_skill_sync(public_id)
-        test_public_discovery_and_filtering(public_id)
-        test_project_deletion_and_cascade(public_id)
+        public_id = _test_project_creation_and_validation()
+        _test_rbac_and_unauthorized_creation()
+        private_id = _test_student_projects_listing(public_id)
+        _test_visibility_guards(public_id, private_id)
+        _test_ownership_protection(public_id)
+        _test_project_update_and_skill_sync(public_id)
+        _test_public_discovery_and_filtering(public_id)
+        _test_project_deletion_and_cascade(public_id)
         print("\n=========================================================")
         print("ALL INNOVATION PROJECTS TESTS PASSED (8/8)!")
         print("=========================================================\n")
@@ -396,4 +396,4 @@ def run_all_tests():
 
 
 if __name__ == "__main__":
-    run_all_tests()
+    test_innovation_projects_workflow()
