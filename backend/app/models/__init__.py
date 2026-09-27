@@ -18,6 +18,13 @@ from app.models.project_milestone import ProjectMilestone, MilestoneStatus
 from app.models.project_evidence import ProjectEvidence, EvidenceType
 from app.models.project_evidence_verification import EvidenceVerification, EvidenceVerificationStatus
 from app.models.experience_record import ExperienceRecord, ExperienceSkill, ExperienceType, VerificationStatus, VerificationSource
+from app.models.project_evaluation import (
+    ProjectEvaluation,
+    EvaluationSkillAssessment,
+    EvaluationStatus,
+    EvaluationRecommendation,
+    SkillAssessmentProficiency,
+)
 
 __all__ = [
     "Base",
@@ -62,4 +69,9 @@ __all__ = [
     "ExperienceType",
     "VerificationStatus",
     "VerificationSource",
+    "ProjectEvaluation",
+    "EvaluationSkillAssessment",
+    "EvaluationStatus",
+    "EvaluationRecommendation",
+    "SkillAssessmentProficiency",
 ]

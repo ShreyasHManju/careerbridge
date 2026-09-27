@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.project_evaluation import ProjectEvaluation
     from app.models.project_evidence import ProjectEvidence
     from app.models.project_milestone import ProjectMilestone
     from app.models.skill import Skill
@@ -119,6 +120,12 @@ class InnovationProject(Base):
         back_populates="innovation_project",
         cascade="all, delete-orphan",
         order_by="ProjectEvidence.created_at.desc()",
+    )
+    evaluations: Mapped[list["ProjectEvaluation"]] = relationship(
+        "ProjectEvaluation",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        order_by="ProjectEvaluation.created_at.desc()",
     )
 
     @property

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from app.models.notification import Notification
     from app.models.notification_preference import NotificationPreference
     from app.models.profile_image import ProfileImage
+    from app.models.project_evaluation import ProjectEvaluation
     from app.models.recruiter_profile import RecruiterProfile
     from app.models.resume import Resume
     from app.models.saved_job import SavedJob
@@ -156,6 +157,22 @@ class User(Base):
     interviews_as_student: Mapped[list["Interview"]] = relationship(
         "Interview",
         foreign_keys="[Interview.student_id]",
+        back_populates="student",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-many relationship with ProjectEvaluation (as recruiter)
+    evaluations_as_recruiter: Mapped[list["ProjectEvaluation"]] = relationship(
+        "ProjectEvaluation",
+        foreign_keys="[ProjectEvaluation.recruiter_id]",
+        back_populates="recruiter",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-many relationship with ProjectEvaluation (as student)
+    evaluations_as_student: Mapped[list["ProjectEvaluation"]] = relationship(
+        "ProjectEvaluation",
+        foreign_keys="[ProjectEvaluation.student_id]",
         back_populates="student",
         cascade="all, delete-orphan",
     )

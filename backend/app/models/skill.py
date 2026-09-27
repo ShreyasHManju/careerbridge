@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from app.models.job_posting import JobPosting
     from app.models.innovation_project import ProjectSkill
     from app.models.experience_record import ExperienceSkill
+    from app.models.project_evaluation import EvaluationSkillAssessment
 
 
 class Skill(Base):
@@ -49,6 +50,11 @@ class Skill(Base):
     )
     experience_associations: Mapped[list["ExperienceSkill"]] = relationship(
         "ExperienceSkill",
+        back_populates="skill",
+        cascade="all, delete-orphan",
+    )
+    evaluation_assessments: Mapped[list["EvaluationSkillAssessment"]] = relationship(
+        "EvaluationSkillAssessment",
         back_populates="skill",
         cascade="all, delete-orphan",
     )

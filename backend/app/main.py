@@ -20,6 +20,7 @@ from app.routers import (
     messaging_router,
     notifications_router,
     passport_router,
+    project_evaluations_router,
     profile_image_router,
     rbac_router,
     recruiter_profile_router,
@@ -274,6 +275,7 @@ app.include_router(skills_router, prefix=settings.API_V1_STR)
 app.include_router(innovation_projects_router, prefix=settings.API_V1_STR)
 app.include_router(experience_records_router, prefix=settings.API_V1_STR)
 app.include_router(passport_router, prefix=settings.API_V1_STR)
+app.include_router(project_evaluations_router, prefix=settings.API_V1_STR)
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)
 app.include_router(dashboards_router, prefix=settings.API_V1_STR)

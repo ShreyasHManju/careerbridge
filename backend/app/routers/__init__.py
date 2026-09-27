@@ -5,6 +5,7 @@ from app.routers.dashboards import router as dashboards_router
 from app.routers.innovation_projects import router as innovation_projects_router
 from app.routers.experience_records import router as experience_records_router
 from app.routers.passport import router as passport_router
+from app.routers.project_evaluations import router as project_evaluations_router
 from app.routers.interviews import router as interviews_router
 from app.routers.job_posting import router as job_posting_router
 from app.routers.messaging import router as messaging_router
@@ -40,4 +41,5 @@ __all__ = [
     "innovation_projects_router",
     "experience_records_router",
     "passport_router",
+    "project_evaluations_router",
 ]

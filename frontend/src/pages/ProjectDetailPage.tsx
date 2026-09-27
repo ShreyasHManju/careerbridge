@@ -16,6 +16,13 @@ import {
   updateProjectMilestone,
 } from '@/api/innovationProjects';
 import {
+  createProjectEvaluation,
+  getProjectEvaluations,
+  submitProjectEvaluation,
+  updateProjectEvaluation,
+  withdrawProjectEvaluation,
+} from '@/api/projectEvaluations';
+import {
   EvidenceVerificationCreate,
   InnovationProject,
   InnovationProjectUpdate,
@@ -27,6 +34,11 @@ import {
   ProjectMilestoneCreate,
   ProjectMilestoneUpdate,
 } from '@/types/innovationProject';
+import {
+  ProjectEvaluation,
+  ProjectEvaluationCreate,
+  ProjectEvaluationUpdate,
+} from '@/types/projectEvaluation';
 import { InnovationProjectForm } from '@/components/projects/InnovationProjectForm';
 import { ProjectMilestoneProgress } from '@/components/projects/ProjectMilestoneProgress';
 import { ProjectMilestoneList } from '@/components/projects/ProjectMilestoneList';
@@ -34,6 +46,8 @@ import { ProjectMilestoneModal } from '@/components/projects/ProjectMilestoneMod
 import { ProjectEvidenceList } from '@/components/projects/ProjectEvidenceList';
 import { ProjectEvidenceModal } from '@/components/projects/ProjectEvidenceModal';
 import { ProjectEvidenceVerificationModal } from '@/components/projects/ProjectEvidenceVerificationModal';
+import { ProjectEvaluationList } from '@/components/evaluations/ProjectEvaluationList';
+import { ProjectEvaluationModal } from '@/components/evaluations/ProjectEvaluationModal';
 
 export const ProjectDetailPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -78,6 +92,13 @@ export const ProjectDetailPage: React.FC = () => {
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [isVerificationSaving, setIsVerificationSaving] = useState(false);
 
+  // Recruiter Evaluation State (Phase 30C)
+  const [evaluations, setEvaluations] = useState<ProjectEvaluation[]>([]);
+  const [evaluationsLoading, setEvaluationsLoading] = useState(false);
+  const [evaluationsError, setEvaluationsError] = useState<string | null>(null);
+  const [isEvaluationModalOpen, setIsEvaluationModalOpen] = useState(false);
+  const [editingEvaluation, setEditingEvaluation] = useState<ProjectEvaluation | null>(null);
+  const [isEvaluationSaving, setIsEvaluationSaving] = useState(false);
 
   const fetchMilestones = async (pId: number) => {
     setMilestonesLoading(true);
@@ -114,6 +135,21 @@ export const ProjectDetailPage: React.FC = () => {
     }
   };
 
+  const fetchEvaluations = async (pId: number) => {
+    setEvaluationsLoading(true);
+    setEvaluationsError(null);
+    try {
+      const res = await getProjectEvaluations(pId);
+      setEvaluations(Array.isArray(res) ? res : (res as any)?.items || []);
+    } catch (err: any) {
+      setEvaluationsError(
+        err.response?.data?.detail || err.message || 'Failed to load evaluations.'
+      );
+    } finally {
+      setEvaluationsLoading(false);
+    }
+  };
+
   const fetchProject = async () => {
     if (!projectId || isNaN(Number(projectId))) {
       setError('Invalid project ID.');
@@ -126,7 +162,11 @@ export const ProjectDetailPage: React.FC = () => {
     try {
       const data = await getProjectById(Number(projectId));
       setProject(data);
-      await Promise.all([fetchMilestones(data.id), fetchEvidence(data.id)]);
+      await Promise.all([
+        fetchMilestones(data.id),
+        fetchEvidence(data.id),
+        fetchEvaluations(data.id),
+      ]);
     } catch (err: any) {
       if (err.response?.status === 404) {
         setError('Innovation project not found or you do not have permission to view it.');
@@ -255,6 +295,54 @@ export const ProjectDetailPage: React.FC = () => {
       setVerifyingEvidence(null);
     } finally {
       setIsVerificationSaving(false);
+    }
+  };
+
+  const handleSaveEvaluation = async (
+    payload: ProjectEvaluationCreate,
+    submitImmediately = false
+  ) => {
+    if (!project) return;
+    setIsEvaluationSaving(true);
+    try {
+      let savedEval: ProjectEvaluation;
+      if (editingEvaluation) {
+        savedEval = await updateProjectEvaluation(
+          editingEvaluation.id,
+          payload as ProjectEvaluationUpdate
+        );
+      } else {
+        savedEval = await createProjectEvaluation(project.id, payload);
+      }
+      if (submitImmediately && savedEval.status === 'draft') {
+        await submitProjectEvaluation(savedEval.id);
+      }
+      await fetchEvaluations(project.id);
+      setIsEvaluationModalOpen(false);
+      setEditingEvaluation(null);
+    } finally {
+      setIsEvaluationSaving(false);
+    }
+  };
+
+  const handleSubmitEvaluation = async (evaluationId: number) => {
+    if (!project) return;
+    try {
+      await submitProjectEvaluation(evaluationId);
+      await fetchEvaluations(project.id);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to submit evaluation.');
+    }
+  };
+
+  const handleWithdrawEvaluation = async (evaluationId: number) => {
+    if (!project) return;
+    if (!window.confirm('Are you sure you want to withdraw this evaluation?')) return;
+    try {
+      await withdrawProjectEvaluation(evaluationId);
+      await fetchEvaluations(project.id);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to withdraw evaluation.');
     }
   };
 
@@ -542,6 +630,52 @@ export const ProjectDetailPage: React.FC = () => {
           )}
         </div>
 
+        {/* Recruiter Project Evaluations Section (Phase 30C) */}
+        <div
+          className="cb-detail-section cb-detail-evaluations-section"
+          data-testid="project-evaluations-section"
+        >
+          <div className="cb-detail-section-header">
+            <div className="cb-section-title-wrap">
+              <h3>Recruiter Evaluations ({evaluations.length})</h3>
+              <p className="cb-section-subtitle">
+                Structured technical assessments, skill proficiencies, and hiring recommendations from verified recruiters.
+              </p>
+            </div>
+            {user?.role === 'recruiter' && !isOwner && (
+              <button
+                type="button"
+                className="cb-btn cb-btn-primary cb-btn-sm"
+                onClick={() => {
+                  const existing = evaluations.find((e) => e.recruiter_id === user?.id);
+                  setEditingEvaluation(existing || null);
+                  setIsEvaluationModalOpen(true);
+                }}
+                data-testid="evaluate-project-btn"
+              >
+                {evaluations.some((e) => e.recruiter_id === user?.id && e.status === 'draft')
+                  ? '✏️ Edit Draft Evaluation'
+                  : '⭐ Evaluate Project'}
+              </button>
+            )}
+          </div>
+
+          <ProjectEvaluationList
+            evaluations={evaluations}
+            currentUserId={user?.id}
+            userRole={user?.role}
+            isLoading={evaluationsLoading}
+            error={evaluationsError}
+            onRetry={() => fetchEvaluations(project.id)}
+            onEdit={(ev) => {
+              setEditingEvaluation(ev);
+              setIsEvaluationModalOpen(true);
+            }}
+            onSubmitDraft={handleSubmitEvaluation}
+            onWithdraw={handleWithdrawEvaluation}
+          />
+        </div>
+
         <div className="cb-detail-footer">
           <span className="cb-timestamp">
             Created: {new Date(project.created_at).toLocaleDateString()}
@@ -739,6 +873,19 @@ export const ProjectDetailPage: React.FC = () => {
           setVerifyingEvidence(null);
         }}
         isLoading={isVerificationSaving}
+      />
+
+      {/* Recruiter Project Evaluation Modal (Phase 30C) */}
+      <ProjectEvaluationModal
+        isOpen={isEvaluationModalOpen}
+        project={project}
+        existingEvaluation={editingEvaluation}
+        onSave={handleSaveEvaluation}
+        onClose={() => {
+          setIsEvaluationModalOpen(false);
+          setEditingEvaluation(null);
+        }}
+        isLoading={isEvaluationSaving}
       />
     </div>
   );

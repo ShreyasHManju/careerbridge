@@ -3,11 +3,13 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProjectDetailPage } from '../ProjectDetailPage';
 import * as api from '@/api/innovationProjects';
+import * as evalApi from '@/api/projectEvaluations';
 import * as useAuthModule from '@/auth/useAuth';
 import {
   InnovationProject,
   ProjectMilestoneListResponse,
 } from '@/types/innovationProject';
+import { ProjectEvaluation } from '@/types/projectEvaluation';
 import { User } from '@/types/auth';
 
 const mockProject: InnovationProject = {
@@ -504,5 +506,94 @@ describe('ProjectDetailPage Integration (Milestone 2.0-C Phase 5)', () => {
 
     expect(await screen.findByTestId('detail-error')).toBeInTheDocument();
     expect(screen.getByText(/not found or you do not have permission/i)).toBeInTheDocument();
+  });
+
+  it('allows recruiter to view project and open evaluation modal', async () => {
+    setupAuth({
+      id: 25,
+      email: 'recruiter@tech.com',
+      role: 'recruiter',
+      is_active: true,
+      is_verified: true,
+      created_at: '2026-09-24T00:00:00Z',
+      updated_at: '2026-09-24T00:00:00Z',
+    });
+    vi.spyOn(api, 'getProjectById').mockResolvedValueOnce(mockProject);
+    vi.spyOn(api, 'getProjectMilestones').mockResolvedValueOnce(emptyMilestonesResponse);
+    vi.spyOn(api, 'getProjectEvidenceList').mockResolvedValueOnce({ project_id: 42, total_count: 0, items: [] });
+    vi.spyOn(evalApi, 'getProjectEvaluations').mockResolvedValueOnce([]);
+
+    render(
+      <MemoryRouter initialEntries={['/app/projects/42']}>
+        <Routes>
+          <Route path="/app/projects/:projectId" element={<ProjectDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Autonomous Drone Swarm')).toBeInTheDocument();
+    expect(screen.getByTestId('project-evaluations-section')).toBeInTheDocument();
+
+    const evaluateBtn = screen.getByTestId('evaluate-project-btn');
+    expect(evaluateBtn).toBeInTheDocument();
+    expect(evaluateBtn).toHaveTextContent(/Evaluate Project/i);
+
+    fireEvent.click(evaluateBtn);
+    expect(screen.getByTestId('project-evaluation-modal')).toBeInTheDocument();
+  });
+
+  it('renders submitted evaluations for student with scores and recommendation', async () => {
+    const mockEval: ProjectEvaluation = {
+      id: 99,
+      project_id: 42,
+      student_id: 10,
+      recruiter_id: 25,
+      status: 'submitted',
+      technical_quality_score: 5,
+      problem_solving_score: 4,
+      execution_score: 5,
+      communication_documentation_score: 4,
+      evidence_quality_score: 5,
+      overall_score: 4.6,
+      recommendation: 'strongly_recommended',
+      strengths: 'Outstanding architecture.',
+      improvement_areas: 'None.',
+      feedback: 'Great overall work.',
+      skill_assessments: [],
+      recruiter_name: 'Alex Recruiter',
+      company_name: 'Initech',
+      submitted_at: '2026-09-27T10:00:00Z',
+      created_at: '2026-09-27T09:00:00Z',
+      updated_at: '2026-09-27T10:00:00Z',
+    };
+
+    setupAuth({
+      id: 10,
+      email: 'student@cb.io',
+      role: 'student',
+      is_active: true,
+      is_verified: true,
+      created_at: '2026-09-24T00:00:00Z',
+      updated_at: '2026-09-24T00:00:00Z',
+    });
+    vi.spyOn(api, 'getProjectById').mockResolvedValueOnce(mockProject);
+    vi.spyOn(api, 'getProjectMilestones').mockResolvedValueOnce(emptyMilestonesResponse);
+    vi.spyOn(api, 'getProjectEvidenceList').mockResolvedValueOnce({ project_id: 42, total_count: 0, items: [] });
+    vi.spyOn(evalApi, 'getProjectEvaluations').mockResolvedValueOnce([mockEval]);
+
+    render(
+      <MemoryRouter initialEntries={['/app/projects/42']}>
+        <Routes>
+          <Route path="/app/projects/:projectId" element={<ProjectDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('Autonomous Drone Swarm')).toBeInTheDocument();
+    expect(screen.getByTestId('evaluation-card-99')).toBeInTheDocument();
+    expect(screen.getByText('Alex Recruiter')).toBeInTheDocument();
+    expect(screen.getByText('(Initech)')).toBeInTheDocument();
+    expect(screen.getByText('4.6')).toBeInTheDocument();
+    expect(screen.getByText('Strongly Recommended')).toBeInTheDocument();
   });
 });
