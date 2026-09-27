@@ -105,3 +105,51 @@ export interface InnovationProjectPaginationResponse {
   total: number;
   total_pages: number;
 }
+
+// =========================================================================
+// Project Evidence Types (Milestone R5)
+// =========================================================================
+
+export type EvidenceType =
+  | 'repository'
+  | 'document'
+  | 'image'
+  | 'video'
+  | 'demo'
+  | 'presentation'
+  | 'link'
+  | 'other';
+
+export interface ProjectEvidence {
+  id: number;
+  innovation_project_id: number;
+  milestone_id?: number | null;
+  title: string;
+  description?: string | null;
+  evidence_type: EvidenceType;
+  url: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectEvidenceCreate {
+  title: string;
+  description?: string | null;
+  evidence_type?: EvidenceType;
+  url: string;
+  milestone_id?: number | null;
+}
+
+export interface ProjectEvidenceUpdate {
+  title?: string;
+  description?: string | null;
+  evidence_type?: EvidenceType;
+  url?: string;
+  milestone_id?: number | null;
+}
+
+export interface ProjectEvidenceListResponse {
+  project_id: number;
+  total_count: number;
+  items: ProjectEvidence[];
+}

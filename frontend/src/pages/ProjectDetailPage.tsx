@@ -2,18 +2,25 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/auth/useAuth';
 import {
+  createProjectEvidence,
   createProjectMilestone,
   deleteProject,
+  deleteProjectEvidence,
   deleteProjectMilestone,
   getProjectById,
+  getProjectEvidenceList,
   getProjectMilestones,
   updateProject,
+  updateProjectEvidence,
   updateProjectMilestone,
 } from '@/api/innovationProjects';
 import {
   InnovationProject,
   InnovationProjectUpdate,
   MilestoneStatus,
+  ProjectEvidence,
+  ProjectEvidenceCreate,
+  ProjectEvidenceUpdate,
   ProjectMilestone,
   ProjectMilestoneCreate,
   ProjectMilestoneUpdate,
@@ -22,6 +29,8 @@ import { InnovationProjectForm } from '@/components/projects/InnovationProjectFo
 import { ProjectMilestoneProgress } from '@/components/projects/ProjectMilestoneProgress';
 import { ProjectMilestoneList } from '@/components/projects/ProjectMilestoneList';
 import { ProjectMilestoneModal } from '@/components/projects/ProjectMilestoneModal';
+import { ProjectEvidenceList } from '@/components/projects/ProjectEvidenceList';
+import { ProjectEvidenceModal } from '@/components/projects/ProjectEvidenceModal';
 
 export const ProjectDetailPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -51,6 +60,17 @@ export const ProjectDetailPage: React.FC = () => {
   const [deletingMilestone, setDeletingMilestone] = useState<ProjectMilestone | null>(null);
   const [isMilestoneDeleting, setIsMilestoneDeleting] = useState(false);
 
+  // Evidence Integration State (Milestone R5)
+  const [evidenceList, setEvidenceList] = useState<ProjectEvidence[]>([]);
+  const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const [evidenceError, setEvidenceError] = useState<string | null>(null);
+  const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
+  const [editingEvidence, setEditingEvidence] = useState<ProjectEvidence | null>(null);
+  const [isEvidenceSaving, setIsEvidenceSaving] = useState(false);
+  const [deletingEvidence, setDeletingEvidence] = useState<ProjectEvidence | null>(null);
+  const [isEvidenceDeleting, setIsEvidenceDeleting] = useState(false);
+
+
   const fetchMilestones = async (pId: number) => {
     setMilestonesLoading(true);
     setMilestonesError(null);
@@ -71,6 +91,21 @@ export const ProjectDetailPage: React.FC = () => {
     }
   };
 
+  const fetchEvidence = async (pId: number) => {
+    setEvidenceLoading(true);
+    setEvidenceError(null);
+    try {
+      const res = await getProjectEvidenceList(pId);
+      setEvidenceList(res.items);
+    } catch (err: any) {
+      setEvidenceError(
+        err.response?.data?.detail || err.message || 'Failed to load evidence artifacts.'
+      );
+    } finally {
+      setEvidenceLoading(false);
+    }
+  };
+
   const fetchProject = async () => {
     if (!projectId || isNaN(Number(projectId))) {
       setError('Invalid project ID.');
@@ -83,7 +118,7 @@ export const ProjectDetailPage: React.FC = () => {
     try {
       const data = await getProjectById(Number(projectId));
       setProject(data);
-      await fetchMilestones(data.id);
+      await Promise.all([fetchMilestones(data.id), fetchEvidence(data.id)]);
     } catch (err: any) {
       if (err.response?.status === 404) {
         setError('Innovation project not found or you do not have permission to view it.');
@@ -168,6 +203,40 @@ export const ProjectDetailPage: React.FC = () => {
       setIsMilestoneDeleting(false);
     }
   };
+
+  const handleSaveEvidence = async (
+    payload: ProjectEvidenceCreate | ProjectEvidenceUpdate
+  ) => {
+    if (!project) return;
+    setIsEvidenceSaving(true);
+    try {
+      if (editingEvidence) {
+        await updateProjectEvidence(project.id, editingEvidence.id, payload);
+      } else {
+        await createProjectEvidence(project.id, payload as ProjectEvidenceCreate);
+      }
+      await fetchEvidence(project.id);
+      setIsEvidenceModalOpen(false);
+      setEditingEvidence(null);
+    } finally {
+      setIsEvidenceSaving(false);
+    }
+  };
+
+  const handleDeleteEvidence = async () => {
+    if (!project || !deletingEvidence) return;
+    setIsEvidenceDeleting(true);
+    try {
+      await deleteProjectEvidence(project.id, deletingEvidence.id);
+      await fetchEvidence(project.id);
+      setDeletingEvidence(null);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to delete evidence artifact.');
+    } finally {
+      setIsEvidenceDeleting(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -384,6 +453,69 @@ export const ProjectDetailPage: React.FC = () => {
           )}
         </div>
 
+        {/* Project Evidence & Artifacts Section (Milestone R5) */}
+        <div
+          className="cb-detail-section cb-detail-evidence-section"
+          data-testid="project-evidence-section"
+        >
+          <div className="cb-detail-section-header">
+            <div className="cb-section-title-wrap">
+              <h3>Tangible Evidence & Artifacts ({evidenceList.length})</h3>
+              <p className="cb-section-subtitle">
+                Inspect proof of execution including source code, live demos, diagrams, and documentation.
+              </p>
+            </div>
+            {isOwner && (
+              <button
+                type="button"
+                className="cb-btn cb-btn-primary cb-btn-sm"
+                onClick={() => {
+                  setEditingEvidence(null);
+                  setIsEvidenceModalOpen(true);
+                }}
+                aria-label="Attach Evidence"
+              >
+                + Attach Evidence
+              </button>
+            )}
+          </div>
+
+          {evidenceLoading ? (
+            <div className="cb-evidence-loading" data-testid="evidence-loading">
+              <div className="cb-spinner" />
+              <p>Loading evidence artifacts...</p>
+            </div>
+          ) : evidenceError ? (
+            <div className="cb-evidence-error" data-testid="evidence-error">
+              <p className="cb-error-text">{evidenceError}</p>
+              <button
+                type="button"
+                className="cb-btn cb-btn-secondary cb-btn-sm"
+                onClick={() => fetchEvidence(project.id)}
+              >
+                Retry Loading Evidence
+              </button>
+            </div>
+          ) : (
+            <ProjectEvidenceList
+              evidenceList={evidenceList}
+              milestones={milestones}
+              isOwner={!!isOwner}
+              onAddEvidence={() => {
+                setEditingEvidence(null);
+                setIsEvidenceModalOpen(true);
+              }}
+              onEditEvidence={(item) => {
+                setEditingEvidence(item);
+                setIsEvidenceModalOpen(true);
+              }}
+              onDeleteEvidence={(item) => {
+                setDeletingEvidence(item);
+              }}
+            />
+          )}
+        </div>
+
         <div className="cb-detail-footer">
           <span className="cb-timestamp">
             Created: {new Date(project.created_at).toLocaleDateString()}
@@ -509,6 +641,62 @@ export const ProjectDetailPage: React.FC = () => {
                 disabled={isMilestoneDeleting}
               >
                 {isMilestoneDeleting ? 'Deleting...' : 'Delete Milestone'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Evidence Modal (Create / Edit) */}
+      <ProjectEvidenceModal
+        isOpen={isEvidenceModalOpen}
+        initialData={editingEvidence}
+        milestones={milestones}
+        onSubmit={handleSaveEvidence}
+        onClose={() => {
+          setIsEvidenceModalOpen(false);
+          setEditingEvidence(null);
+        }}
+        isLoading={isEvidenceSaving}
+      />
+
+      {/* Evidence Deletion Confirmation Dialog */}
+      {deletingEvidence && (
+        <div className="cb-modal-overlay" role="alertdialog" aria-modal="true">
+          <div className="cb-modal cb-modal-sm">
+            <div className="cb-modal-header">
+              <h2>Confirm Evidence Deletion</h2>
+              <button
+                type="button"
+                className="cb-modal-close"
+                onClick={() => setDeletingEvidence(null)}
+                disabled={isEvidenceDeleting}
+              >
+                &times;
+              </button>
+            </div>
+            <div className="cb-modal-body">
+              <p>
+                Are you sure you want to remove evidence artifact{' '}
+                <strong>"{deletingEvidence.title}"</strong>?
+              </p>
+            </div>
+            <div className="cb-modal-footer">
+              <button
+                type="button"
+                className="cb-btn cb-btn-secondary"
+                onClick={() => setDeletingEvidence(null)}
+                disabled={isEvidenceDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="cb-btn cb-btn-danger"
+                onClick={handleDeleteEvidence}
+                disabled={isEvidenceDeleting}
+              >
+                {isEvidenceDeleting ? 'Deleting...' : 'Delete Artifact'}
               </button>
             </div>
           </div>

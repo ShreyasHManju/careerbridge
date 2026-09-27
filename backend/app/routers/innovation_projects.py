@@ -18,8 +18,15 @@ from app.schemas.project_milestone import (
     ProjectMilestoneResponse,
     ProjectMilestoneUpdate,
 )
+from app.schemas.project_evidence import (
+    ProjectEvidenceCreate,
+    ProjectEvidenceListResponse,
+    ProjectEvidenceResponse,
+    ProjectEvidenceUpdate,
+)
 from app.services.innovation_project_service import InnovationProjectService
 from app.services.project_milestone_service import ProjectMilestoneService
+from app.services.project_evidence_service import ProjectEvidenceService
 
 router = APIRouter(prefix="/innovation-projects", tags=["Innovation Projects"])
 
@@ -288,6 +295,129 @@ def delete_project_milestone(
         db=db,
         project_id=project_id,
         milestone_id=milestone_id,
+        student_id=current_user.id,
+    )
+    return None
+
+
+# =========================================================================
+# PROJECT EVIDENCE ENDPOINTS (Phase R5)
+# =========================================================================
+
+@router.post(
+    "/{project_id}/evidence",
+    response_model=ProjectEvidenceResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Attach an evidence artifact to an innovation project",
+    description="Allows the owning student to attach evidence (repo, document, demo, video, link) to their project or a specific milestone.",
+)
+def create_project_evidence(
+    project_id: int = Path(..., ge=1, description="Primary key identifier of the parent project"),
+    payload: ProjectEvidenceCreate = ...,
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: Session = Depends(get_db),
+):
+    """
+    Attach an evidence artifact to the specified project. Enforces student ownership and milestone integrity.
+    """
+    return ProjectEvidenceService.create_evidence(
+        db=db,
+        project_id=project_id,
+        student_id=current_user.id,
+        payload=payload,
+    )
+
+
+@router.get(
+    "/{project_id}/evidence",
+    response_model=ProjectEvidenceListResponse,
+    summary="List evidence artifacts for an innovation project",
+    description="Retrieves all evidence items for a project. Respects private project visibility boundaries.",
+)
+def list_project_evidence(
+    project_id: int = Path(..., ge=1, description="Primary key identifier of the parent project"),
+    milestone_id: Optional[int] = Query(None, ge=1, description="Optional filter by milestone ID"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    List evidence items for the specified project. Returns 404 for private projects if accessed by unauthorized users.
+    """
+    return ProjectEvidenceService.list_project_evidence(
+        db=db,
+        project_id=project_id,
+        current_user=current_user,
+        milestone_id=milestone_id,
+    )
+
+
+@router.get(
+    "/{project_id}/evidence/{evidence_id}",
+    response_model=ProjectEvidenceResponse,
+    summary="Get single project evidence item",
+    description="Retrieves single evidence item by ID. Respects private project visibility boundaries.",
+)
+def get_project_evidence(
+    project_id: int = Path(..., ge=1, description="Primary key identifier of the parent project"),
+    evidence_id: int = Path(..., ge=1, description="Primary key identifier of the evidence item"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get a single evidence artifact. Enforces visibility access control.
+    """
+    return ProjectEvidenceService.get_evidence(
+        db=db,
+        project_id=project_id,
+        evidence_id=evidence_id,
+        current_user=current_user,
+    )
+
+
+@router.patch(
+    "/{project_id}/evidence/{evidence_id}",
+    response_model=ProjectEvidenceResponse,
+    summary="Update a project evidence artifact",
+    description="Allows the owning student to update an evidence item's title, description, URL, or milestone association.",
+)
+def update_project_evidence(
+    project_id: int = Path(..., ge=1, description="Primary key identifier of the parent project"),
+    evidence_id: int = Path(..., ge=1, description="Primary key identifier of the evidence item"),
+    payload: ProjectEvidenceUpdate = ...,
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: Session = Depends(get_db),
+):
+    """
+    Update an evidence artifact. Enforces student ownership.
+    """
+    return ProjectEvidenceService.update_evidence(
+        db=db,
+        project_id=project_id,
+        evidence_id=evidence_id,
+        student_id=current_user.id,
+        payload=payload,
+    )
+
+
+@router.delete(
+    "/{project_id}/evidence/{evidence_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a project evidence artifact",
+    description="Allows the owning student to delete an evidence artifact from their project.",
+)
+def delete_project_evidence(
+    project_id: int = Path(..., ge=1, description="Primary key identifier of the parent project"),
+    evidence_id: int = Path(..., ge=1, description="Primary key identifier of the evidence item"),
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete an evidence artifact. Enforces student ownership.
+    """
+    ProjectEvidenceService.delete_evidence(
+        db=db,
+        project_id=project_id,
+        evidence_id=evidence_id,
         student_id=current_user.id,
     )
     return None

@@ -2,19 +2,26 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { apiClient } from '../client';
 import {
   createProject,
+  createProjectEvidence,
   createProjectMilestone,
   deleteProject,
+  deleteProjectEvidence,
   deleteProjectMilestone,
   getMyProjects,
   getProjectById,
+  getProjectEvidence,
+  getProjectEvidenceList,
   getProjectMilestones,
   getProjects,
   updateProject,
+  updateProjectEvidence,
   updateProjectMilestone,
 } from '../innovationProjects';
 import {
   InnovationProject,
   InnovationProjectPaginationResponse,
+  ProjectEvidence,
+  ProjectEvidenceListResponse,
   ProjectMilestone,
   ProjectMilestoneListResponse,
 } from '@/types/innovationProject';
@@ -49,6 +56,18 @@ const mockMilestone: ProjectMilestone = {
   display_order: 1,
   due_date: '2026-10-15T00:00:00Z',
   completed_at: null,
+  created_at: '2026-09-24T00:00:00Z',
+  updated_at: '2026-09-24T00:00:00Z',
+};
+
+const mockEvidence: ProjectEvidence = {
+  id: 501,
+  innovation_project_id: 1,
+  milestone_id: 101,
+  title: 'ROS2 Codebase Monorepo',
+  description: 'Node architecture and telemetry publishers',
+  evidence_type: 'repository',
+  url: 'https://github.com/student/drone-ros2',
   created_at: '2026-09-24T00:00:00Z',
   updated_at: '2026-09-24T00:00:00Z',
 };
@@ -180,6 +199,82 @@ describe('Innovation Projects API Service Module', () => {
       const deleteSpy = vi.spyOn(apiClient, 'delete').mockResolvedValueOnce({ data: null });
       await deleteProjectMilestone(1, 101);
       expect(deleteSpy).toHaveBeenCalledWith('/innovation-projects/1/milestones/101');
+    });
+  });
+
+  // =========================================================================
+  // Project Evidence API Tests (Milestone R5)
+  // =========================================================================
+
+  describe('createProjectEvidence', () => {
+    it('calls POST /innovation-projects/:projectId/evidence with payload', async () => {
+      const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ data: mockEvidence });
+      const payload = {
+        title: 'ROS2 Codebase Monorepo',
+        description: 'Node architecture and telemetry publishers',
+        evidence_type: 'repository' as const,
+        url: 'https://github.com/student/drone-ros2',
+        milestone_id: 101,
+      };
+      const res = await createProjectEvidence(1, payload);
+      expect(postSpy).toHaveBeenCalledWith('/innovation-projects/1/evidence', payload);
+      expect(res).toEqual(mockEvidence);
+    });
+  });
+
+  describe('getProjectEvidenceList', () => {
+    it('calls GET /innovation-projects/:projectId/evidence without milestone filter', async () => {
+      const listResponse: ProjectEvidenceListResponse = {
+        project_id: 1,
+        total_count: 1,
+        items: [mockEvidence],
+      };
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: listResponse });
+      const res = await getProjectEvidenceList(1);
+      expect(getSpy).toHaveBeenCalledWith('/innovation-projects/1/evidence', { params: undefined });
+      expect(res).toEqual(listResponse);
+    });
+
+    it('calls GET /innovation-projects/:projectId/evidence with milestone filter', async () => {
+      const listResponse: ProjectEvidenceListResponse = {
+        project_id: 1,
+        total_count: 1,
+        items: [mockEvidence],
+      };
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: listResponse });
+      const res = await getProjectEvidenceList(1, 101);
+      expect(getSpy).toHaveBeenCalledWith('/innovation-projects/1/evidence', {
+        params: { milestone_id: 101 },
+      });
+      expect(res).toEqual(listResponse);
+    });
+  });
+
+  describe('getProjectEvidence', () => {
+    it('calls GET /innovation-projects/:projectId/evidence/:evidenceId', async () => {
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: mockEvidence });
+      const res = await getProjectEvidence(1, 501);
+      expect(getSpy).toHaveBeenCalledWith('/innovation-projects/1/evidence/501');
+      expect(res).toEqual(mockEvidence);
+    });
+  });
+
+  describe('updateProjectEvidence', () => {
+    it('calls PATCH /innovation-projects/:projectId/evidence/:evidenceId with payload', async () => {
+      const updatedEvidence = { ...mockEvidence, title: 'Updated ROS2 Repo' };
+      const patchSpy = vi.spyOn(apiClient, 'patch').mockResolvedValueOnce({ data: updatedEvidence });
+      const payload = { title: 'Updated ROS2 Repo' };
+      const res = await updateProjectEvidence(1, 501, payload);
+      expect(patchSpy).toHaveBeenCalledWith('/innovation-projects/1/evidence/501', payload);
+      expect(res).toEqual(updatedEvidence);
+    });
+  });
+
+  describe('deleteProjectEvidence', () => {
+    it('calls DELETE /innovation-projects/:projectId/evidence/:evidenceId', async () => {
+      const deleteSpy = vi.spyOn(apiClient, 'delete').mockResolvedValueOnce({ data: null });
+      await deleteProjectEvidence(1, 501);
+      expect(deleteSpy).toHaveBeenCalledWith('/innovation-projects/1/evidence/501');
     });
   });
 });

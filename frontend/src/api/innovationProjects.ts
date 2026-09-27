@@ -8,6 +8,10 @@ import {
   ProjectMilestoneCreate,
   ProjectMilestoneListResponse,
   ProjectMilestoneUpdate,
+  ProjectEvidence,
+  ProjectEvidenceCreate,
+  ProjectEvidenceListResponse,
+  ProjectEvidenceUpdate,
   ProjectStatus,
   ProjectType,
 } from '@/types/innovationProject';
@@ -97,4 +101,61 @@ export const deleteProjectMilestone = async (
   milestoneId: number
 ): Promise<void> => {
   await apiClient.delete(`/innovation-projects/${projectId}/milestones/${milestoneId}`);
+};
+
+// =========================================================================
+// Project Evidence API (Milestone R5)
+// =========================================================================
+
+export const createProjectEvidence = async (
+  projectId: number,
+  payload: ProjectEvidenceCreate
+): Promise<ProjectEvidence> => {
+  const response = await apiClient.post<ProjectEvidence>(
+    `/innovation-projects/${projectId}/evidence`,
+    payload
+  );
+  return response.data;
+};
+
+export const getProjectEvidenceList = async (
+  projectId: number,
+  milestoneId?: number
+): Promise<ProjectEvidenceListResponse> => {
+  const response = await apiClient.get<ProjectEvidenceListResponse>(
+    `/innovation-projects/${projectId}/evidence`,
+    {
+      params: milestoneId ? { milestone_id: milestoneId } : undefined,
+    }
+  );
+  return response.data;
+};
+
+export const getProjectEvidence = async (
+  projectId: number,
+  evidenceId: number
+): Promise<ProjectEvidence> => {
+  const response = await apiClient.get<ProjectEvidence>(
+    `/innovation-projects/${projectId}/evidence/${evidenceId}`
+  );
+  return response.data;
+};
+
+export const updateProjectEvidence = async (
+  projectId: number,
+  evidenceId: number,
+  payload: ProjectEvidenceUpdate
+): Promise<ProjectEvidence> => {
+  const response = await apiClient.patch<ProjectEvidence>(
+    `/innovation-projects/${projectId}/evidence/${evidenceId}`,
+    payload
+  );
+  return response.data;
+};
+
+export const deleteProjectEvidence = async (
+  projectId: number,
+  evidenceId: number
+): Promise<void> => {
+  await apiClient.delete(`/innovation-projects/${projectId}/evidence/${evidenceId}`);
 };
