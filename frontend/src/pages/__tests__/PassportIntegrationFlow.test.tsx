@@ -292,6 +292,81 @@ describe('CareerBridge 2.0-E — Experience Passport Integration Flow', () => {
     expect(screen.queryByTestId('passport-owner-badge')).not.toBeInTheDocument();
   });
 
+  it('Recruiter candidate review evaluates projects: displays submitted evaluation scores, recommendations, and dimensions in candidate passport', async () => {
+    setupAuthMock(mockRecruiterUser);
+    const evaluatedCandidatePassport: PassportResponse = {
+      ...mockCandidatePassport,
+      summary: {
+        ...mockCandidatePassport.summary,
+        total_evaluations_count: 1,
+        average_project_score: 4.8,
+      },
+      projects: [
+        {
+          ...mockCandidatePassport.projects[0],
+          average_evaluation_score: 4.8,
+          evaluations_count: 1,
+          evaluations: [
+            {
+              id: 99,
+              overall_score: 4.8,
+              technical_score: 5,
+              problem_solving_score: 5,
+              execution_score: 5,
+              communication_score: 4,
+              evidence_score: 5,
+              recommendation: 'strongly_recommended',
+              strengths: 'Exceptional architectural clarity and test discipline.',
+              recruiter_id: 2,
+              recruiter_company: 'Apex Cloud Systems',
+              recruiter_name: 'Jane Recruiter',
+              submitted_at: '2026-09-25T12:00:00Z',
+              assessed_skills: [
+                {
+                  id: 1,
+                  name: 'Python',
+                  slug: 'python',
+                  category: 'Backend',
+                  is_verified: true,
+                  created_at: '2026-09-20T00:00:00Z',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    vi.spyOn(applicationsApi, 'getRecruiterApplications').mockResolvedValueOnce([mockApplication]);
+    vi.spyOn(jobsApi, 'getJobById').mockResolvedValueOnce(mockJob);
+    vi.spyOn(passportApi, 'getStudentPassport').mockResolvedValueOnce(evaluatedCandidatePassport);
+
+    render(
+      <MemoryRouter initialEntries={['/app/recruiter/applications']}>
+        <App />
+      </MemoryRouter>
+    );
+
+    const viewPassportBtn = await screen.findByTestId('view-passport-btn-501');
+    fireEvent.click(viewPassportBtn);
+
+    expect(await screen.findByTestId('passport-page')).toBeInTheDocument();
+    expect(await screen.findByTestId('passport-student-name')).toHaveTextContent('Candidate Sam');
+
+    // Summary evaluation metrics
+    expect(screen.getByTestId('stat-count-evaluations')).toHaveTextContent('1');
+    expect(screen.getByTestId('stat-avg-score')).toHaveTextContent('4.8');
+
+    // Project evaluation details
+    expect(screen.getByTestId('proj-avg-eval-201')).toHaveTextContent('Avg Rating: 4.8 / 5.0');
+    expect(screen.getByTestId('passport-eval-card-99')).toBeInTheDocument();
+    expect(screen.getByTestId('eval-company-99')).toHaveTextContent('Apex Cloud Systems');
+    expect(screen.getByTestId('eval-rec-99')).toHaveTextContent('Strongly Recommended');
+    expect(screen.getByTestId('eval-dimensions-99')).toHaveTextContent('Technical Quality: 5/5');
+    expect(screen.getByTestId('eval-strengths-99')).toHaveTextContent('Exceptional architectural clarity');
+    expect(screen.getByTestId('eval-skills-99')).toHaveTextContent('Python');
+  });
+
   it('General candidate read-only route flow: authenticated user navigates to /app/passport/8', async () => {
     setupAuthMock(mockStudentUser);
     const getStudentSpy = vi.spyOn(passportApi, 'getStudentPassport').mockResolvedValueOnce(mockCandidatePassport);

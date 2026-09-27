@@ -78,13 +78,15 @@ describe('Passport Component Prototypes', () => {
   });
 
   describe('PassportSummary', () => {
-    it('renders metric counts for experiences, projects, skills, and milestones', () => {
+    it('renders metric counts for experiences, projects, skills, milestones, and evaluations', () => {
       const summary: PassportSummaryType = {
         verified_experiences_count: 3,
         public_projects_count: 2,
         canonical_skills_count: 5,
         completed_milestones_count: 4,
         verified_evidence_count: 0,
+        total_evaluations_count: 2,
+        average_project_score: 4.5,
       };
 
       render(<PassportSummary summary={summary} />);
@@ -93,6 +95,8 @@ describe('Passport Component Prototypes', () => {
       expect(screen.getByTestId('stat-count-projects')).toHaveTextContent('2');
       expect(screen.getByTestId('stat-count-skills')).toHaveTextContent('5');
       expect(screen.getByTestId('stat-count-milestones')).toHaveTextContent('4');
+      expect(screen.getByTestId('stat-count-evaluations')).toHaveTextContent('2');
+      expect(screen.getByTestId('stat-avg-score')).toHaveTextContent('4.5');
     });
 
     it('renders cleanly with zero values', () => {
@@ -102,6 +106,8 @@ describe('Passport Component Prototypes', () => {
         canonical_skills_count: 0,
         completed_milestones_count: 0,
         verified_evidence_count: 0,
+        total_evaluations_count: 0,
+        average_project_score: null,
       };
 
       render(<PassportSummary summary={zeroSummary} />);
@@ -110,6 +116,8 @@ describe('Passport Component Prototypes', () => {
       expect(screen.getByTestId('stat-count-projects')).toHaveTextContent('0');
       expect(screen.getByTestId('stat-count-skills')).toHaveTextContent('0');
       expect(screen.getByTestId('stat-count-milestones')).toHaveTextContent('0');
+      expect(screen.getByTestId('stat-count-evaluations')).toHaveTextContent('0');
+      expect(screen.getByTestId('stat-avg-score')).toHaveTextContent('—');
     });
   });
 
@@ -264,6 +272,56 @@ describe('Passport Component Prototypes', () => {
       expect(screen.getByTestId('proj-milestones-201')).toHaveTextContent('50%');
       expect(screen.getByTestId('milestone-item-1')).toHaveTextContent('Architecture Blueprint');
       expect(screen.getByTestId('milestone-item-2')).toHaveTextContent('Worker Implementation');
+    });
+
+    it('renders recruiter evaluations with 5-dimensional breakdown, recommendations, and assessed skills', () => {
+      const evaluatedProject: PassportProjectItem = {
+        ...mockProjects[0],
+        average_evaluation_score: 4.6,
+        evaluations_count: 1,
+        evaluations: [
+          {
+            id: 10,
+            overall_score: 5,
+            technical_score: 5,
+            problem_solving_score: 4,
+            execution_score: 5,
+            communication_score: 4,
+            evidence_score: 5,
+            recommendation: 'strongly_recommended',
+            strengths: 'Outstanding architecture and robust asynchronous handling.',
+            recruiter_id: 2,
+            recruiter_company: 'Acme Systems',
+            recruiter_name: 'Jane Recruiter',
+            submitted_at: '2026-09-25T12:00:00Z',
+            assessed_skills: [
+              {
+                id: 2,
+                name: 'React',
+                slug: 'react',
+                category: 'Frontend',
+                is_verified: true,
+                created_at: '2026-09-20T00:00:00Z',
+              },
+            ],
+          },
+        ],
+      };
+
+      render(<PassportProjects projects={[evaluatedProject]} />);
+
+      expect(screen.getByTestId('proj-avg-eval-201')).toHaveTextContent('Avg Rating: 4.6 / 5.0');
+      expect(screen.getByTestId('passport-eval-card-10')).toBeInTheDocument();
+      expect(screen.getByTestId('eval-company-10')).toHaveTextContent('Acme Systems');
+      expect(screen.getByTestId('eval-score-10')).toHaveTextContent('⭐ 5.0');
+      expect(screen.getByTestId('eval-rec-10')).toHaveTextContent('Strongly Recommended');
+      expect(screen.getByTestId('eval-dimensions-10')).toHaveTextContent('Technical Quality: 5/5');
+      expect(screen.getByTestId('eval-dimensions-10')).toHaveTextContent('Problem Solving: 4/5');
+      expect(screen.getByTestId('eval-dimensions-10')).toHaveTextContent('Execution: 5/5');
+      expect(screen.getByTestId('eval-dimensions-10')).toHaveTextContent('Communication: 4/5');
+      expect(screen.getByTestId('eval-dimensions-10')).toHaveTextContent('Evidence Quality: 5/5');
+      expect(screen.getByTestId('eval-strengths-10')).toHaveTextContent('Outstanding architecture');
+      expect(screen.getByTestId('eval-skills-10')).toHaveTextContent('React');
     });
 
     it('renders clean empty state when no public projects exist', () => {

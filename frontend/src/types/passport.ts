@@ -22,12 +22,31 @@ export interface PassportIdentity {
   created_at: string;
 }
 
+export interface PassportEvaluationItem {
+  id: number;
+  recruiter_id: number;
+  recruiter_company: string | null;
+  recruiter_name: string | null;
+  overall_score: number | null;
+  technical_score: number | null;
+  problem_solving_score: number | null;
+  execution_score: number | null;
+  communication_score: number | null;
+  evidence_score: number | null;
+  recommendation: string | null;
+  strengths: string | null;
+  assessed_skills: Skill[];
+  submitted_at: string | null;
+}
+
 export interface PassportSummary {
   verified_experiences_count: number;
   public_projects_count: number;
   canonical_skills_count: number;
   completed_milestones_count: number;
   verified_evidence_count: number;
+  total_evaluations_count?: number;
+  average_project_score?: number | null;
 }
 
 export interface PassportSkillItem {
@@ -100,6 +119,9 @@ export interface PassportProjectItem {
   milestones: PassportMilestoneItem[];
   verified_evidence: PassportEvidenceItem[];
   verified_evidence_count: number;
+  evaluations?: PassportEvaluationItem[];
+  average_evaluation_score?: number | null;
+  evaluations_count?: number;
 }
 
 export interface PassportResumeInfo {

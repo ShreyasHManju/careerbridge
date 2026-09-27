@@ -43,6 +43,20 @@ export const PassportSummary: React.FC<PassportSummaryProps> = ({ summary }) => 
           </span>
           <span className="cb-stat-lbl">Verified Evidence</span>
         </div>
+
+        <div className="cb-stat-pill" data-testid="stat-total-evaluations">
+          <span className="cb-stat-num" data-testid="stat-count-evaluations">
+            {summary.total_evaluations_count ?? 0}
+          </span>
+          <span className="cb-stat-lbl">Recruiter Evaluations</span>
+        </div>
+
+        <div className="cb-stat-pill" data-testid="stat-average-project-score">
+          <span className="cb-stat-num" data-testid="stat-avg-score">
+            {summary.average_project_score != null ? summary.average_project_score.toFixed(1) : '—'}
+          </span>
+          <span className="cb-stat-lbl">Overall Project Rating</span>
+        </div>
       </div>
     </section>
   );

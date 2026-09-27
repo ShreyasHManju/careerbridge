@@ -42,6 +42,13 @@ from app.models.innovation_project import (
 )
 from app.models.project_evidence import EvidenceType, ProjectEvidence
 from app.models.project_evidence_verification import EvidenceVerification, EvidenceVerificationStatus
+from app.models.project_evaluation import (
+    EvaluationRecommendation,
+    EvaluationSkillAssessment,
+    EvaluationStatus,
+    ProjectEvaluation,
+    SkillAssessmentProficiency,
+)
 from app.models.project_milestone import MilestoneStatus, ProjectMilestone
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.resume import Resume
@@ -55,6 +62,7 @@ client = TestClient(app)
 STUDENT1_EMAIL = "passport.student1@careerbridge.io"
 STUDENT2_EMAIL = "passport.student2@careerbridge.io"
 RECRUITER_EMAIL = "passport.recruiter@careerbridge.io"
+RECRUITER2_EMAIL = "passport.recruiter2@careerbridge.io"
 ADMIN_EMAIL = "passport.admin@careerbridge.io"
 TEST_PASSWORD = "PassportPassword123!"
 
@@ -66,6 +74,7 @@ def cleanup_test_data():
             STUDENT1_EMAIL,
             STUDENT2_EMAIL,
             RECRUITER_EMAIL,
+            RECRUITER2_EMAIL,
             ADMIN_EMAIL,
         ]
         users = list(db.scalars(select(User).where(User.email.in_(test_emails))).all())
@@ -637,6 +646,174 @@ def test_7_passport_verified_evidence_aggregation_and_privacy():
     print("  [PASS] Owner passport view displays all verified evidence artifacts across all owned projects.")
 
 
+def test_8_passport_recruiter_evaluations_aggregation_and_privacy():
+    """
+    Phase 30D: Validate that:
+    1. SUBMITTED project evaluations aggregate into the student's Passport with dimensional scores and recommendations.
+    2. Multiple submitted evaluations compute project-level and passport-level score averages correctly.
+    3. DRAFT and WITHDRAWN evaluations are strictly excluded from the Passport.
+    4. Recruiter personal emails and private details are never exposed.
+    5. Assessed skills appear in the canonical skills list with 'evaluation' provenance.
+    6. Students without evaluations receive clean empty structures.
+    """
+    print("\n--- Test 8: Passport Recruiter Evaluations Aggregation & Privacy (Phase 30D) ---")
+    data = setup_users()
+    s1_id = data["s1_id"]
+    r1_id = data["r1_id"]
+    headers_s1 = {"Authorization": f"Bearer {data['token_s1']}"}
+    headers_r1 = {"Authorization": f"Bearer {data['token_r1']}"}
+
+    with SessionLocal() as db:
+        # Create a second recruiter for multi-evaluation testing
+        r2 = User(
+            email="passport.recruiter2@careerbridge.io",
+            password_hash=hash_password(TEST_PASSWORD),
+            role=UserRole.RECRUITER,
+            is_active=True,
+            is_verified=True,
+        )
+        db.add(r2)
+        db.flush()
+        db.add(
+            RecruiterProfile(
+                user_id=r2.id,
+                company_name="Nexus Innovations",
+                contact_name="Sarah Connor",
+                is_verified=True,
+            )
+        )
+
+        # Public Innovation Project
+        pub_proj = InnovationProject(
+            student_id=s1_id,
+            title="Distributed Transaction Engine",
+            slug="distributed-transaction-engine",
+            description="High performance 2PC distributed transaction manager in Rust.",
+            project_type=ProjectType.SOFTWARE,
+            status=ProjectStatus.ACTIVE,
+            visibility=ProjectVisibility.PUBLIC,
+        )
+        db.add(pub_proj)
+        db.flush()
+
+        # Canonical skill for evaluation assessment
+        rust_skill = get_or_create_skill(db, "Rust", "Systems")
+
+        # 1. Submitted evaluation by Recruiter 1
+        eval_submitted = ProjectEvaluation(
+            project_id=pub_proj.id,
+            student_id=s1_id,
+            recruiter_id=r1_id,
+            status=EvaluationStatus.SUBMITTED,
+            technical_quality_score=5,
+            problem_solving_score=5,
+            execution_score=4,
+            communication_documentation_score=4,
+            evidence_quality_score=5,
+            overall_score=4.60,
+            recommendation=EvaluationRecommendation.STRONGLY_RECOMMENDED,
+            strengths="Exceptional concurrency control and lock-free data structures.",
+            feedback="Top 1% systems engineering candidate.",
+            submitted_at=datetime.now(timezone.utc),
+        )
+        # 2. Draft evaluation by Recruiter 2 (should be excluded)
+        eval_draft = ProjectEvaluation(
+            project_id=pub_proj.id,
+            student_id=s1_id,
+            recruiter_id=r2.id,
+            status=EvaluationStatus.DRAFT,
+            technical_quality_score=3,
+            overall_score=3.00,
+            feedback="Draft notes not yet finalized.",
+        )
+        db.add_all([eval_submitted, eval_draft])
+        db.flush()
+
+        # Add assessed skill on submitted evaluation
+        sa = EvaluationSkillAssessment(
+            evaluation_id=eval_submitted.id,
+            skill_id=rust_skill.id,
+            proficiency=SkillAssessmentProficiency.ADVANCED,
+        )
+        db.add(sa)
+        db.commit()
+        eval_draft_id = eval_draft.id
+
+    # Verify Public / Recruiter Passport View
+    res = client.get(f"/api/v1/passport/{s1_id}", headers=headers_r1)
+    assert res.status_code == 200
+    body = res.json()
+
+    # Project evaluations
+    proj = body["projects"][0]
+    assert proj["title"] == "Distributed Transaction Engine"
+    assert proj["evaluations_count"] == 1
+    assert len(proj["evaluations"]) == 1
+    assert proj["average_evaluation_score"] == 4.6
+
+    eval_data = proj["evaluations"][0]
+    assert eval_data["recruiter_company"] == "Apex Cloud Systems"
+    assert eval_data["overall_score"] == 4.6
+    assert eval_data["technical_score"] == 5
+    assert eval_data["problem_solving_score"] == 5
+    assert eval_data["execution_score"] == 4
+    assert eval_data["communication_score"] == 4
+    assert eval_data["evidence_score"] == 5
+    assert eval_data["recommendation"] == "strongly_recommended"
+    assert eval_data["strengths"] == "Exceptional concurrency control and lock-free data structures."
+    assert len(eval_data["assessed_skills"]) == 1
+    assert eval_data["assessed_skills"][0]["name"] == "Rust"
+
+    # Privacy checks: Draft evaluation is excluded and recruiter personal email is not exposed
+    res_text = res.text
+    assert "Draft notes not yet finalized" not in res_text
+    assert RECRUITER_EMAIL not in res_text
+
+    # Summary metrics
+    summary = body["summary"]
+    assert summary["total_evaluations_count"] == 1
+    assert summary["average_project_score"] == 4.6
+
+    # Canonical skills provenance includes 'evaluation'
+    rust_in_skills = next((s for s in body["skills"] if s["name"] == "Rust"), None)
+    assert rust_in_skills is not None
+    assert "evaluation" in rust_in_skills["sources"]
+    print("  [PASS] Submitted recruiter evaluations aggregate cleanly into Passport with privacy shielding.")
+
+    # Multi-evaluation aggregation check
+    with SessionLocal() as db:
+        # Submit the second evaluation
+        db_eval2 = db.scalar(select(ProjectEvaluation).where(ProjectEvaluation.id == eval_draft_id))
+        db_eval2.status = EvaluationStatus.SUBMITTED
+        db_eval2.overall_score = 4.00
+        db_eval2.submitted_at = datetime.now(timezone.utc)
+        db.commit()
+
+    res_multi = client.get(f"/api/v1/passport/{s1_id}", headers=headers_r1)
+    assert res_multi.status_code == 200
+    multi_body = res_multi.json()
+    proj_multi = multi_body["projects"][0]
+    assert proj_multi["evaluations_count"] == 2
+    assert len(proj_multi["evaluations"]) == 2
+    assert proj_multi["average_evaluation_score"] == 4.3  # (4.6 + 4.0) / 2 = 4.3
+    assert multi_body["summary"]["total_evaluations_count"] == 2
+    assert multi_body["summary"]["average_project_score"] == 4.3
+    print("  [PASS] Multiple submitted evaluations correctly compute project and passport average scores.")
+
+    # Withdrawn evaluation check
+    with SessionLocal() as db:
+        db_eval2 = db.scalar(select(ProjectEvaluation).where(ProjectEvaluation.id == eval_draft_id))
+        db_eval2.status = EvaluationStatus.WITHDRAWN
+        db.commit()
+
+    res_withdrawn = client.get(f"/api/v1/passport/{s1_id}", headers=headers_r1)
+    assert res_withdrawn.status_code == 200
+    withdrawn_body = res_withdrawn.json()
+    assert withdrawn_body["projects"][0]["evaluations_count"] == 1
+    assert withdrawn_body["summary"]["total_evaluations_count"] == 1
+    print("  [PASS] Withdrawn evaluations are strictly omitted from Passport.")
+
+
 def run_all():
     print("=" * 70)
     print("CAREERBRIDGE 2.0-E — EXPERIENCE PASSPORT TEST SUITE")
@@ -648,6 +825,7 @@ def run_all():
     test_5_resume_metadata_exposure()
     test_6_security_and_nonexistent_students()
     test_7_passport_verified_evidence_aggregation_and_privacy()
+    test_8_passport_recruiter_evaluations_aggregation_and_privacy()
     cleanup_test_data()
     print("\n" + "=" * 70)
     print("ALL 2.0-E EXPERIENCE PASSPORT TESTS PASSED!")

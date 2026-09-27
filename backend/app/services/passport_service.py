@@ -7,14 +7,21 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.experience_record import ExperienceRecord, VerificationStatus
 from app.models.innovation_project import InnovationProject, ProjectStatus, ProjectVisibility
 from app.models.profile_image import ProfileImage
+from app.models.project_evaluation import (
+    EvaluationSkillAssessment,
+    EvaluationStatus,
+    ProjectEvaluation,
+)
 from app.models.project_evidence import ProjectEvidence
 from app.models.project_evidence_verification import EvidenceVerification, EvidenceVerificationStatus
 from app.models.project_milestone import MilestoneStatus, ProjectMilestone
+from app.models.recruiter_profile import RecruiterProfile
 from app.models.resume import Resume
 from app.models.skill import Skill, StudentSkill
 from app.models.student_profile import StudentProfile
 from app.models.user import User, UserRole
 from app.schemas.passport import (
+    PassportEvaluationItem,
     PassportEvidenceItem,
     PassportExperienceItem,
     PassportIdentity,
@@ -45,6 +52,8 @@ class PassportService:
         Assemble the Experience Passport for a given student.
         Enforces server-side privacy boundaries:
         - Non-owner/non-admin callers only receive verified experiences and active public projects.
+        - Only SUBMITTED recruiter evaluations are included; draft and withdrawn evaluations are strictly omitted.
+        - Recruiter personal contact emails are never exposed in evaluation metadata.
         - Internal moderation notes and rejected/pending claims are never exposed.
         """
         # 1. Validate Target Student Exists
@@ -98,7 +107,10 @@ class PassportService:
         # 3. Retrieve and Filter Experience Records
         exp_stmt = (
             select(ExperienceRecord)
-            .where(ExperienceRecord.student_id == target_student_id)
+            .where(
+                ExperienceRecord.student_id == target_student_id,
+                ExperienceRecord.status == VerificationStatus.VERIFIED,
+            )
             .options(
                 selectinload(ExperienceRecord.experience_skills).selectinload(ExperienceRecord.experience_skills.property.mapper.class_.skill),
                 selectinload(ExperienceRecord.innovation_project),
@@ -106,24 +118,14 @@ class PassportService:
             .order_by(ExperienceRecord.start_date.desc(), ExperienceRecord.id.desc())
         )
 
-        # In Passport presentation, experiences are strictly verified evidence
-        # For non-owner, only VERIFIED. For owner, we include VERIFIED records in the passport timeline.
-        if not (is_owner or is_admin):
-            exp_stmt = exp_stmt.where(ExperienceRecord.status == VerificationStatus.VERIFIED)
-        else:
-            # For owner preview, filter to verified records for the verified timeline
-            exp_stmt = exp_stmt.where(ExperienceRecord.status == VerificationStatus.VERIFIED)
-
         raw_experiences = list(db.scalars(exp_stmt).all())
-
         passport_experiences: List[PassportExperienceItem] = []
+
         for exp in raw_experiences:
             exp_skills: List[SkillResponse] = []
-            skill_names: List[str] = []
             if exp.experience_skills:
                 for es in exp.experience_skills:
                     if es.skill:
-                        skill_names.append(es.skill.name)
                         exp_skills.append(
                             SkillResponse(
                                 id=es.skill.id,
@@ -134,7 +136,8 @@ class PassportService:
                                 created_at=es.skill.created_at,
                             )
                         )
-            skills_str = format_skills_string(skill_names) if skill_names else None
+
+            skills_str = format_skills_string([s.name for s in exp_skills]) if exp_skills else None
 
             passport_experiences.append(
                 PassportExperienceItem(
@@ -156,7 +159,7 @@ class PassportService:
                 )
             )
 
-        # 4. Retrieve and Filter Innovation Projects, Milestones & Verified Evidence
+        # 4. Retrieve and Filter Innovation Projects, Milestones, Evidence & Evaluations
         proj_stmt = (
             select(InnovationProject)
             .where(InnovationProject.student_id == target_student_id)
@@ -165,6 +168,8 @@ class PassportService:
                 selectinload(InnovationProject.milestones),
                 selectinload(InnovationProject.evidence_items).selectinload(ProjectEvidence.verification),
                 selectinload(InnovationProject.evidence_items).selectinload(ProjectEvidence.milestone),
+                selectinload(InnovationProject.evaluations).selectinload(ProjectEvaluation.recruiter).selectinload(User.recruiter_profile),
+                selectinload(InnovationProject.evaluations).selectinload(ProjectEvaluation.skill_assessments).selectinload(EvaluationSkillAssessment.skill),
             )
             .order_by(InnovationProject.created_at.desc())
         )
@@ -247,6 +252,60 @@ class PassportService:
                     proj_verified_evidence.append(ev_item)
                     all_verified_evidence.append(ev_item)
 
+            # Extract submitted recruiter evaluations (Privacy: SUBMITTED only)
+            proj_evaluations: List[PassportEvaluationItem] = []
+            for pe in (proj.evaluations or []):
+                is_submitted = (
+                    (hasattr(pe.status, "value") and pe.status.value == "submitted")
+                    or pe.status == "submitted"
+                    or pe.status == EvaluationStatus.SUBMITTED
+                )
+                if not is_submitted:
+                    continue
+
+                rec_company = None
+                rec_contact = None
+                if pe.recruiter and pe.recruiter.recruiter_profile:
+                    rec_company = pe.recruiter.recruiter_profile.company_name
+                    rec_contact = pe.recruiter.recruiter_profile.contact_name
+
+                # Assessed skills on this evaluation
+                assessed_skills_list: List[SkillResponse] = []
+                if pe.skill_assessments:
+                    for sa in pe.skill_assessments:
+                        if sa.skill:
+                            assessed_skills_list.append(
+                                SkillResponse(
+                                    id=sa.skill.id,
+                                    name=sa.skill.name,
+                                    slug=sa.skill.slug,
+                                    category=sa.skill.category,
+                                    is_verified=sa.skill.is_verified,
+                                    created_at=sa.skill.created_at,
+                                )
+                            )
+
+                eval_item = PassportEvaluationItem(
+                    id=pe.id,
+                    recruiter_id=pe.recruiter_id,
+                    recruiter_company=rec_company,
+                    recruiter_name=rec_contact,
+                    overall_score=float(pe.overall_score) if pe.overall_score is not None else None,
+                    technical_score=pe.technical_quality_score,
+                    problem_solving_score=pe.problem_solving_score,
+                    execution_score=pe.execution_score,
+                    communication_score=pe.communication_documentation_score,
+                    evidence_score=pe.evidence_quality_score,
+                    recommendation=pe.recommendation.value if hasattr(pe.recommendation, "value") else str(pe.recommendation) if pe.recommendation else None,
+                    strengths=pe.strengths,
+                    assessed_skills=assessed_skills_list,
+                    submitted_at=pe.submitted_at,
+                )
+                proj_evaluations.append(eval_item)
+
+            valid_eval_scores = [e.overall_score for e in proj_evaluations if e.overall_score is not None]
+            avg_proj_eval_score = round(sum(valid_eval_scores) / len(valid_eval_scores), 2) if valid_eval_scores else None
+
             passport_projects.append(
                 PassportProjectItem(
                     id=proj.id,
@@ -267,6 +326,9 @@ class PassportService:
                     milestones=proj_milestones_items,
                     verified_evidence=proj_verified_evidence,
                     verified_evidence_count=len(proj_verified_evidence),
+                    evaluations=proj_evaluations,
+                    average_evaluation_score=avg_proj_eval_score,
+                    evaluations_count=len(proj_evaluations),
                 )
             )
 
@@ -317,6 +379,20 @@ class PassportService:
                     }
                 skill_map[s.id]["sources"].add("project")
 
+            # Assessed skills on submitted evaluations
+            for pe in proj.evaluations:
+                for s in pe.assessed_skills:
+                    if s.id not in skill_map:
+                        skill_map[s.id] = {
+                            "id": s.id,
+                            "name": s.name,
+                            "slug": s.slug,
+                            "category": s.category,
+                            "is_verified": s.is_verified,
+                            "sources": set(),
+                        }
+                    skill_map[s.id]["sources"].add("evaluation")
+
         passport_skills = [
             PassportSkillItem(
                 id=v["id"],
@@ -341,12 +417,23 @@ class PassportService:
             )
 
         # 7. Summary metrics
+        all_eval_scores = [
+            e.overall_score
+            for proj in passport_projects
+            for e in proj.evaluations
+            if e.overall_score is not None
+        ]
+        total_eval_count = sum(proj.evaluations_count for proj in passport_projects)
+        avg_project_score = round(sum(all_eval_scores) / len(all_eval_scores), 2) if all_eval_scores else None
+
         summary = PassportSummary(
             verified_experiences_count=len(passport_experiences),
             public_projects_count=len([p for p in passport_projects if p.visibility == "public" and p.status == "active"]),
             canonical_skills_count=len(passport_skills),
             completed_milestones_count=completed_milestone_count,
             verified_evidence_count=len(all_verified_evidence),
+            total_evaluations_count=total_eval_count,
+            average_project_score=avg_project_score,
         )
 
         return PassportResponse(

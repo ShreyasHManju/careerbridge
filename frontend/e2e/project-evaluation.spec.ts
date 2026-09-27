@@ -153,6 +153,37 @@ test.describe('Recruiter Project Evaluation Workflow (Phase 30C)', () => {
     await expect(studentPage.getByText('Exceptional query optimization algorithms')).toBeVisible();
 
     // -------------------------------------------------------------------------
+    // STEP 4B: Experience Passport Synthesis & Recruiter Candidate Review (Phase 30D)
+    // -------------------------------------------------------------------------
+    // 1. Student navigates to their own Experience Passport
+    await studentPage.locator('nav.cb-nav-links').getByRole('link', { name: 'Passport' }).click();
+    await expect(studentPage).toHaveURL(/\/app\/passport/);
+    await expect(studentPage.getByTestId('passport-page')).toBeVisible({ timeout: 10000 });
+
+    // Verify Passport summary metrics reflect the evaluation
+    await expect(studentPage.getByTestId('stat-count-evaluations')).toHaveText('1');
+    await expect(studentPage.getByTestId('stat-avg-score')).toHaveText('4.6');
+
+    // Verify evaluated project card on Passport
+    await expect(studentPage.getByTestId('proj-avg-eval-' + projectHref.split('/').pop())).toBeVisible({ timeout: 10000 });
+    await expect(studentPage.getByText('Technical Quality:')).toBeVisible();
+    await expect(studentPage.getByText('Problem Solving:')).toBeVisible();
+    await expect(studentPage.getByText('Strongly Recommended')).toBeVisible();
+
+    // 2. Recruiter navigates to Applications and clicks View Passport to inspect candidate
+    await recruiterPage.locator('nav.cb-nav-links').getByRole('link', { name: 'Applications' }).click();
+    await expect(recruiterPage).toHaveURL(/\/app\/recruiter\/applications/);
+    const viewPassportBtn = recruiterPage.locator('[data-testid^="view-passport-btn-"]').first();
+    await expect(viewPassportBtn).toBeVisible({ timeout: 10000 });
+    await viewPassportBtn.click();
+
+    // Verify candidate passport view for recruiter
+    await expect(recruiterPage.getByTestId('passport-page')).toBeVisible({ timeout: 10000 });
+    await expect(recruiterPage.getByTestId('stat-count-evaluations')).toHaveText('1');
+    await expect(recruiterPage.getByTestId('stat-avg-score')).toHaveText('4.6');
+    await expect(recruiterPage.getByText('Technical Quality:')).toBeVisible();
+
+    // -------------------------------------------------------------------------
     // STEP 5: Security / Isolation Check — Other Recruiter Cannot Modify Evaluation
     // -------------------------------------------------------------------------
     const otherRecruiterContext = await browser.newContext();

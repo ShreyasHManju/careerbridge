@@ -5,6 +5,22 @@ export interface PassportProjectsProps {
   projects: PassportProjectItem[];
 }
 
+export const formatRecommendationText = (rec?: string | null): string => {
+  if (!rec) return '';
+  switch (rec) {
+    case 'strongly_recommended':
+      return 'Strongly Recommended';
+    case 'recommended':
+      return 'Recommended';
+    case 'neutral':
+      return 'Neutral';
+    case 'not_recommended':
+      return 'Not Recommended';
+    default:
+      return rec;
+  }
+};
+
 export const formatMilestoneStatusText = (status: string): string => {
   switch (status) {
     case 'completed':
@@ -209,6 +225,115 @@ export const PassportProjects: React.FC<PassportProjectsProps> = ({ projects }) 
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+            {/* Recruiter Project Evaluations */}
+            {proj.evaluations && proj.evaluations.length > 0 && (
+              <div
+                className="cb-passport-evaluations-box"
+                data-testid={`proj-evaluations-box-${proj.id}`}
+                style={{ marginTop: '1rem', borderTop: '1px solid var(--cb-border-subtle, #e2e8f0)', paddingTop: '0.75rem' }}
+              >
+                <div className="cb-passport-evaluations-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                  <h4 className="cb-passport-evaluations-title" style={{ fontSize: '0.9rem', fontWeight: 600, margin: 0 }}>
+                    Recruiter Evaluations ({proj.evaluations.length})
+                  </h4>
+                  {proj.average_evaluation_score != null && (
+                    <span className="cb-badge cb-badge-primary cb-badge-sm" data-testid={`proj-avg-eval-${proj.id}`}>
+                      Avg Rating: {proj.average_evaluation_score.toFixed(1)} / 5.0
+                    </span>
+                  )}
+                </div>
+
+                <div className="cb-passport-eval-items" aria-label={`Recruiter evaluations for ${proj.title}`} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {proj.evaluations.map((ev) => (
+                    <div
+                      key={ev.id}
+                      className="cb-card cb-passport-eval-card"
+                      data-testid={`passport-eval-card-${ev.id}`}
+                      style={{ padding: '0.75rem 1rem', background: 'var(--cb-bg-subtle, #f8fafc)', borderRadius: '6px', border: '1px solid var(--cb-border-subtle, #e2e8f0)' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <div>
+                          <span style={{ fontWeight: 600, fontSize: '0.95rem' }} data-testid={`eval-company-${ev.id}`}>
+                            {ev.recruiter_company || 'Verified Recruiter'}
+                          </span>
+                          {ev.recruiter_name && (
+                            <span style={{ fontSize: '0.8rem', color: 'var(--cb-text-muted, #64748b)', marginLeft: '0.5rem' }}>
+                              ({ev.recruiter_name})
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          {ev.recommendation && (
+                            <span className={`cb-badge cb-badge-sm ${ev.recommendation.includes('recommended') ? 'cb-badge-success' : 'cb-badge-neutral'}`} data-testid={`eval-rec-${ev.id}`}>
+                              {formatRecommendationText(ev.recommendation)}
+                            </span>
+                          )}
+                          {ev.overall_score != null && (
+                            <span className="cb-badge cb-badge-primary cb-badge-sm" data-testid={`eval-score-${ev.id}`}>
+                              ⭐ {ev.overall_score.toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 5-Dimensional Scores Breakdown */}
+                      <div
+                        className="cb-passport-eval-dimensions"
+                        data-testid={`eval-dimensions-${ev.id}`}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                          gap: '0.5rem',
+                          background: '#ffffff',
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: '4px',
+                          border: '1px solid var(--cb-border-subtle, #e2e8f0)',
+                          fontSize: '0.8rem',
+                          marginBottom: '0.5rem'
+                        }}
+                      >
+                        <div>
+                          <span style={{ color: 'var(--cb-text-muted, #64748b)' }}>Technical Quality: </span>
+                          <strong>{ev.technical_score ?? '—'}/5</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--cb-text-muted, #64748b)' }}>Problem Solving: </span>
+                          <strong>{ev.problem_solving_score ?? '—'}/5</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--cb-text-muted, #64748b)' }}>Execution: </span>
+                          <strong>{ev.execution_score ?? '—'}/5</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--cb-text-muted, #64748b)' }}>Communication: </span>
+                          <strong>{ev.communication_score ?? '—'}/5</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--cb-text-muted, #64748b)' }}>Evidence Quality: </span>
+                          <strong>{ev.evidence_score ?? '—'}/5</strong>
+                        </div>
+                      </div>
+
+                      {ev.strengths && (
+                        <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'var(--cb-text-primary, #1e293b)' }} data-testid={`eval-strengths-${ev.id}`}>
+                          <strong>Strengths: </strong>{ev.strengths}
+                        </p>
+                      )}
+
+                      {ev.assessed_skills && ev.assessed_skills.length > 0 && (
+                        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginTop: '0.5rem' }} data-testid={`eval-skills-${ev.id}`}>
+                          {ev.assessed_skills.map((s) => (
+                            <span key={s.id} className="cb-badge cb-badge-secondary cb-badge-sm">
+                              ✓ {s.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

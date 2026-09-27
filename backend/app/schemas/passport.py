@@ -25,6 +25,26 @@ class PassportIdentity(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PassportEvaluationItem(BaseModel):
+    """Safe recruiter project evaluation metadata for public and recruiter presentation."""
+    id: int
+    recruiter_id: int
+    recruiter_company: Optional[str] = None
+    recruiter_name: Optional[str] = None
+    overall_score: Optional[float] = None
+    technical_score: Optional[int] = None
+    problem_solving_score: Optional[int] = None
+    execution_score: Optional[int] = None
+    communication_score: Optional[int] = None
+    evidence_score: Optional[int] = None
+    recommendation: Optional[str] = None
+    strengths: Optional[str] = None
+    assessed_skills: List[SkillResponse] = Field(default_factory=list)
+    submitted_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PassportSummary(BaseModel):
     """Aggregate metric counts derived from verified evidence."""
     verified_experiences_count: int = Field(0, description="Total count of recruiter/admin-verified experiences")
@@ -32,6 +52,8 @@ class PassportSummary(BaseModel):
     canonical_skills_count: int = Field(0, description="Count of distinct canonical skills backed by evidence")
     completed_milestones_count: int = Field(0, description="Total completed milestones across public projects")
     verified_evidence_count: int = Field(0, description="Total count of verified evidence artifacts across public projects")
+    total_evaluations_count: int = Field(0, description="Total count of submitted recruiter evaluations across projects")
+    average_project_score: Optional[float] = Field(None, description="Average overall score across all evaluated projects")
 
 
 class PassportSkillItem(BaseModel):
@@ -41,7 +63,7 @@ class PassportSkillItem(BaseModel):
     slug: str
     category: Optional[str] = None
     is_verified: bool = True
-    sources: List[str] = Field(default_factory=list, description="Evidence provenance (experience, project, profile)")
+    sources: List[str] = Field(default_factory=list, description="Evidence provenance (experience, project, profile, evaluation)")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -98,7 +120,7 @@ class PassportMilestoneItem(BaseModel):
 
 
 class PassportProjectItem(BaseModel):
-    """Public innovation project with milestones, skills, and verified evidence."""
+    """Public innovation project with milestones, skills, verified evidence, and recruiter evaluations."""
     id: int
     title: str
     slug: str
@@ -117,6 +139,9 @@ class PassportProjectItem(BaseModel):
     milestones: List[PassportMilestoneItem] = Field(default_factory=list)
     verified_evidence: List[PassportEvidenceItem] = Field(default_factory=list)
     verified_evidence_count: int = 0
+    evaluations: List[PassportEvaluationItem] = Field(default_factory=list)
+    average_evaluation_score: Optional[float] = None
+    evaluations_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 
