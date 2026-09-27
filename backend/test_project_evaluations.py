@@ -1,24 +1,26 @@
 """
-CareerBridge Phase 30C — Recruiter Project Evaluation Test Suite
+CareerBridge Phase 30C — Recruiter Project Evaluation Test Suite (Security Tightened)
 Comprehensive coverage for:
-1. Authorized recruiter creation of draft evaluations with candidate relationship.
-2. Authorization denial (403) for unauthorized recruiters (no relationship, private project).
-3. Student role prevention (403) from creating recruiter evaluations.
-4. Prevention of evaluating own project (400).
-5. Unique constraint rejection (409) for duplicate recruiter evaluations on same project.
-6. Validation bounds on scores (1 to 5) and controlled recommendation/proficiency enums.
-7. Updating draft evaluation by owner recruiter.
-8. Cross-recruiter modification rejection (403/404).
-9. Student modification rejection (403).
-10. Submission requirement validation (all 5 dimensional scores and recommendation required).
-11. Deterministic server-side overall score calculation.
-12. Status transition DRAFT -> SUBMITTED and student in-app notification trigger.
-13. Submitted evaluation immutability (cannot be modified after submission).
-14. Draft invisibility: students cannot view draft evaluations.
-15. Student visibility of submitted evaluations.
-16. Evaluation withdrawal rules by owner recruiter or admin.
-17. Skill assessment linking to canonical master skills and invalid skill ID rejection.
-18. Database constraints, uniqueness, and cascade deletions.
+1. Authorized recruiter creation of draft evaluations with candidate relationship (Student -> Application -> JobPosting -> Recruiter).
+2. Authorization denial (403) for recruiter without application relationship on PUBLIC + ACTIVE project.
+3. Authorization denial (403) for recruiter without application relationship on PRIVATE project.
+4. Recruiter cannot bypass authorization merely by knowing project_id or evaluation_id.
+5. Student role prevention (403) from creating recruiter evaluations.
+6. Prevention of evaluating own project (400/403).
+7. Unique constraint rejection (409) for duplicate recruiter evaluations on same project.
+8. Validation bounds on scores (1 to 5) and controlled recommendation/proficiency enums.
+9. Updating draft evaluation by owner recruiter.
+10. Cross-recruiter modification rejection (403/404).
+11. Student modification rejection (403).
+12. Submission requirement validation (all 5 dimensional scores and recommendation required).
+13. Deterministic server-side overall score calculation.
+14. Status transition DRAFT -> SUBMITTED and student in-app notification trigger.
+15. Submitted evaluation immutability (cannot be modified after submission).
+16. Draft invisibility: students cannot view draft evaluations.
+17. Student visibility of submitted evaluations.
+18. Evaluation withdrawal rules by owner recruiter or admin.
+19. Skill assessment linking to canonical master skills and invalid skill ID rejection.
+20. Database constraints, uniqueness, and cascade deletions.
 """
 
 from pathlib import Path
@@ -169,7 +171,7 @@ def setup_test_users():
             status=ProjectStatus.ACTIVE,
             visibility=ProjectVisibility.PUBLIC,
         )
-        # Student 2's private project (Student 2 has NOT applied to Recruiter 1's jobs)
+        # Student 2's private project (Student 2 has NOT applied to Recruiter 1's or Recruiter 2's jobs)
         proj_private = InnovationProject(
             student_id=student2.id,
             title="Private Research Algorithm",
@@ -200,6 +202,7 @@ def test_project_evaluations_suite():
         skill_python = db.scalar(select(Skill).where(Skill.slug == "python"))
         student1 = db.scalar(select(User).where(User.email == STUDENT1_EMAIL))
         recruiter1 = db.scalar(select(User).where(User.email == RECRUITER1_EMAIL))
+        recruiter2 = db.scalar(select(User).where(User.email == RECRUITER2_EMAIL))
 
         public_proj_id = proj_public.id
         private_proj_id = proj_private.id
@@ -211,7 +214,6 @@ def test_project_evaluations_suite():
     stud2_headers = auth_headers(STUDENT2_EMAIL)
     admin_headers = auth_headers(ADMIN_EMAIL)
 
-    print("\n[Scenario 1] Authorized Recruiter creates Draft Evaluation for student's project")
     create_payload = {
         "technical_quality_score": 4,
         "problem_solving_score": 5,
@@ -230,6 +232,8 @@ def test_project_evaluations_suite():
             }
         ],
     }
+
+    print("\n[Scenario 1] Authorized Recruiter with Application can evaluate student's project")
     resp = client.post(
         f"/api/v1/innovation-projects/{public_proj_id}/evaluations",
         json=create_payload,
@@ -247,18 +251,30 @@ def test_project_evaluations_suite():
     assert len(eval_data["skill_assessments"]) == 1
     assert eval_data["skill_assessments"][0]["skill_name"] == "Python"
     assert eval_data["skill_assessments"][0]["proficiency"] == "advanced"
-    print("  -> Draft evaluation created successfully with server-side calculated overall score.")
+    print("  -> Draft evaluation created successfully by authorized recruiter with active candidate application.")
 
-    print("\n[Scenario 2] Unauthorized Recruiter cannot evaluate private project of non-applicant student")
+    print("\n[Scenario 2] Recruiter without Application relationship CANNOT evaluate an arbitrary PUBLIC + ACTIVE project")
+    resp_rec2_pub = client.post(
+        f"/api/v1/innovation-projects/{public_proj_id}/evaluations",
+        json=create_payload,
+        headers=rec2_headers,
+    )
+    assert resp_rec2_pub.status_code == 403, (
+        f"Expected 403 Forbidden for Recruiter 2 without application on public project, got {resp_rec2_pub.status_code}"
+    )
+    assert "not authorized to evaluate this candidate's project without an active candidate application" in resp_rec2_pub.json().get("detail", "")
+    print("  -> Recruiter without application relationship strictly denied (403) on PUBLIC + ACTIVE project.")
+
+    print("\n[Scenario 3] Recruiter without Application cannot evaluate PRIVATE project")
     resp_unauth = client.post(
         f"/api/v1/innovation-projects/{private_proj_id}/evaluations",
         json=create_payload,
         headers=rec1_headers,
     )
     assert resp_unauth.status_code == 403, f"Expected 403 Forbidden on private non-candidate project, got {resp_unauth.status_code}"
-    print("  -> Recruiter correctly blocked with 403 on private project without candidate relationship.")
+    print("  -> Recruiter correctly blocked with 403 on private project without candidate application.")
 
-    print("\n[Scenario 3] Student cannot create recruiter evaluations")
+    print("\n[Scenario 4] Student cannot create recruiter evaluations")
     resp_stud = client.post(
         f"/api/v1/innovation-projects/{public_proj_id}/evaluations",
         json=create_payload,
@@ -267,7 +283,7 @@ def test_project_evaluations_suite():
     assert resp_stud.status_code == 403, f"Expected 403 for student creating evaluation, got {resp_stud.status_code}"
     print("  -> Student role cannot create recruiter evaluations.")
 
-    print("\n[Scenario 4] Duplicate evaluation for same (project_id, recruiter_id) is rejected with 409 Conflict")
+    print("\n[Scenario 5] Duplicate evaluation for same (project_id, recruiter_id) is rejected with 409 Conflict")
     resp_dup = client.post(
         f"/api/v1/innovation-projects/{public_proj_id}/evaluations",
         json=create_payload,
@@ -276,7 +292,7 @@ def test_project_evaluations_suite():
     assert resp_dup.status_code == 409, f"Expected 409 Conflict for duplicate evaluation, got {resp_dup.status_code}"
     print("  -> Uniqueness constraint correctly enforced with 409 Conflict.")
 
-    print("\n[Scenario 5] Invalid scores outside 1-5 range are rejected with 422")
+    print("\n[Scenario 6] Invalid scores outside 1-5 range are rejected with 422")
     invalid_score_payload = {**create_payload, "technical_quality_score": 6}
     resp_invalid = client.patch(
         f"/api/v1/project-evaluations/{eval_id}",
@@ -286,7 +302,7 @@ def test_project_evaluations_suite():
     assert resp_invalid.status_code == 422, f"Expected 422 for score=6, got {resp_invalid.status_code}"
     print("  -> Score range [1..5] validation enforced.")
 
-    print("\n[Scenario 6] Draft evaluation can be updated by owner recruiter")
+    print("\n[Scenario 7] Draft evaluation can be updated by owner recruiter")
     update_payload = {
         "technical_quality_score": 5,
         "strengths": "Updated strengths note.",
@@ -303,16 +319,22 @@ def test_project_evaluations_suite():
     assert updated_data["overall_score"] == 4.6  # (5+5+4+4+5)/5 = 4.6
     print("  -> Draft updated successfully and overall score recalculated.")
 
-    print("\n[Scenario 7] Other recruiter cannot update another recruiter's draft")
-    resp_other_rec = client.patch(
+    print("\n[Scenario 8] Another recruiter cannot update or access another recruiter's draft evaluation")
+    resp_other_rec_patch = client.patch(
         f"/api/v1/project-evaluations/{eval_id}",
         json=update_payload,
         headers=rec2_headers,
     )
-    assert resp_other_rec.status_code == 403, f"Expected 403 for cross-recruiter modification, got {resp_other_rec.status_code}"
-    print("  -> Cross-recruiter modification strictly blocked.")
+    assert resp_other_rec_patch.status_code == 403, f"Expected 403 for cross-recruiter modification, got {resp_other_rec_patch.status_code}"
 
-    print("\n[Scenario 8] Student cannot see DRAFT evaluation (Invisibility rule)")
+    resp_other_rec_get = client.get(
+        f"/api/v1/project-evaluations/{eval_id}",
+        headers=rec2_headers,
+    )
+    assert resp_other_rec_get.status_code == 404, f"Expected 404 for other recruiter inspecting draft evaluation, got {resp_other_rec_get.status_code}"
+    print("  -> Cross-recruiter modification and draft snooping strictly blocked.")
+
+    print("\n[Scenario 9] Student cannot see DRAFT evaluation (Invisibility rule)")
     # 1. Detail endpoint
     resp_stud_get = client.get(
         f"/api/v1/project-evaluations/{eval_id}",
@@ -329,8 +351,8 @@ def test_project_evaluations_suite():
     assert len(resp_stud_list.json()) == 0, "Student project evaluation list must be empty while in DRAFT"
     print("  -> Draft evaluation is completely invisible to student.")
 
-    print("\n[Scenario 9] Incomplete evaluation cannot be submitted")
-    # Set one score to None via update to test incomplete submission
+    print("\n[Scenario 10] Incomplete evaluation cannot be submitted")
+    # Set one score to None via direct DB modification to test submission validation
     with SessionLocal() as db:
         ev_obj = db.scalar(select(ProjectEvaluation).where(ProjectEvaluation.id == eval_id))
         ev_obj.evidence_quality_score = None
@@ -349,7 +371,7 @@ def test_project_evaluations_suite():
         ev_obj.evidence_quality_score = 5
         db.commit()
 
-    print("\n[Scenario 10] Submitting evaluation transitions status, sets timestamp, and sends student notification")
+    print("\n[Scenario 11] Submitting evaluation transitions status, sets timestamp, and sends student notification")
     resp_submit = client.post(
         f"/api/v1/project-evaluations/{eval_id}/submit",
         headers=rec1_headers,
@@ -372,7 +394,7 @@ def test_project_evaluations_suite():
         assert "submitted a structured evaluation" in notif.message
     print("  -> Evaluation submitted, status is 'submitted', and notification was dispatched.")
 
-    print("\n[Scenario 11] Submitted evaluation is immutable (cannot be updated by recruiter)")
+    print("\n[Scenario 12] Submitted evaluation is immutable (cannot be updated by recruiter)")
     resp_edit_submitted = client.patch(
         f"/api/v1/project-evaluations/{eval_id}",
         json={"strengths": "Trying to modify submitted evaluation"},
@@ -381,7 +403,7 @@ def test_project_evaluations_suite():
     assert resp_edit_submitted.status_code == 400, f"Expected 400 on modifying submitted evaluation, got {resp_edit_submitted.status_code}"
     print("  -> Submitted evaluation cannot be modified.")
 
-    print("\n[Scenario 12] Student can now view SUBMITTED evaluation in list and detail")
+    print("\n[Scenario 13] Student can now view SUBMITTED evaluation in list and detail")
     resp_stud_detail = client.get(
         f"/api/v1/project-evaluations/{eval_id}",
         headers=stud1_headers,
@@ -398,7 +420,7 @@ def test_project_evaluations_suite():
     assert resp_stud_list2.json()[0]["id"] == eval_id
     print("  -> Student successfully views submitted evaluation.")
 
-    print("\n[Scenario 13] Withdrawal workflow respects ownership and admin governance")
+    print("\n[Scenario 14] Withdrawal workflow respects ownership and admin governance")
     # Non-owner student cannot withdraw
     resp_with_stud = client.post(
         f"/api/v1/project-evaluations/{eval_id}/withdraw",
@@ -415,8 +437,7 @@ def test_project_evaluations_suite():
     assert resp_with_admin.json()["status"] == "withdrawn"
     print("  -> Evaluation successfully withdrawn under governance authorization.")
 
-    print("\n[Scenario 14] Invalid canonical skill ID is rejected on assessment")
-    # Clean up and test invalid skill ID
+    print("\n[Scenario 15] Invalid canonical skill ID is rejected on assessment")
     cleanup_test_data()
     setup_test_users()
     rec1_headers = auth_headers(RECRUITER1_EMAIL)

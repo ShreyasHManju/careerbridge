@@ -78,13 +78,15 @@ test.describe('Recruiter Project Evaluation Workflow (Phase 30C)', () => {
     await studentPage.locator('nav.cb-nav-links').getByRole('link', { name: 'Projects' }).click();
     await expect(studentPage).toHaveURL(/\/app\/projects/);
 
-    await studentPage.getByRole('button', { name: /\+ Create Project/i }).click();
+    await studentPage.getByRole('button', { name: /\+ New Project/i }).click();
     await studentPage.getByLabel(/Project Title/i).fill(projectTitle);
     await studentPage.getByLabel(/Short Summary/i).fill('High-throughput distributed query processor in Rust.');
     await studentPage.getByLabel(/Detailed Description/i).fill('Architecture implements cost-based optimizer and vectorized execution.');
-    await studentPage.getByRole('button', { name: /Create Project/i }).click();
+    await studentPage.getByRole('button', { name: /Publish Project/i }).click();
 
-    await expect(studentPage.getByText(projectTitle)).toBeVisible({ timeout: 10000 });
+    const projectLink = studentPage.getByRole('link', { name: projectTitle });
+    await expect(projectLink).toBeVisible({ timeout: 10000 });
+    const projectHref = (await projectLink.getAttribute('href')) || '/app/projects';
 
     // Apply to Recruiter Job
     await studentPage.locator('nav.cb-nav-links').getByRole('link', { name: 'Opportunities' }).click();
@@ -105,8 +107,7 @@ test.describe('Recruiter Project Evaluation Workflow (Phase 30C)', () => {
     // -------------------------------------------------------------------------
     // STEP 3: Recruiter Reviews Candidate Project & Submits Evaluation
     // -------------------------------------------------------------------------
-    await recruiterPage.locator('nav.cb-nav-links').getByRole('link', { name: 'Projects' }).click();
-    await recruiterPage.getByRole('link', { name: projectTitle }).click();
+    await recruiterPage.goto(projectHref);
     await expect(recruiterPage.getByRole('heading', { name: projectTitle })).toBeVisible({ timeout: 10000 });
 
     // Open Evaluation Modal
@@ -142,8 +143,7 @@ test.describe('Recruiter Project Evaluation Workflow (Phase 30C)', () => {
     // -------------------------------------------------------------------------
     // STEP 4: Student Verifies Submitted Evaluation
     // -------------------------------------------------------------------------
-    await studentPage.locator('nav.cb-nav-links').getByRole('link', { name: 'Projects' }).click();
-    await studentPage.getByRole('link', { name: projectTitle }).click();
+    await studentPage.goto(projectHref);
 
     // Verify evaluation is visible to student
     await expect(studentPage.getByTestId('project-evaluations-section')).toBeVisible({ timeout: 10000 });
@@ -170,8 +170,7 @@ test.describe('Recruiter Project Evaluation Workflow (Phase 30C)', () => {
     await otherRecruiterPage.getByRole('button', { name: /Sign In/i }).click();
 
     // Navigate to project
-    await otherRecruiterPage.locator('nav.cb-nav-links').getByRole('link', { name: 'Projects' }).click();
-    await otherRecruiterPage.getByRole('link', { name: projectTitle }).click();
+    await otherRecruiterPage.goto(projectHref);
 
     // Other recruiter should NOT see edit or withdraw buttons on first recruiter's evaluation
     await expect(otherRecruiterPage.getByTestId('edit-evaluation-btn')).not.toBeVisible();

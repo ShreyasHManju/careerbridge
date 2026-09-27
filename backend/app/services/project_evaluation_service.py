@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.application import Application
+from app.models.job_posting import JobPosting
 from app.models.innovation_project import InnovationProject, ProjectStatus, ProjectVisibility
 from app.models.notification import NotificationType
 from app.models.project_evaluation import (
@@ -103,31 +104,36 @@ class ProjectEvaluationService:
     ) -> None:
         """
         Verify that the recruiter has a legitimate candidate/application relationship
-        with the student, or that the project is an active public project.
-        Private projects strictly require an application relationship with the recruiter's jobs.
+        with the student. A recruiter may evaluate the student's project ONLY when
+        the existing Application relationship proves the recruiter is legitimately connected
+        to that candidate (Student -> Application -> JobPosting -> Recruiter).
+
+        A recruiter must NOT be granted authorization merely because:
+        - The project is PUBLIC
+        - The project is ACTIVE
+        - The recruiter knows the project_id
         """
-        # 1. Candidate Application Relationship: Student applied to a job posted by this recruiter
+        if project.student_id == recruiter_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Recruiter cannot evaluate their own project.",
+            )
+
+        # Candidate Application Relationship: Student applied to a job posted by this recruiter
         has_application = db.scalar(
             select(Application.id)
-            .join(Application.job_posting)
+            .join(JobPosting, Application.job_posting_id == JobPosting.id)
             .where(
                 Application.student_id == project.student_id,
-                Application.job_posting.property.mapper.class_.recruiter_id == recruiter_id,
+                JobPosting.recruiter_id == recruiter_id,
             )
         )
 
-        if has_application:
-            return
-
-        # 2. Public Project Discovery: Active public project can be reviewed by active recruiter
-        if project.visibility == ProjectVisibility.PUBLIC and project.status == ProjectStatus.ACTIVE:
-            return
-
-        # If private and no candidate application exists, recruiter is forbidden
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Recruiter is not authorized to evaluate this candidate's project.",
-        )
+        if not has_application:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Recruiter is not authorized to evaluate this candidate's project without an active candidate application relationship.",
+            )
 
     @staticmethod
     def create_evaluation(
