@@ -91,7 +91,7 @@ def get_token(email: str, role: UserRole) -> str:
         return create_access_token(subject=user.id)
 
 
-def test_milestone_creation_and_validation():
+def _test_milestone_creation_and_validation():
     print("[1/8] Testing milestone creation and input validation...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -183,7 +183,7 @@ def test_milestone_creation_and_validation():
     return project_id, milestone1_id
 
 
-def test_ownership_and_authorization(project_id: int, milestone_id: int):
+def _test_ownership_and_authorization(project_id: int, milestone_id: int):
     print("[2/8] Testing ownership enforcement and cross-student authorization...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     token2 = get_token(STUDENT2_EMAIL, UserRole.STUDENT)
@@ -253,7 +253,7 @@ def test_ownership_and_authorization(project_id: int, milestone_id: int):
     return p2_id
 
 
-def test_completed_at_status_transitions(project_id: int, milestone_id: int):
+def _test_completed_at_status_transitions(project_id: int, milestone_id: int):
     print("[3/8] Testing completed_at status transition business rules...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -321,7 +321,7 @@ def test_completed_at_status_transitions(project_id: int, milestone_id: int):
     print("  -> Status transition business rules passed.")
 
 
-def test_progress_calculation(project_id: int):
+def _test_progress_calculation(project_id: int):
     print("[4/8] Testing project execution progress calculation...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -367,7 +367,7 @@ def test_progress_calculation(project_id: int):
     print("  -> Progress calculation passed.")
 
 
-def test_privacy_and_visibility_guards(p2_id: int):
+def _test_privacy_and_visibility_guards(p2_id: int):
     print("[5/8] Testing milestone privacy and visibility inheritance...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     token2 = get_token(STUDENT2_EMAIL, UserRole.STUDENT)
@@ -410,7 +410,7 @@ def test_privacy_and_visibility_guards(p2_id: int):
     print("  -> Milestone privacy guards passed.")
 
 
-def test_milestone_deletion(project_id: int):
+def _test_milestone_deletion(project_id: int):
     print("[6/8] Testing single milestone deletion...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -439,7 +439,7 @@ def test_milestone_deletion(project_id: int):
     print("  -> Single milestone deletion passed.")
 
 
-def test_project_deletion_cascades_milestones():
+def _test_project_deletion_cascades_milestones():
     print("[7/8] Testing parent project deletion cascades milestone rows...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -490,7 +490,7 @@ def test_project_deletion_cascades_milestones():
     print("  -> Parent project cascade cleanup passed.")
 
 
-def test_zero_milestones_progress():
+def _test_zero_milestones_progress():
     print("[8/8] Testing progress calculation when project has 0 milestones...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -519,20 +519,20 @@ def test_zero_milestones_progress():
     print("  -> Zero milestone progress calculation passed.")
 
 
-def run_all_tests():
+def test_project_milestones_workflow():
     print("\n=========================================================")
     print("STARTING MILESTONE 2.0-C PROJECT MILESTONES TEST SUITE...")
     print("=========================================================\n")
     cleanup_test_data()
     try:
-        project_id, milestone1_id = test_milestone_creation_and_validation()
-        p2_id = test_ownership_and_authorization(project_id, milestone1_id)
-        test_completed_at_status_transitions(project_id, milestone1_id)
-        test_progress_calculation(project_id)
-        test_privacy_and_visibility_guards(p2_id)
-        test_milestone_deletion(project_id)
-        test_project_deletion_cascades_milestones()
-        test_zero_milestones_progress()
+        project_id, milestone1_id = _test_milestone_creation_and_validation()
+        p2_id = _test_ownership_and_authorization(project_id, milestone1_id)
+        _test_completed_at_status_transitions(project_id, milestone1_id)
+        _test_progress_calculation(project_id)
+        _test_privacy_and_visibility_guards(p2_id)
+        _test_milestone_deletion(project_id)
+        _test_project_deletion_cascades_milestones()
+        _test_zero_milestones_progress()
 
         print("\n=========================================================")
         print("ALL 2.0-C PROJECT MILESTONES TESTS PASSED SUCCESSFULLY!")
@@ -542,4 +542,4 @@ def run_all_tests():
 
 
 if __name__ == "__main__":
-    run_all_tests()
+    test_project_milestones_workflow()
