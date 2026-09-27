@@ -93,7 +93,7 @@ def get_token(email: str, role: UserRole) -> str:
         return create_access_token(subject=user.id)
 
 
-def test_create_project_evidence_success():
+def _test_create_project_evidence_success():
     print("[1/9] Testing project evidence creation and responses...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -138,7 +138,7 @@ def test_create_project_evidence_success():
     return project_id, evidence_id
 
 
-def test_create_evidence_attached_to_milestone(project_id: int):
+def _test_create_evidence_attached_to_milestone(project_id: int):
     print("[2/9] Testing evidence attached to project milestone...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -179,7 +179,7 @@ def test_create_evidence_attached_to_milestone(project_id: int):
     return milestone_id, ms_evidence_id
 
 
-def test_mismatched_milestone_rejection(project_id: int):
+def _test_mismatched_milestone_rejection(project_id: int):
     print("[3/9] Testing mismatched milestone rejection...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -224,7 +224,7 @@ def test_mismatched_milestone_rejection(project_id: int):
     print("  -> Mismatched milestone rejection passed.")
 
 
-def test_ownership_and_role_enforcement(project_id: int, evidence_id: int):
+def _test_ownership_and_role_enforcement(project_id: int, evidence_id: int):
     print("[4/9] Testing ownership enforcement and RBAC...")
     token2 = get_token(STUDENT2_EMAIL, UserRole.STUDENT)
     recruiter_token = get_token(RECRUITER_EMAIL, UserRole.RECRUITER)
@@ -271,7 +271,7 @@ def test_ownership_and_role_enforcement(project_id: int, evidence_id: int):
     print("  -> Ownership and RBAC enforcement passed.")
 
 
-def test_list_and_filter_evidence(project_id: int, milestone_id: int):
+def _test_list_and_filter_evidence(project_id: int, milestone_id: int):
     print("[5/9] Testing evidence listing and milestone filtering...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -300,7 +300,7 @@ def test_list_and_filter_evidence(project_id: int, milestone_id: int):
     print("  -> Evidence listing and filtering passed.")
 
 
-def test_privacy_and_visibility_guards():
+def _test_privacy_and_visibility_guards():
     print("[6/9] Testing private project evidence privacy guards...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     token2 = get_token(STUDENT2_EMAIL, UserRole.STUDENT)
@@ -358,7 +358,7 @@ def test_privacy_and_visibility_guards():
     print("  -> Private project evidence visibility guards passed.")
 
 
-def test_update_and_delete_evidence(project_id: int, evidence_id: int):
+def _test_update_and_delete_evidence(project_id: int, evidence_id: int):
     print("[7/9] Testing evidence update and deletion...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -395,7 +395,7 @@ def test_update_and_delete_evidence(project_id: int, evidence_id: int):
     print("  -> Evidence update and deletion passed.")
 
 
-def test_validation_rules(project_id: int):
+def _test_validation_rules(project_id: int):
     print("[8/9] Testing evidence input validation rules...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -419,7 +419,7 @@ def test_validation_rules(project_id: int):
     print("  -> Input validation rules passed.")
 
 
-def test_cascade_deletion():
+def _test_cascade_deletion():
     print("[9/9] Testing parent project deletion cascades evidence...")
     token1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     headers1 = {"Authorization": f"Bearer {token1}"}
@@ -465,21 +465,21 @@ def test_cascade_deletion():
     print("  -> Cascade deletion passed.")
 
 
-def run_all_tests():
+def test_project_evidence_workflow():
     print("\n=========================================================")
     print("STARTING MILESTONE R5 PROJECT EVIDENCE TEST SUITE...")
     print("=========================================================\n")
     cleanup_test_data()
     try:
-        project_id, evidence_id = test_create_project_evidence_success()
-        milestone_id, ms_evidence_id = test_create_evidence_attached_to_milestone(project_id)
-        test_mismatched_milestone_rejection(project_id)
-        test_ownership_and_role_enforcement(project_id, evidence_id)
-        test_list_and_filter_evidence(project_id, milestone_id)
-        test_privacy_and_visibility_guards()
-        test_update_and_delete_evidence(project_id, evidence_id)
-        test_validation_rules(project_id)
-        test_cascade_deletion()
+        project_id, evidence_id = _test_create_project_evidence_success()
+        milestone_id, ms_evidence_id = _test_create_evidence_attached_to_milestone(project_id)
+        _test_mismatched_milestone_rejection(project_id)
+        _test_ownership_and_role_enforcement(project_id, evidence_id)
+        _test_list_and_filter_evidence(project_id, milestone_id)
+        _test_privacy_and_visibility_guards()
+        _test_update_and_delete_evidence(project_id, evidence_id)
+        _test_validation_rules(project_id)
+        _test_cascade_deletion()
 
         print("\n=========================================================")
         print("ALL MILESTONE R5 PROJECT EVIDENCE TESTS PASSED SUCCESSFULLY!")
@@ -489,4 +489,4 @@ def run_all_tests():
 
 
 if __name__ == "__main__":
-    run_all_tests()
+    test_project_evidence_workflow()
