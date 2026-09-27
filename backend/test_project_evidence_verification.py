@@ -128,7 +128,7 @@ def setup_fixture():
     return project_id, evidence_id
 
 
-def test_admin_verification_lifecycle(project_id: int, evidence_id: int):
+def _test_admin_verification_lifecycle(project_id: int, evidence_id: int):
     print("[1/8] Testing Admin verification creation, update, and transitions...")
     admin_token = get_token(ADMIN_EMAIL, UserRole.ADMIN)
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
@@ -206,7 +206,7 @@ def test_admin_verification_lifecycle(project_id: int, evidence_id: int):
     print("  -> Admin verification lifecycle passed.")
 
 
-def test_self_verification_prevention(project_id: int, evidence_id: int):
+def _test_self_verification_prevention(project_id: int, evidence_id: int):
     print("[2/8] Testing student self-verification prevention...")
     student_token = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     student_headers = {"Authorization": f"Bearer {student_token}"}
@@ -235,10 +235,10 @@ def test_self_verification_prevention(project_id: int, evidence_id: int):
     print("  -> Student self-verification prevention passed.")
 
 
-def test_role_and_auth_enforcement(project_id: int, evidence_id: int):
+def _test_role_and_auth_enforcement(project_id: int, evidence_id: int):
     print("[3/8] Testing RBAC and unauthenticated requests...")
     student2_token = get_token(STUDENT2_EMAIL, UserRole.STUDENT)
-    recruiter_token = get_token(RECRUITER_EMAIL, UserRole.RECRUITER)
+    recruiter_token = get_token(RECRUITER_EMAIL, UserRole.RECRUTER if hasattr(UserRole, "RECRUTER") else UserRole.RECRUITER)
 
     # 1. Unauthenticated request -> 401
     res_no_auth = client.post(
@@ -266,7 +266,7 @@ def test_role_and_auth_enforcement(project_id: int, evidence_id: int):
     print("  -> RBAC and auth enforcement passed.")
 
 
-def test_validation_rules(project_id: int, evidence_id: int):
+def _test_validation_rules(project_id: int, evidence_id: int):
     print("[4/8] Testing input validation rules...")
     admin_token = get_token(ADMIN_EMAIL, UserRole.ADMIN)
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
@@ -290,7 +290,7 @@ def test_validation_rules(project_id: int, evidence_id: int):
     print("  -> Input validation rules passed.")
 
 
-def test_relationship_and_not_found(project_id: int, evidence_id: int):
+def _test_relationship_and_not_found(project_id: int, evidence_id: int):
     print("[5/8] Testing relationship integrity and 404 responses...")
     admin_token = get_token(ADMIN_EMAIL, UserRole.ADMIN)
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
@@ -336,7 +336,7 @@ def test_relationship_and_not_found(project_id: int, evidence_id: int):
     print("  -> Relationship integrity and 404 responses passed.")
 
 
-def test_privacy_shield_private_projects():
+def _test_privacy_shield_private_projects():
     print("[6/8] Testing private project verification privacy shielding...")
     student1_token = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     student2_token = get_token(STUDENT2_EMAIL, UserRole.STUDENT)
@@ -412,7 +412,7 @@ def test_privacy_shield_private_projects():
     print("  -> Private project verification privacy shielding passed.")
 
 
-def test_duplicate_prevention_and_upsert(project_id: int, evidence_id: int):
+def _test_duplicate_prevention_and_upsert(project_id: int, evidence_id: int):
     print("[7/8] Testing 1-to-1 verification constraint and single record count...")
     admin_token = get_token(ADMIN_EMAIL, UserRole.ADMIN)
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
@@ -437,7 +437,7 @@ def test_duplicate_prevention_and_upsert(project_id: int, evidence_id: int):
     print("  -> Duplicate prevention and upsert passed.")
 
 
-def test_cascade_deletion():
+def _test_cascade_deletion():
     print("[8/8] Testing cascade deletion on evidence removal...")
     student_token = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
     admin_token = get_token(ADMIN_EMAIL, UserRole.ADMIN)
@@ -494,21 +494,21 @@ def test_cascade_deletion():
     print("  -> Cascade deletion passed.")
 
 
-def run_all_tests():
+def test_project_evidence_verification_workflow():
     print("\n=========================================================")
     print("STARTING MILESTONE R6 PROJECT EVIDENCE VERIFICATION TESTS...")
     print("=========================================================\n")
     cleanup_test_data()
     try:
         project_id, evidence_id = setup_fixture()
-        test_admin_verification_lifecycle(project_id, evidence_id)
-        test_self_verification_prevention(project_id, evidence_id)
-        test_role_and_auth_enforcement(project_id, evidence_id)
-        test_validation_rules(project_id, evidence_id)
-        test_relationship_and_not_found(project_id, evidence_id)
-        test_privacy_shield_private_projects()
-        test_duplicate_prevention_and_upsert(project_id, evidence_id)
-        test_cascade_deletion()
+        _test_admin_verification_lifecycle(project_id, evidence_id)
+        _test_self_verification_prevention(project_id, evidence_id)
+        _test_role_and_auth_enforcement(project_id, evidence_id)
+        _test_validation_rules(project_id, evidence_id)
+        _test_relationship_and_not_found(project_id, evidence_id)
+        _test_privacy_shield_private_projects()
+        _test_duplicate_prevention_and_upsert(project_id, evidence_id)
+        _test_cascade_deletion()
 
         print("\n=========================================================")
         print("ALL MILESTONE R6 VERIFICATION TESTS PASSED SUCCESSFULLY!")
@@ -518,4 +518,4 @@ def run_all_tests():
 
 
 if __name__ == "__main__":
-    run_all_tests()
+    test_project_evidence_verification_workflow()
