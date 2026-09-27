@@ -15,7 +15,7 @@ from app.main import app
 client = TestClient(app)
 
 
-def main():
+def test_db_connection_workflow():
     print("[1/6] Testing Python sqlalchemy connectivity to PostgreSQL")
     try:
         connected_initial = check_db_connection()
@@ -89,4 +89,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    test_db_connection_workflow()

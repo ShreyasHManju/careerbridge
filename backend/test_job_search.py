@@ -53,7 +53,7 @@ def cleanup_test_data():
             db.commit()
 
 
-def run_job_search_tests():
+def test_job_search_workflow():
     print("\n=========================================================")
     print("STARTING PHASE 12 SEARCH, FILTERING & PAGINATION TESTS")
     print("=========================================================\n")
@@ -616,4 +616,4 @@ def run_job_search_tests():
 
 
 if __name__ == "__main__":
-    run_job_search_tests()
+    test_job_search_workflow()
