@@ -12,6 +12,9 @@ import {
   ProjectEvidenceCreate,
   ProjectEvidenceListResponse,
   ProjectEvidenceUpdate,
+  ProjectEvidenceVerification,
+  EvidenceVerificationCreate,
+  EvidenceVerificationUpdate,
   ProjectStatus,
   ProjectType,
 } from '@/types/innovationProject';
@@ -158,4 +161,42 @@ export const deleteProjectEvidence = async (
   evidenceId: number
 ): Promise<void> => {
   await apiClient.delete(`/innovation-projects/${projectId}/evidence/${evidenceId}`);
+};
+
+// =========================================================================
+// Project Evidence Verification API (Milestone R6)
+// =========================================================================
+
+export const createOrUpdateEvidenceVerification = async (
+  projectId: number,
+  evidenceId: number,
+  payload: EvidenceVerificationCreate
+): Promise<ProjectEvidenceVerification> => {
+  const response = await apiClient.post<ProjectEvidenceVerification>(
+    `/innovation-projects/${projectId}/evidence/${evidenceId}/verification`,
+    payload
+  );
+  return response.data;
+};
+
+export const getEvidenceVerification = async (
+  projectId: number,
+  evidenceId: number
+): Promise<ProjectEvidenceVerification> => {
+  const response = await apiClient.get<ProjectEvidenceVerification>(
+    `/innovation-projects/${projectId}/evidence/${evidenceId}/verification`
+  );
+  return response.data;
+};
+
+export const updateEvidenceVerification = async (
+  projectId: number,
+  evidenceId: number,
+  payload: EvidenceVerificationUpdate
+): Promise<ProjectEvidenceVerification> => {
+  const response = await apiClient.patch<ProjectEvidenceVerification>(
+    `/innovation-projects/${projectId}/evidence/${evidenceId}/verification`,
+    payload
+  );
+  return response.data;
 };

@@ -1,23 +1,28 @@
 import React from 'react';
 import { ProjectEvidence, ProjectMilestone } from '@/types/innovationProject';
 import { EvidenceTypeBadge } from './EvidenceTypeBadge';
+import { VerificationStatusBadge } from './VerificationStatusBadge';
 
 interface ProjectEvidenceListProps {
   evidenceList: ProjectEvidence[];
   milestones?: ProjectMilestone[];
   isOwner: boolean;
+  isAdmin?: boolean;
   onAddEvidence?: () => void;
   onEditEvidence?: (evidence: ProjectEvidence) => void;
   onDeleteEvidence?: (evidence: ProjectEvidence) => void;
+  onVerifyEvidence?: (evidence: ProjectEvidence) => void;
 }
 
 export const ProjectEvidenceList: React.FC<ProjectEvidenceListProps> = ({
   evidenceList,
   milestones = [],
   isOwner,
+  isAdmin = false,
   onAddEvidence,
   onEditEvidence,
   onDeleteEvidence,
+  onVerifyEvidence,
 }) => {
   const milestoneMap = new Map<number, ProjectMilestone>(
     milestones.map((m) => [m.id, m])
@@ -64,6 +69,8 @@ export const ProjectEvidenceList: React.FC<ProjectEvidenceListProps> = ({
           ? milestoneMap.get(item.milestone_id)
           : null;
 
+        const verificationStatus = item.verification?.status || 'pending';
+
         return (
           <div
             key={item.id}
@@ -75,6 +82,10 @@ export const ProjectEvidenceList: React.FC<ProjectEvidenceListProps> = ({
               <div className="cb-evidence-title-row">
                 <div className="cb-evidence-badge-group">
                   <EvidenceTypeBadge type={item.evidence_type} />
+                  <VerificationStatusBadge
+                    status={verificationStatus}
+                    testId={`verification-badge-${item.id}`}
+                  />
                   {attachedMilestone && (
                     <span
                       className="cb-badge cb-badge-milestone-link"
@@ -87,34 +98,80 @@ export const ProjectEvidenceList: React.FC<ProjectEvidenceListProps> = ({
                 <h4 className="cb-evidence-title">{item.title}</h4>
               </div>
 
-              {isOwner && (
-                <div className="cb-evidence-actions">
-                  {onEditEvidence && (
-                    <button
-                      type="button"
-                      className="cb-btn cb-btn-secondary cb-btn-xs"
-                      onClick={() => onEditEvidence(item)}
-                      aria-label={`Edit ${item.title}`}
-                    >
-                      Edit
-                    </button>
-                  )}
-                  {onDeleteEvidence && (
-                    <button
-                      type="button"
-                      className="cb-btn cb-btn-danger cb-btn-xs"
-                      onClick={() => onDeleteEvidence(item)}
-                      aria-label={`Delete ${item.title}`}
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="cb-evidence-actions">
+                {isAdmin && onVerifyEvidence && (
+                  <button
+                    type="button"
+                    className="cb-btn cb-btn-outline cb-btn-xs cb-btn-verify-action"
+                    onClick={() => onVerifyEvidence(item)}
+                    aria-label={`Review and verify ${item.title}`}
+                    data-testid={`verify-btn-${item.id}`}
+                  >
+                    🛡️ Review / Verify
+                  </button>
+                )}
+                {isOwner && (
+                  <>
+                    {onEditEvidence && (
+                      <button
+                        type="button"
+                        className="cb-btn cb-btn-secondary cb-btn-xs"
+                        onClick={() => onEditEvidence(item)}
+                        aria-label={`Edit ${item.title}`}
+                        data-testid={`edit-evidence-${item.id}`}
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {onDeleteEvidence && (
+                      <button
+                        type="button"
+                        className="cb-btn cb-btn-danger cb-btn-xs"
+                        onClick={() => onDeleteEvidence(item)}
+                        aria-label={`Delete ${item.title}`}
+                        data-testid={`delete-evidence-${item.id}`}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
 
             {item.description && (
               <p className="cb-evidence-desc">{item.description}</p>
+            )}
+
+            {item.verification?.notes && (
+              <div
+                className={`cb-evidence-verification-notes cb-verification-notes-${verificationStatus}`}
+                style={{
+                  marginTop: '0.5rem',
+                  marginBottom: '0.5rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '4px',
+                  fontSize: '0.85rem',
+                  backgroundColor:
+                    verificationStatus === 'verified'
+                      ? '#f0fdf4'
+                      : verificationStatus === 'rejected'
+                      ? '#fef2f2'
+                      : '#f8fafc',
+                  borderLeft:
+                    verificationStatus === 'verified'
+                      ? '3px solid #22c55e'
+                      : verificationStatus === 'rejected'
+                      ? '3px solid #ef4444'
+                      : '3px solid #64748b',
+                }}
+                data-testid={`verification-notes-${item.id}`}
+              >
+                <div style={{ fontWeight: 600, color: '#334155', marginBottom: '0.2rem' }}>
+                  Verification Note:
+                </div>
+                <div style={{ color: '#475569' }}>{item.verification.notes}</div>
+              </div>
             )}
 
             <div className="cb-evidence-footer">
@@ -124,6 +181,7 @@ export const ProjectEvidenceList: React.FC<ProjectEvidenceListProps> = ({
                 rel="noopener noreferrer"
                 className="cb-btn cb-btn-outline cb-btn-sm cb-evidence-link"
                 aria-label={`Open artifact link for ${item.title}`}
+                data-testid={`evidence-link-${item.id}`}
               >
                 🔗 Open Artifact Link ↗
               </a>

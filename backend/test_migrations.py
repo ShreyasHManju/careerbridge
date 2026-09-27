@@ -35,7 +35,8 @@ def test_migrations():
     assert "experience_records" in Base.metadata.tables, "Table 'experience_records' missing from Base.metadata"
     assert "experience_skills" in Base.metadata.tables, "Table 'experience_skills' missing from Base.metadata"
     assert "project_evidence" in Base.metadata.tables, "Table 'project_evidence' missing from Base.metadata"
-    print("  -> Base.metadata contains innovation projects, milestones, evidence, and experience records tables.")
+    assert "project_evidence_verifications" in Base.metadata.tables, "Table 'project_evidence_verifications' missing from Base.metadata"
+    print("  -> Base.metadata contains innovation projects, milestones, evidence, verifications, and experience records tables.")
 
     print("[3/11] Verifying database schema after migration")
     inspector = inspect(engine)
@@ -62,6 +63,7 @@ def test_migrations():
     assert "project_skills" in tables, "Table 'project_skills' not found in database!"
     assert "project_milestones" in tables, "Table 'project_milestones' not found in database!"
     assert "project_evidence" in tables, "Table 'project_evidence' not found in database!"
+    assert "project_evidence_verifications" in tables, "Table 'project_evidence_verifications' not found in database!"
     assert "experience_records" in tables, "Table 'experience_records' not found in database!"
     assert "experience_skills" in tables, "Table 'experience_skills' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
@@ -516,7 +518,26 @@ def test_migrations():
     pe_idx_names = [idx["name"] for idx in pe_indexes]
     assert any("innovation_project_id" in name for name in pe_idx_names), "Index on innovation_project_id missing on project_evidence!"
 
-    print("[25/25] Verifying alembic_version table in PostgreSQL")
+    print("[25/26] Verifying 'project_evidence_verifications' table columns, indexes, FKs, and constraints")
+    pev_columns = {col["name"]: col for col in inspector.get_columns("project_evidence_verifications")}
+    expected_pev_cols = [
+        "id", "evidence_id", "verifier_id", "status", "notes",
+        "verified_at", "created_at", "updated_at"
+    ]
+    for c in expected_pev_cols:
+        assert c in pev_columns, f"Column '{c}' missing from 'project_evidence_verifications' table"
+    pev_fks = inspector.get_foreign_keys("project_evidence_verifications")
+    pev_ref_tables = {fk.get("referred_table") for fk in pev_fks}
+    assert "project_evidence" in pev_ref_tables, "FK to project_evidence missing on project_evidence_verifications!"
+    assert "users" in pev_ref_tables, "FK to users missing on project_evidence_verifications!"
+    pev_indexes = inspector.get_indexes("project_evidence_verifications")
+    pev_idx_cols = [idx["column_names"] for idx in pev_indexes]
+    assert ["evidence_id"] in pev_idx_cols, "Index on evidence_id missing on project_evidence_verifications!"
+    # Ensure evidence_id has unique index / constraint
+    ev_id_idx = [idx for idx in pev_indexes if idx["column_names"] == ["evidence_id"]]
+    assert any(idx.get("unique") is True for idx in ev_id_idx), "Unique index on 'evidence_id' missing on project_evidence_verifications!"
+
+    print("[26/26] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")

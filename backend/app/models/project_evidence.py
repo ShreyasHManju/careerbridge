@@ -9,6 +9,7 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from app.models.innovation_project import InnovationProject
     from app.models.project_milestone import ProjectMilestone
+    from app.models.project_evidence_verification import EvidenceVerification
 
 
 class EvidenceType(str, enum.Enum):
@@ -79,6 +80,12 @@ class ProjectEvidence(Base):
     milestone: Mapped[Optional["ProjectMilestone"]] = relationship(
         "ProjectMilestone",
         back_populates="evidence_items",
+    )
+    verification: Mapped[Optional["EvidenceVerification"]] = relationship(
+        "EvidenceVerification",
+        back_populates="evidence",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:

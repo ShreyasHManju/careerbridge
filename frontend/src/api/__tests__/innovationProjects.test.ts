@@ -1,18 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { apiClient } from '../client';
 import {
+  createOrUpdateEvidenceVerification,
   createProject,
   createProjectEvidence,
   createProjectMilestone,
   deleteProject,
   deleteProjectEvidence,
   deleteProjectMilestone,
+  getEvidenceVerification,
   getMyProjects,
   getProjectById,
   getProjectEvidence,
   getProjectEvidenceList,
   getProjectMilestones,
   getProjects,
+  updateEvidenceVerification,
   updateProject,
   updateProjectEvidence,
   updateProjectMilestone,
@@ -275,6 +278,72 @@ describe('Innovation Projects API Service Module', () => {
       const deleteSpy = vi.spyOn(apiClient, 'delete').mockResolvedValueOnce({ data: null });
       await deleteProjectEvidence(1, 501);
       expect(deleteSpy).toHaveBeenCalledWith('/innovation-projects/1/evidence/501');
+    });
+  });
+
+  // =========================================================================
+  // Project Evidence Verification API Tests (Milestone R6)
+  // =========================================================================
+
+  describe('createOrUpdateEvidenceVerification', () => {
+    it('calls POST /innovation-projects/:projectId/evidence/:evidenceId/verification with payload', async () => {
+      const mockVerification = {
+        id: 77,
+        evidence_id: 501,
+        verifier_id: 99,
+        status: 'verified' as const,
+        notes: 'Thoroughly audited repository.',
+        verified_at: '2026-09-25T12:00:00Z',
+        created_at: '2026-09-25T12:00:00Z',
+        updated_at: '2026-09-25T12:00:00Z',
+      };
+      const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({ data: mockVerification });
+      const payload = {
+        status: 'verified' as const,
+        notes: 'Thoroughly audited repository.',
+      };
+      const res = await createOrUpdateEvidenceVerification(1, 501, payload);
+      expect(postSpy).toHaveBeenCalledWith('/innovation-projects/1/evidence/501/verification', payload);
+      expect(res).toEqual(mockVerification);
+    });
+  });
+
+  describe('getEvidenceVerification', () => {
+    it('calls GET /innovation-projects/:projectId/evidence/:evidenceId/verification', async () => {
+      const mockVerification = {
+        id: 77,
+        evidence_id: 501,
+        verifier_id: 99,
+        status: 'verified' as const,
+        notes: 'Audited.',
+        verified_at: '2026-09-25T12:00:00Z',
+        created_at: '2026-09-25T12:00:00Z',
+        updated_at: '2026-09-25T12:00:00Z',
+      };
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: mockVerification });
+      const res = await getEvidenceVerification(1, 501);
+      expect(getSpy).toHaveBeenCalledWith('/innovation-projects/1/evidence/501/verification');
+      expect(res).toEqual(mockVerification);
+    });
+  });
+
+  describe('updateEvidenceVerification', () => {
+    it('calls PATCH /innovation-projects/:projectId/evidence/:evidenceId/verification with payload', async () => {
+      const mockVerification = {
+        id: 77,
+        evidence_id: 501,
+        verifier_id: 99,
+        status: 'rejected' as const,
+        notes: 'Needs update.',
+        verified_at: '2026-09-25T12:00:00Z',
+        created_at: '2026-09-25T12:00:00Z',
+        updated_at: '2026-09-25T12:00:00Z',
+      };
+      const patchSpy = vi.spyOn(apiClient, 'patch').mockResolvedValueOnce({ data: mockVerification });
+      const payload = { status: 'rejected' as const, notes: 'Needs update.' };
+      const res = await updateEvidenceVerification(1, 501, payload);
+      expect(patchSpy).toHaveBeenCalledWith('/innovation-projects/1/evidence/501/verification', payload);
+      expect(res).toEqual(mockVerification);
     });
   });
 });

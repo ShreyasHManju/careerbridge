@@ -3,9 +3,11 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 from app.models.project_evidence import EvidenceType
+from app.schemas.project_evidence_verification import EvidenceVerificationResponse
 
 
 class ProjectEvidenceBase(BaseModel):
+
     title: str = Field(..., min_length=2, max_length=150, description="Evidence artifact title (e.g., GitHub Repo, Live Demo, Whitepaper)")
     description: Optional[str] = Field(None, max_length=2000, description="Detailed description of the evidence artifact and its relevance")
     evidence_type: EvidenceType = Field(default=EvidenceType.LINK, description="Category of evidence artifact (repository, document, image, video, demo, presentation, link, other)")
@@ -64,10 +66,12 @@ class ProjectEvidenceUpdate(BaseModel):
 class ProjectEvidenceResponse(ProjectEvidenceBase):
     id: int
     innovation_project_id: int
+    verification: Optional[EvidenceVerificationResponse] = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class ProjectEvidenceListResponse(BaseModel):

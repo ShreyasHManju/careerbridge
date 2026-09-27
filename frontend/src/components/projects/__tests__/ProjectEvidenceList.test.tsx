@@ -26,6 +26,16 @@ const mockEvidenceList: ProjectEvidence[] = [
     url: 'https://github.com/example/careerbridge',
     created_at: '2026-09-25T00:00:00Z',
     updated_at: '2026-09-25T00:00:00Z',
+    verification: {
+      id: 10,
+      evidence_id: 1,
+      verifier_id: 99,
+      status: 'verified',
+      notes: 'Code passes all quality benchmarks.',
+      verified_at: '2026-09-25T12:00:00Z',
+      created_at: '2026-09-25T12:00:00Z',
+      updated_at: '2026-09-25T12:00:00Z',
+    },
   },
   {
     id: 2,
@@ -37,6 +47,28 @@ const mockEvidenceList: ProjectEvidence[] = [
     url: 'https://example.com/architecture.pdf',
     created_at: '2026-09-25T00:00:00Z',
     updated_at: '2026-09-25T00:00:00Z',
+    verification: null,
+  },
+  {
+    id: 3,
+    innovation_project_id: 1,
+    milestone_id: null,
+    title: 'Rejected Draft Diagram',
+    description: 'Outdated architectural draft.',
+    evidence_type: 'image',
+    url: 'https://example.com/draft.png',
+    created_at: '2026-09-25T00:00:00Z',
+    updated_at: '2026-09-25T00:00:00Z',
+    verification: {
+      id: 11,
+      evidence_id: 3,
+      verifier_id: 99,
+      status: 'rejected',
+      notes: 'Resolution is too low and diagram is incomplete.',
+      verified_at: '2026-09-25T12:00:00Z',
+      created_at: '2026-09-25T12:00:00Z',
+      updated_at: '2026-09-25T12:00:00Z',
+    },
   },
 ];
 
@@ -84,10 +116,32 @@ describe('ProjectEvidenceList Component', () => {
 
     // Check external links
     const links = screen.getAllByRole('link', { name: /Open artifact link/i });
-    expect(links).toHaveLength(2);
+    expect(links).toHaveLength(3);
     expect(links[0]).toHaveAttribute('href', 'https://github.com/example/careerbridge');
     expect(links[0]).toHaveAttribute('target', '_blank');
     expect(links[1]).toHaveAttribute('href', 'https://example.com/architecture.pdf');
+  });
+
+  it('renders verification status badges and reviewer notes for verified, rejected, and pending evidence', () => {
+    render(
+      <ProjectEvidenceList
+        evidenceList={mockEvidenceList}
+        milestones={mockMilestones}
+        isOwner={false}
+      />
+    );
+
+    // Verified badge on evidence 1
+    expect(screen.getByTestId('verification-badge-1')).toHaveTextContent('Verified Evidence');
+    expect(screen.getByTestId('verification-notes-1')).toHaveTextContent('Code passes all quality benchmarks.');
+
+    // Pending badge on evidence 2 (no verification record)
+    expect(screen.getByTestId('verification-badge-2')).toHaveTextContent('Pending Review');
+    expect(screen.queryByTestId('verification-notes-2')).not.toBeInTheDocument();
+
+    // Rejected badge on evidence 3
+    expect(screen.getByTestId('verification-badge-3')).toHaveTextContent('Review Rejected');
+    expect(screen.getByTestId('verification-notes-3')).toHaveTextContent('Resolution is too low and diagram is incomplete.');
   });
 
   it('renders owner actions and triggers edit and delete callbacks', () => {
@@ -105,12 +159,12 @@ describe('ProjectEvidenceList Component', () => {
     );
 
     const editBtns = screen.getAllByRole('button', { name: /Edit /i });
-    expect(editBtns).toHaveLength(2);
+    expect(editBtns).toHaveLength(3);
     fireEvent.click(editBtns[0]);
     expect(handleEdit).toHaveBeenCalledWith(mockEvidenceList[0]);
 
     const deleteBtns = screen.getAllByRole('button', { name: /Delete /i });
-    expect(deleteBtns).toHaveLength(2);
+    expect(deleteBtns).toHaveLength(3);
     fireEvent.click(deleteBtns[1]);
     expect(handleDelete).toHaveBeenCalledWith(mockEvidenceList[1]);
   });
@@ -126,5 +180,38 @@ describe('ProjectEvidenceList Component', () => {
 
     expect(screen.queryByRole('button', { name: /Edit /i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Delete /i })).not.toBeInTheDocument();
+  });
+
+  it('renders Review / Verify buttons for admins and triggers onVerifyEvidence', () => {
+    const handleVerify = vi.fn();
+
+    render(
+      <ProjectEvidenceList
+        evidenceList={mockEvidenceList}
+        milestones={mockMilestones}
+        isOwner={false}
+        isAdmin={true}
+        onVerifyEvidence={handleVerify}
+      />
+    );
+
+    const verifyBtns = screen.getAllByRole('button', { name: /Review and verify/i });
+    expect(verifyBtns).toHaveLength(3);
+
+    fireEvent.click(verifyBtns[0]);
+    expect(handleVerify).toHaveBeenCalledWith(mockEvidenceList[0]);
+  });
+
+  it('does NOT render Review / Verify buttons for regular student owners or non-admin viewers', () => {
+    render(
+      <ProjectEvidenceList
+        evidenceList={mockEvidenceList}
+        milestones={mockMilestones}
+        isOwner={true}
+        isAdmin={false}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /Review and verify/i })).not.toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/auth/useAuth';
 import {
+  createOrUpdateEvidenceVerification,
   createProjectEvidence,
   createProjectMilestone,
   deleteProject,
@@ -15,6 +16,7 @@ import {
   updateProjectMilestone,
 } from '@/api/innovationProjects';
 import {
+  EvidenceVerificationCreate,
   InnovationProject,
   InnovationProjectUpdate,
   MilestoneStatus,
@@ -31,6 +33,7 @@ import { ProjectMilestoneList } from '@/components/projects/ProjectMilestoneList
 import { ProjectMilestoneModal } from '@/components/projects/ProjectMilestoneModal';
 import { ProjectEvidenceList } from '@/components/projects/ProjectEvidenceList';
 import { ProjectEvidenceModal } from '@/components/projects/ProjectEvidenceModal';
+import { ProjectEvidenceVerificationModal } from '@/components/projects/ProjectEvidenceVerificationModal';
 
 export const ProjectDetailPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -69,6 +72,11 @@ export const ProjectDetailPage: React.FC = () => {
   const [isEvidenceSaving, setIsEvidenceSaving] = useState(false);
   const [deletingEvidence, setDeletingEvidence] = useState<ProjectEvidence | null>(null);
   const [isEvidenceDeleting, setIsEvidenceDeleting] = useState(false);
+
+  // Evidence Verification State (Milestone R6)
+  const [verifyingEvidence, setVerifyingEvidence] = useState<ProjectEvidence | null>(null);
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+  const [isVerificationSaving, setIsVerificationSaving] = useState(false);
 
 
   const fetchMilestones = async (pId: number) => {
@@ -234,6 +242,19 @@ export const ProjectDetailPage: React.FC = () => {
       alert(err.response?.data?.detail || 'Failed to delete evidence artifact.');
     } finally {
       setIsEvidenceDeleting(false);
+    }
+  };
+
+  const handleSaveVerification = async (payload: EvidenceVerificationCreate) => {
+    if (!project || !verifyingEvidence) return;
+    setIsVerificationSaving(true);
+    try {
+      await createOrUpdateEvidenceVerification(project.id, verifyingEvidence.id, payload);
+      await fetchEvidence(project.id);
+      setIsVerificationModalOpen(false);
+      setVerifyingEvidence(null);
+    } finally {
+      setIsVerificationSaving(false);
     }
   };
 
@@ -501,6 +522,7 @@ export const ProjectDetailPage: React.FC = () => {
               evidenceList={evidenceList}
               milestones={milestones}
               isOwner={!!isOwner}
+              isAdmin={user?.role === 'admin'}
               onAddEvidence={() => {
                 setEditingEvidence(null);
                 setIsEvidenceModalOpen(true);
@@ -511,6 +533,10 @@ export const ProjectDetailPage: React.FC = () => {
               }}
               onDeleteEvidence={(item) => {
                 setDeletingEvidence(item);
+              }}
+              onVerifyEvidence={(item) => {
+                setVerifyingEvidence(item);
+                setIsVerificationModalOpen(true);
               }}
             />
           )}
@@ -702,6 +728,18 @@ export const ProjectDetailPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Evidence Verification Modal (Milestone R6) */}
+      <ProjectEvidenceVerificationModal
+        isOpen={isVerificationModalOpen}
+        evidence={verifyingEvidence}
+        onSubmit={handleSaveVerification}
+        onClose={() => {
+          setIsVerificationModalOpen(false);
+          setVerifyingEvidence(null);
+        }}
+        isLoading={isVerificationSaving}
+      />
     </div>
   );
 };

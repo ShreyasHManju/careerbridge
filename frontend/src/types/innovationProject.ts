@@ -130,6 +130,7 @@ export interface ProjectEvidence {
   url: string;
   created_at: string;
   updated_at: string;
+  verification?: ProjectEvidenceVerification | null;
 }
 
 export interface ProjectEvidenceCreate {
@@ -152,4 +153,31 @@ export interface ProjectEvidenceListResponse {
   project_id: number;
   total_count: number;
   items: ProjectEvidence[];
+}
+
+// =========================================================================
+// Project Evidence Verification Types (Milestone R6)
+// =========================================================================
+
+export type EvidenceVerificationStatus = 'pending' | 'verified' | 'rejected';
+
+export interface ProjectEvidenceVerification {
+  id: number;
+  evidence_id: number;
+  verifier_id?: number | null;
+  status: EvidenceVerificationStatus;
+  notes?: string | null;
+  verified_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EvidenceVerificationCreate {
+  status?: EvidenceVerificationStatus;
+  notes?: string | null;
+}
+
+export interface EvidenceVerificationUpdate {
+  status?: EvidenceVerificationStatus;
+  notes?: string | null;
 }

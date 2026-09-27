@@ -24,11 +24,18 @@ from app.schemas.project_evidence import (
     ProjectEvidenceResponse,
     ProjectEvidenceUpdate,
 )
+from app.schemas.project_evidence_verification import (
+    EvidenceVerificationCreate,
+    EvidenceVerificationResponse,
+    EvidenceVerificationUpdate,
+)
 from app.services.innovation_project_service import InnovationProjectService
 from app.services.project_milestone_service import ProjectMilestoneService
 from app.services.project_evidence_service import ProjectEvidenceService
+from app.services.project_evidence_verification_service import ProjectEvidenceVerificationService
 
 router = APIRouter(prefix="/innovation-projects", tags=["Innovation Projects"])
+
 
 
 @router.post(
@@ -421,3 +428,82 @@ def delete_project_evidence(
         student_id=current_user.id,
     )
     return None
+
+
+# =========================================================================
+# PROJECT EVIDENCE VERIFICATION ENDPOINTS (Milestone R6)
+# =========================================================================
+
+@router.post(
+    "/{project_id}/evidence/{evidence_id}/verification",
+    response_model=EvidenceVerificationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Create or update project evidence verification decision",
+    description="Allows platform administrators to verify or reject project evidence artifacts. Students cannot self-verify.",
+)
+def create_or_update_evidence_verification(
+    project_id: int = Path(..., ge=1, description="Primary key identifier of the parent project"),
+    evidence_id: int = Path(..., ge=1, description="Primary key identifier of the evidence item"),
+    payload: EvidenceVerificationCreate = ...,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Evaluate and record verification decision for a project evidence artifact.
+    Enforces admin authority and prevents student self-approval.
+    """
+    return ProjectEvidenceVerificationService.create_or_update_verification(
+        db=db,
+        project_id=project_id,
+        evidence_id=evidence_id,
+        current_user=current_user,
+        payload=payload,
+    )
+
+
+@router.get(
+    "/{project_id}/evidence/{evidence_id}/verification",
+    response_model=EvidenceVerificationResponse,
+    summary="Get project evidence verification status",
+    description="Retrieves current verification state for an evidence artifact. Respects private project visibility guards.",
+)
+def get_evidence_verification(
+    project_id: int = Path(..., ge=1, description="Primary key identifier of the parent project"),
+    evidence_id: int = Path(..., ge=1, description="Primary key identifier of the evidence item"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get verification state for an evidence artifact.
+    """
+    return ProjectEvidenceVerificationService.get_verification(
+        db=db,
+        project_id=project_id,
+        evidence_id=evidence_id,
+        current_user=current_user,
+    )
+
+
+@router.patch(
+    "/{project_id}/evidence/{evidence_id}/verification",
+    response_model=EvidenceVerificationResponse,
+    summary="Partially update evidence verification state",
+    description="Allows platform administrators to update verification status or review notes.",
+)
+def update_evidence_verification(
+    project_id: int = Path(..., ge=1, description="Primary key identifier of the parent project"),
+    evidence_id: int = Path(..., ge=1, description="Primary key identifier of the evidence item"),
+    payload: EvidenceVerificationUpdate = ...,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update verification state for an evidence artifact. Enforces admin authority.
+    """
+    return ProjectEvidenceVerificationService.create_or_update_verification(
+        db=db,
+        project_id=project_id,
+        evidence_id=evidence_id,
+        current_user=current_user,
+        payload=payload,
+    )
