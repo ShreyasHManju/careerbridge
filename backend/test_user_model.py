@@ -42,8 +42,8 @@ def test_user_model_metadata():
     assert table.c.email.unique is True, "email must have unique constraint"
     assert table.c.email.index is True, "email must be indexed"
     assert table.c.email.nullable is False, "email must not be nullable"
-    assert table.c.password_hash.nullable is False, "password_hash must not be nullable"
-    print("  -> Primary key (id) and unique index (email) verified.")
+    assert table.c.password_hash.nullable is True, "password_hash must be nullable for OAuth users"
+    print("  -> Primary key (id), unique email index, and nullable password_hash verified.")
 
 
     print("[4/6] Verifying role enum and supported values")
