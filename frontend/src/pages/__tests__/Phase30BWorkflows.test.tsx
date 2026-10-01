@@ -220,6 +220,7 @@ describe('Phase 30B Workflows & Integrations', () => {
         isLoading: false,
         error: null,
         login: vi.fn(),
+        loginWithGoogle: vi.fn(),
         register: vi.fn(),
         logout: vi.fn(),
         clearAuthentication: vi.fn(),

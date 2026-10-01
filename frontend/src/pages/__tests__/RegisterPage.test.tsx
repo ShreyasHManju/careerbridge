@@ -19,6 +19,7 @@ describe('RegisterPage', () => {
       token: null,
       isAuthenticated: false,
       login: vi.fn(),
+      loginWithGoogle: vi.fn(),
       logout: vi.fn(),
       clearAuthentication: vi.fn(),
       initializeSession: vi.fn(),

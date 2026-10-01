@@ -80,6 +80,7 @@ function setupAuth(user: User | null) {
     isLoading: false,
     error: null,
     login: vi.fn(),
+    loginWithGoogle: vi.fn(),
     register: vi.fn(),
     logout: vi.fn(),
     clearAuthentication: vi.fn(),

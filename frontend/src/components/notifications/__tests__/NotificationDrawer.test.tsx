@@ -55,6 +55,7 @@ describe('NotificationDrawer Component', () => {
       token: 'valid-token',
       error: null,
       login: vi.fn(),
+      loginWithGoogle: vi.fn(),
       register: vi.fn(),
       logout: vi.fn(),
       clearAuthentication: vi.fn(),

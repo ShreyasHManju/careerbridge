@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { useAuth } from '@/auth/useAuth';
 import { ApiErrorResponse } from '@/types/api';
 
@@ -10,7 +11,7 @@ export const LoginPage: React.FC = () => {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState<boolean>(false);
 
-  const { login, isLoading, error: authError, clearError } = useAuth();
+  const { login, loginWithGoogle, isLoading, error: authError, clearError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -56,6 +57,27 @@ export const LoginPage: React.FC = () => {
         setCountdown(apiError.retry_after);
       }
     }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    if (isLoading || countdown !== null) return;
+    if (!credentialResponse.credential) {
+      setLocalError('Google authentication failed: no credential received.');
+      return;
+    }
+    clearError();
+    setLocalError(null);
+
+    try {
+      await loginWithGoogle(credentialResponse.credential);
+      navigate(from, { replace: true });
+    } catch {
+      // Error handled by AuthContext state or displayed via displayedError
+    }
+  };
+
+  const handleGoogleError = () => {
+    setLocalError('Google sign-in was unsuccessful. Please try again.');
   };
 
   const displayedError = localError || authError;
@@ -122,6 +144,22 @@ export const LoginPage: React.FC = () => {
           {isLoading ? 'Signing In...' : 'Sign In'}
         </button>
       </form>
+
+      <div className="cb-auth-divider">
+        <span>or</span>
+      </div>
+
+      <div
+        className={`cb-google-btn-wrapper ${isLoading || countdown !== null ? 'cb-google-disabled' : ''}`}
+      >
+        <GoogleLogin
+          onSuccess={handleGoogleSuccess}
+          onError={handleGoogleError}
+          text="continue_with"
+          shape="rectangular"
+          width="100%"
+        />
+      </div>
 
       <div className="cb-auth-footer">
         <p>

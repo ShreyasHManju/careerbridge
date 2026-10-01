@@ -56,3 +56,14 @@ export async function rootPingApi(): Promise<{ message: string; status: string }
   });
   return response.data;
 }
+
+/**
+ * Authenticate using a Google OAuth ID token.
+ * Route: POST /api/v1/auth/google
+ */
+export async function googleLoginApi(credential: string): Promise<LoginResponse> {
+  const response = await apiClient.post<LoginResponse>('/auth/google', {
+    credential,
+  });
+  return response.data;
+}

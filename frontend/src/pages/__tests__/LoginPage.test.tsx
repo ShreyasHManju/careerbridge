@@ -13,8 +13,39 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+vi.mock('@react-oauth/google', () => ({
+  GoogleLogin: ({ onSuccess, onError, text }: { onSuccess: (res: { credential?: string }) => void; onError?: () => void; text?: string }) => (
+    <div data-testid="google-login-container">
+      <button
+        type="button"
+        onClick={() => onSuccess({ credential: 'mock-google-id-token-xyz' })}
+        data-testid="google-login-button"
+      >
+        {text === 'continue_with' ? 'Continue with Google' : 'Sign in with Google'}
+      </button>
+      <button
+        type="button"
+        onClick={() => onError && onError()}
+        data-testid="google-error-trigger"
+      >
+        Trigger Google Error
+      </button>
+      <button
+        type="button"
+        onClick={() => onSuccess({ credential: undefined })}
+        data-testid="google-empty-credential-trigger"
+      >
+        Trigger Empty Credential
+      </button>
+    </div>
+  ),
+  useGoogleLogin: vi.fn(),
+  GoogleOAuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 describe('LoginPage Component', () => {
   const mockLogin = vi.fn();
+  const mockLoginWithGoogle = vi.fn();
   const mockClearError = vi.fn();
 
   beforeEach(() => {
@@ -22,6 +53,7 @@ describe('LoginPage Component', () => {
     sessionStorage.clear();
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       login: mockLogin,
+      loginWithGoogle: mockLoginWithGoogle,
       isLoading: false,
       error: null,
       clearError: mockClearError,
@@ -109,6 +141,7 @@ describe('LoginPage Component', () => {
   it('displays auth error message when authentication fails', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       login: mockLogin,
+      loginWithGoogle: mockLoginWithGoogle,
       isLoading: false,
       error: 'Incorrect email or password',
       clearError: mockClearError,
@@ -128,5 +161,63 @@ describe('LoginPage Component', () => {
     );
 
     expect(screen.getByRole('alert')).toHaveTextContent('Incorrect email or password');
+  });
+
+  it('renders Google sign-in button', () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTestId('google-login-button')).toBeInTheDocument();
+    expect(screen.getByText(/Continue with Google/i)).toBeInTheDocument();
+  });
+
+  it('invokes loginWithGoogle and navigates on successful Google login', async () => {
+    mockLoginWithGoogle.mockResolvedValueOnce({
+      id: 5,
+      email: 'google.student@example.com',
+      role: 'student',
+    });
+
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId('google-login-button'));
+
+    await waitFor(() => {
+      expect(mockClearError).toHaveBeenCalled();
+      expect(mockLoginWithGoogle).toHaveBeenCalledWith('mock-google-id-token-xyz');
+      expect(mockNavigate).toHaveBeenCalledWith('/app', { replace: true });
+    });
+  });
+
+  it('handles Google authentication error when Google returns failure', async () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId('google-error-trigger'));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Google sign-in was unsuccessful. Please try again.');
+  });
+
+  it('handles Google authentication error when empty credential is received', async () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId('google-empty-credential-trigger'));
+
+    expect(mockLoginWithGoogle).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Google authentication failed: no credential received.');
   });
 });

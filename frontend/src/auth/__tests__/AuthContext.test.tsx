@@ -26,8 +26,19 @@ const TestConsumer: React.FC = () => {
       <span data-testid="loading-status">{auth.isLoading ? 'loading' : 'ready'}</span>
       <span data-testid="user-email">{auth.user?.email || 'none'}</span>
       <span data-testid="auth-error">{auth.error || 'none'}</span>
-      <button onClick={() => auth.login({ email: 'student@example.com', password: 'password123' })}>
+      <button
+        onClick={() => {
+          auth.login({ email: 'student@example.com', password: 'password123' }).catch(() => {});
+        }}
+      >
         Log In
+      </button>
+      <button
+        onClick={() => {
+          auth.loginWithGoogle('google-mock-credential-token').catch(() => {});
+        }}
+      >
+        Log In With Google
       </button>
       <button onClick={() => auth.logout()}>Log Out</button>
     </div>
@@ -102,6 +113,67 @@ describe('AuthContext & AuthProvider', () => {
     });
 
     expect(tokenStorage.getToken()).toBe('new-login-token-123');
+  });
+
+  it('performs full Google login workflow: calls googleLoginApi, stores JWT token, calls getMeApi', async () => {
+    const googleSpy = vi.spyOn(authApi, 'googleLoginApi').mockResolvedValue({
+      access_token: 'google-jwt-token-456',
+      token_type: 'bearer',
+    });
+    const getMeSpy = vi.spyOn(authApi, 'getMeApi').mockResolvedValue(mockUser);
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading-status')).toHaveTextContent('ready');
+    });
+
+    // Click Log In With Google
+    act(() => {
+      screen.getByText('Log In With Google').click();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-status')).toHaveTextContent('authenticated');
+      expect(screen.getByTestId('user-email')).toHaveTextContent('student@example.com');
+    });
+
+    expect(googleSpy).toHaveBeenCalledWith('google-mock-credential-token');
+    expect(getMeSpy).toHaveBeenCalled();
+    expect(tokenStorage.getToken()).toBe('google-jwt-token-456');
+  });
+
+  it('handles Google login failure: clears authentication and sets error message', async () => {
+    vi.spyOn(authApi, 'googleLoginApi').mockRejectedValue({
+      status: 401,
+      message: 'Invalid Google authentication token.',
+      error_code: 'UNAUTHORIZED',
+    });
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading-status')).toHaveTextContent('ready');
+    });
+
+    act(() => {
+      screen.getByText('Log In With Google').click();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-status')).toHaveTextContent('unauthenticated');
+      expect(screen.getByTestId('auth-error')).toHaveTextContent('Invalid Google authentication token.');
+    });
+
+    expect(tokenStorage.getToken()).toBeNull();
   });
 
   it('clears token and resets user state upon logout', async () => {

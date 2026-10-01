@@ -1,11 +1,12 @@
 import React, { createContext, useCallback, useEffect, useState } from 'react';
 import { AuthState, LoginRequest, RegisterRequest, User } from '@/types/auth';
-import { getMeApi, loginApi, registerApi } from '@/api/auth';
+import { getMeApi, googleLoginApi, loginApi, registerApi } from '@/api/auth';
 import { tokenStorage } from '@/utils/tokenStorage';
 import { ApiErrorResponse } from '@/types/api';
 
 export interface AuthContextType extends AuthState {
   login: (credentials: LoginRequest) => Promise<User>;
+  loginWithGoogle: (credential: string) => Promise<User>;
   register: (payload: RegisterRequest) => Promise<User>;
   logout: () => void;
   clearAuthentication: () => void;
@@ -131,6 +132,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   /**
+   * Authenticate user with Google OAuth credential:
+   * 1. Accepts Google credential ID token
+   * 2. Calls POST /api/v1/auth/google via googleLoginApi(credential)
+   * 3. Stores returned CareerBridge access token using tokenStorage
+   * 4. Updates AuthContext token state
+   * 5. Calls GET /api/v1/auth/me via getMeApi()
+   * 6. Sets authenticated user
+   * 7. Returns user
+   * 8. Clears authentication if Google authentication fails
+   */
+  const loginWithGoogle = useCallback(
+    async (credential: string): Promise<User> => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const loginResponse = await googleLoginApi(credential);
+        tokenStorage.setToken(loginResponse.access_token);
+        setTokenState(loginResponse.access_token);
+
+        const currentUser = await getMeApi();
+        setUser(currentUser);
+        return currentUser;
+      } catch (err: unknown) {
+        const apiError = err as ApiErrorResponse;
+        const message = apiError.message || 'Google sign-in failed. Please try again.';
+        setError(message);
+        clearAuthentication();
+        throw apiError;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [clearAuthentication]
+  );
+
+  /**
    * Register new user account:
    * Calls POST /api/v1/users
    */
@@ -183,6 +220,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading,
     error,
     login,
+    loginWithGoogle,
     register,
     logout,
     clearAuthentication,

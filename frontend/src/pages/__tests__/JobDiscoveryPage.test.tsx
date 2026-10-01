@@ -106,6 +106,7 @@ function setupAuthMock(user: User = mockStudentUser) {
     isLoading: false,
     error: null,
     login: vi.fn(),
+    loginWithGoogle: vi.fn(),
     register: vi.fn(),
     logout: vi.fn(),
     clearAuthentication: vi.fn(),
