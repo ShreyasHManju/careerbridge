@@ -41,6 +41,21 @@ class User(Base):
         String(255),
          nullable=True,
     )
+
+    auth_provider: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="local",
+        server_default="local",
+    )
+
+    google_subject: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+
     role: Mapped[UserRole] = mapped_column(
         Enum(
             UserRole,

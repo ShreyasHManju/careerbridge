@@ -1,5 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -8,8 +10,9 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.rate_limit import rate_limiter
 from app.core.security import create_access_token, verify_password
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import LoginRequest, TokenResponse
+from app.schemas.google_auth import GoogleLoginRequest
 from app.schemas.user import UserResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -67,7 +70,12 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    user = db.scalar(select(User).where(User.email == payload.email))
+    user = db.scalar(
+        select(User).where(
+            User.email == payload.email,
+            User.auth_provider == "local",
+        )
+    )
     if not user:
         # Mitigate timing attack: compute dummy bcrypt hash so response time is identical
         verify_password(payload.password, DUMMY_BCRYPT_HASH)
@@ -78,6 +86,10 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
             _mask_email(payload.email),
             client_ip,
         )
+        raise generic_auth_exception
+    if not user.password_hash:
+        if settings.RATE_LIMIT_LOGIN_ENABLED:
+            rate_limiter.record_attempt(rate_key)
         raise generic_auth_exception
 
     if not verify_password(payload.password, user.password_hash):
@@ -121,12 +133,12 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     return TokenResponse(access_token=access_token, token_type="bearer")
 
 
-@router.get(
-    "/me",
+@router.get("/me",
     response_model=UserResponse,
     summary="Get current user",
     description="Retrieve account details of the currently authenticated user using the Bearer JWT token.",
 )
+
 def get_current_user_profile(current_user: User = Depends(get_current_user)):
     """
     Protected endpoint:
@@ -134,3 +146,125 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
     Returns safe user profile data (passwords and password hashes are strictly excluded).
     """
     return current_user
+
+@router.post(
+    "/google",
+    response_model=TokenResponse,
+    summary="Google login",
+    description="Authenticate or create a CareerBridge account using a verified Google ID token.",
+)
+def google_login(
+    payload: GoogleLoginRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Authenticate a user using a Google ID token.
+
+    Google verifies the user's identity first.
+    CareerBridge then creates/loads the corresponding local user
+    and issues its own JWT access token.
+    """
+    try:
+        google_data = id_token.verify_oauth2_token(
+            payload.credential,
+            google_requests.Request(),
+            settings.GOOGLE_CLIENT_ID,
+        )
+    except ValueError:
+        security_logger.warning(
+            "Google authentication failed: invalid ID token"
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google authentication token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    google_subject = google_data.get("sub")
+    email = google_data.get("email")
+    email_verified = google_data.get("email_verified", False)
+
+    if not google_subject or not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google account information is incomplete.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google email address is not verified.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    email = email.strip().lower()
+
+    # First find the account using Google's immutable subject identifier.
+    user = db.scalar(
+        select(User).where(
+            User.google_subject == google_subject
+        )
+    )
+
+    if user:
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Inactive user account.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        access_token = create_access_token(subject=user.id)
+
+        security_logger.info(
+            "Google authentication successful: User ID %s",
+            user.id,
+        )
+
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+        )
+
+    # Do not silently link Google to an existing local account.
+    existing_user = db.scalar(
+        select(User).where(User.email == email)
+    )
+
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "An account with this email already exists. "
+                "Please sign in using your existing email and password."
+            ),
+        )
+
+    # Create a new Google-based CareerBridge student account.
+    user = User(
+        email=email,
+        password_hash=None,
+        auth_provider="google",
+        google_subject=google_subject,
+        role=UserRole.STUDENT,
+        is_active=True,
+        is_verified=True,
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    security_logger.info(
+        "New Google account created: User ID %s",
+        user.id,
+    )
+
+    access_token = create_access_token(subject=user.id)
+
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+    )
