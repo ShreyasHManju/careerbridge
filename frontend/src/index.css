@@ -4970,3 +4970,811 @@ a.cb-stat-card-link:focus-visible {
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+
+/* ==========================================================================
+   CareerBridge Student Career Operating System (Phase 1)
+   ========================================================================== */
+
+.cb-student-career-os {
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-bottom: 3rem;
+}
+
+/* Section Common Headers */
+.cb-section-header {
+  margin-bottom: 1rem;
+}
+
+.cb-section-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cb-section-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  letter-spacing: -0.01em;
+  margin-bottom: 0.25rem;
+}
+
+.cb-section-subtitle {
+  font-size: 0.875rem;
+  color: var(--cb-text-muted);
+  line-height: 1.4;
+}
+
+/* 1. Career Header */
+.cb-career-header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 1.75rem 2rem;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.cb-career-header::after {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.2) 0%, rgba(37, 99, 235, 0) 70%);
+  pointer-events: none;
+}
+
+.cb-career-header-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+
+.cb-career-header-greeting-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.cb-career-greeting {
+  color: #f8fafc !important;
+  font-size: 1.625rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.cb-greeting-divider {
+  color: #64748b;
+}
+
+.cb-greeting-sub {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: #cbd5e1;
+}
+
+.cb-career-name {
+  color: #60a5fa;
+  font-weight: 700;
+}
+
+.cb-career-subhead {
+  font-size: 0.9375rem;
+  color: #94a3b8;
+  margin-bottom: 1rem;
+  line-height: 1.45;
+}
+
+.cb-career-readiness-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  color: #e2e8f0;
+}
+
+.cb-career-readiness-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+.cb-career-header-actions .cb-refresh-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+}
+
+.cb-career-header-actions .cb-refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.cb-spin {
+  animation: cb-spin-kf 1s linear infinite;
+}
+
+@keyframes cb-spin-kf {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 2. Career Journey Timeline */
+.cb-journey-timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  background: var(--cb-surface);
+  border: 1px solid var(--cb-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: var(--cb-shadow);
+}
+
+.cb-journey-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  text-decoration: none;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+}
+
+.cb-journey-step:hover {
+  background: #ffffff;
+  border-color: var(--cb-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.cb-journey-step-completed {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.cb-journey-step-active {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.cb-journey-step-upcoming {
+  opacity: 0.75;
+}
+
+.cb-journey-step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cb-journey-step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.cb-journey-step-completed .cb-journey-step-num {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.cb-journey-step-active .cb-journey-step-num {
+  background: var(--cb-primary);
+  color: #ffffff;
+}
+
+.cb-journey-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.cb-journey-badge-completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.cb-journey-badge-active {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.cb-journey-badge-upcoming {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.cb-journey-step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.25rem;
+}
+
+.cb-journey-step-name {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--cb-text);
+}
+
+.cb-journey-step-detail {
+  font-size: 0.75rem;
+  color: var(--cb-text-muted);
+  line-height: 1.35;
+  margin: 0;
+}
+
+/* 3. Today's Career Actions */
+.cb-action-card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.cb-career-action-card {
+  background: var(--cb-surface);
+  border: 1px solid var(--cb-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: var(--cb-shadow);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.cb-career-action-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+.cb-action-priority-high {
+  border-left: 4px solid #ef4444;
+}
+
+.cb-action-priority-medium {
+  border-left: 4px solid #f59e0b;
+}
+
+.cb-action-priority-standard {
+  border-left: 4px solid var(--cb-primary);
+}
+
+.cb-career-action-icon-wrapper {
+  color: var(--cb-primary);
+}
+
+.cb-action-priority-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+  display: inline-block;
+  margin-bottom: 0.35rem;
+}
+
+.cb-badge-high {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.cb-badge-medium {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.cb-badge-standard {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.cb-career-action-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  margin-bottom: 0.35rem;
+}
+
+.cb-career-action-desc {
+  font-size: 0.85rem;
+  color: var(--cb-text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.cb-career-action-cta {
+  margin-top: auto;
+  padding-top: 0.5rem;
+}
+
+.cb-action-link-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+/* 4. Application Funnel Grid */
+.cb-application-funnel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.cb-funnel-stage {
+  position: relative;
+}
+
+.cb-funnel-stage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.cb-funnel-step-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+/* 5. Career Evidence Grid */
+.cb-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.cb-evidence-card {
+  background: var(--cb-surface);
+  border: 1px solid var(--cb-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  text-decoration: none;
+  box-shadow: var(--cb-shadow);
+  transition: all 0.2s ease;
+}
+
+.cb-evidence-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  border-color: var(--cb-primary);
+}
+
+.cb-evidence-card-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cb-icon-success {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.cb-icon-primary {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.cb-icon-info {
+  background: #f0f9ff;
+  color: #0284c7;
+}
+
+.cb-icon-accent {
+  background: #faf5ff;
+  color: #7e22ce;
+}
+
+.cb-icon-warning {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.cb-evidence-value {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--cb-text);
+  line-height: 1;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.cb-evidence-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  margin-bottom: 0.25rem;
+}
+
+.cb-evidence-desc {
+  font-size: 0.8rem;
+  color: var(--cb-text-muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.cb-evaluations-callout {
+  margin-top: 1rem;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cb-evaluations-pill {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #92400e;
+}
+
+.cb-evaluations-text {
+  font-size: 0.825rem;
+  color: #78350f;
+}
+
+/* 6. Passport Banner */
+.cb-passport-banner {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 1.75rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(30, 58, 138, 0.2);
+}
+
+.cb-passport-banner-icon-bg {
+  position: absolute;
+  right: -10px;
+  bottom: -15px;
+  opacity: 0.12;
+  color: #ffffff;
+  pointer-events: none;
+}
+
+.cb-passport-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  display: inline-block;
+  margin-bottom: 0.5rem;
+}
+
+.cb-passport-banner-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+  color: #ffffff;
+}
+
+.cb-passport-banner-desc {
+  font-size: 0.9rem;
+  color: #dbeafe;
+  max-width: 650px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.cb-passport-cta-btn {
+  background: #ffffff !important;
+  color: #1e40af !important;
+  font-weight: 700 !important;
+  border: none !important;
+  padding: 0.65rem 1.25rem !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.cb-passport-cta-btn:hover {
+  background: #f8fafc !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+/* 7. Events & Resources Dual Column Layout */
+.cb-events-resources-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .cb-events-resources-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cb-event-cards-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cb-event-status-card {
+  background: var(--cb-surface);
+  border: 1px solid var(--cb-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  box-shadow: var(--cb-shadow);
+}
+
+.cb-event-status-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cb-event-status-info {
+  flex: 1;
+}
+
+.cb-event-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.cb-event-status-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  margin: 0;
+}
+
+.cb-event-count-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #334155;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.cb-event-status-desc {
+  font-size: 0.85rem;
+  color: var(--cb-text-muted);
+  line-height: 1.4;
+  margin: 0.35rem 0 0.75rem 0;
+}
+
+.cb-event-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cb-primary);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.cb-event-link:hover {
+  text-decoration: underline;
+}
+
+/* 8. Career Insights Card */
+.cb-insights-card {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cb-insights-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cb-insights-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.cb-insights-icon-pill {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4338ca;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cb-insights-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  margin: 0;
+}
+
+.cb-insights-status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #e0e7ff;
+  color: #3730a3;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+}
+
+.cb-insights-description {
+  font-size: 0.875rem;
+  color: var(--cb-text-muted);
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+}
+
+.cb-insights-readiness-checklist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.65rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.cb-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.825rem;
+  font-weight: 500;
+}
+
+.cb-checklist-item.cb-checked {
+  color: #166534;
+}
+
+.cb-checklist-item.cb-pending {
+  color: #64748b;
+}
+
+.cb-checklist-bullet {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.cb-insights-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cb-insights-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .cb-student-career-os {
+    gap: 1.5rem;
+  }
+
+  .cb-career-header {
+    padding: 1.25rem;
+  }
+
+  .cb-career-greeting {
+    font-size: 1.25rem;
+  }
+
+  .cb-greeting-sub {
+    font-size: 1rem;
+  }
+
+  .cb-journey-timeline {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .cb-application-funnel-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cb-action-card-list {
+    grid-template-columns: 1fr;
+  }
+
+  .cb-evidence-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cb-passport-banner {
+    padding: 1.25rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+

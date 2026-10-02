@@ -1,11 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { StudentDashboard } from '@/types/dashboard';
+import { PassportResponse } from '@/types/passport';
 import { getStudentDashboard } from '@/api/dashboards';
+import { getMyPassport } from '@/api/passport';
+import { AuthContext } from '@/auth/AuthContext';
 import { ApiErrorResponse } from '@/types/api';
 
+import { CareerHeader } from './student/CareerHeader';
+import { CareerJourneyTracker } from './student/CareerJourneyTracker';
+import { CareerActionList } from './student/CareerActionList';
+import { ApplicationJourney } from './student/ApplicationJourney';
+import { CareerEvidencePreview } from './student/CareerEvidencePreview';
+import { PassportBanner } from './student/PassportBanner';
+import { UpcomingCareerEvents } from './student/UpcomingCareerEvents';
+import { CareerInsightsCard } from './student/CareerInsightsCard';
+
 export const StudentDashboardView: React.FC = () => {
+  const auth = useContext(AuthContext);
+  const user = auth?.user ?? null;
+
   const [dashboard, setDashboard] = useState<StudentDashboard | null>(null);
+  const [passport, setPassport] = useState<PassportResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -14,8 +29,18 @@ export const StudentDashboardView: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      const data = await getStudentDashboard();
-      setDashboard(data);
+      // Fetch authoritative dashboard metrics
+      const dashboardPromise = getStudentDashboard();
+      // Attempt to fetch passport identity/evidence safely
+      const passportPromise = getMyPassport().catch(() => null);
+
+      const [dashboardData, passportData] = await Promise.all([
+        dashboardPromise,
+        passportPromise,
+      ]);
+
+      setDashboard(dashboardData);
+      setPassport(passportData);
     } catch (err: unknown) {
       const apiError = err as ApiErrorResponse;
       const message =
@@ -63,164 +88,53 @@ export const StudentDashboardView: React.FC = () => {
     return null;
   }
 
+  const hasSkills = Boolean(
+    (passport?.summary?.canonical_skills_count ?? 0) > 0 ||
+    (passport?.skills?.length ?? 0) > 0
+  );
+  const hasProjects = Boolean(
+    (passport?.summary?.public_projects_count ?? 0) > 0 ||
+    (passport?.projects?.length ?? 0) > 0
+  );
+  const hasExperiences = Boolean(
+    (passport?.summary?.verified_experiences_count ?? 0) > 0 ||
+    (passport?.verified_experiences?.length ?? 0) > 0
+  );
+
   return (
-    <div className="cb-dashboard-container" data-testid="student-dashboard-view">
-      {/* Header */}
-      <div className="cb-page-header">
-        <div className="cb-page-header-title-group">
-          <h1 className="cb-page-title">Student Dashboard</h1>
-          <p className="cb-page-subtitle">
-            Overview of your internship application funnel, upcoming interviews, and saved opportunities.
-          </p>
-        </div>
-        <div className="cb-page-header-actions">
-          <button
-            type="button"
-            onClick={fetchDashboardData}
-            className="cb-btn cb-btn-secondary cb-btn-sm"
-            title="Refresh dashboard metrics"
-            data-testid="refresh-student-dashboard-btn"
-          >
-            ↻ Refresh
-          </button>
-        </div>
-      </div>
+    <div className="cb-dashboard-container cb-student-career-os" data-testid="student-dashboard-view">
+      {/* 1. Career Header */}
+      <CareerHeader
+        user={user}
+        identity={passport?.identity}
+        onRefresh={fetchDashboardData}
+        isLoading={isLoading}
+      />
 
-      {/* Six Canonical Metric Cards */}
-      <section aria-labelledby="student-metrics-heading">
-        <h2 id="student-metrics-heading" className="cb-sr-only">
-          Application and Opportunity Metrics
-        </h2>
-        <div className="cb-stat-grid">
-          {/* 1. Total Applications */}
-          <Link
-            to="/app/applications"
-            className="cb-stat-card cb-stat-card-link"
-            data-testid="metric-total-applications"
-            aria-label="View all submitted applications"
-          >
-            <span className="cb-stat-label">Total Applications</span>
-            <span className="cb-stat-value">{dashboard.total_applications}</span>
-            <span className="cb-stat-desc">Submitted applications</span>
-          </Link>
+      {/* 2. Career Journey Roadmap */}
+      <CareerJourneyTracker dashboard={dashboard} passport={passport} />
 
-          {/* 2. Under Review */}
-          <Link
-            to="/app/applications?status=reviewing"
-            className="cb-stat-card cb-stat-warning cb-stat-card-link"
-            data-testid="metric-applications-under-review"
-            aria-label="View applications under review"
-          >
-            <span className="cb-stat-label">Under Review</span>
-            <span className="cb-stat-value">{dashboard.applications_under_review}</span>
-            <span className="cb-stat-desc">Being evaluated by recruiters</span>
-          </Link>
+      {/* 3. Today's Career Actions ("What should I do next?") */}
+      <CareerActionList dashboard={dashboard} passport={passport} />
 
-          {/* 3. Shortlisted */}
-          <Link
-            to="/app/applications?status=shortlisted"
-            className="cb-stat-card cb-stat-info cb-stat-card-link"
-            data-testid="metric-shortlisted-applications"
-            aria-label="View shortlisted applications"
-          >
-            <span className="cb-stat-label">Shortlisted</span>
-            <span className="cb-stat-value">{dashboard.shortlisted_applications}</span>
-            <span className="cb-stat-desc">Advanced to shortlist</span>
-          </Link>
+      {/* 4. Application Journey & Funnel (Preserves metric links & test contracts) */}
+      <ApplicationJourney dashboard={dashboard} />
 
-          {/* 4. Accepted */}
-          <Link
-            to="/app/applications?status=accepted"
-            className="cb-stat-card cb-stat-success cb-stat-card-link"
-            data-testid="metric-accepted-applications"
-            aria-label="View accepted application offers"
-          >
-            <span className="cb-stat-label">Accepted Offers</span>
-            <span className="cb-stat-value">{dashboard.accepted_applications}</span>
-            <span className="cb-stat-desc">Accepted by employers</span>
-          </Link>
+      {/* 5. Verified Career Evidence & Artifacts */}
+      <CareerEvidencePreview passport={passport} />
 
-          {/* 5. Saved Internships */}
-          <Link
-            to="/app/saved-jobs"
-            className="cb-stat-card cb-stat-card-link"
-            data-testid="metric-saved-internships"
-            aria-label="View bookmarked opportunities"
-          >
-            <span className="cb-stat-label">Saved Opportunities</span>
-            <span className="cb-stat-value">{dashboard.saved_internships}</span>
-            <span className="cb-stat-desc">Bookmarked for later</span>
-          </Link>
+      {/* 6. Career Passport Identity CTA */}
+      <PassportBanner />
 
-          {/* 6. Upcoming Interviews */}
-          <Link
-            to="/app/interviews"
-            className="cb-stat-card cb-stat-primary cb-stat-card-link"
-            data-testid="metric-upcoming-interviews"
-            aria-label="View scheduled future interviews"
-          >
-            <span className="cb-stat-label">Upcoming Interviews</span>
-            <span className="cb-stat-value">{dashboard.upcoming_interviews}</span>
-            <span className="cb-stat-desc">Scheduled future interviews</span>
-          </Link>
-        </div>
-      </section>
+      {/* 7. Upcoming Milestones & Quick Resources */}
+      <UpcomingCareerEvents dashboard={dashboard} />
 
-      {/* Quick Actions & Navigation */}
-      <section className="cb-dashboard-actions-section" aria-labelledby="student-quick-actions-heading">
-        <h2 id="student-quick-actions-heading" className="cb-section-title">
-          Quick Actions & Resources
-        </h2>
-        <div className="cb-action-grid">
-          <Link to="/app/jobs" className="cb-action-card" data-testid="quick-link-jobs">
-            <div className="cb-action-card-body">
-              <span className="cb-action-icon" aria-hidden="true">🔍</span>
-              <div>
-                <h3 className="cb-action-title">Browse Opportunities</h3>
-                <p className="cb-action-desc">
-                  Discover new active job and internship postings with custom search and filters.
-                </p>
-              </div>
-            </div>
-          </Link>
-
-          <Link to="/app/applications" className="cb-action-card" data-testid="quick-link-applications">
-            <div className="cb-action-card-body">
-              <span className="cb-action-icon" aria-hidden="true">📋</span>
-              <div>
-                <h3 className="cb-action-title">My Applications</h3>
-                <p className="cb-action-desc">
-                  Track the real-time review status of all your submitted candidate applications.
-                </p>
-              </div>
-            </div>
-          </Link>
-
-          <Link to="/app/interviews" className="cb-action-card" data-testid="quick-link-interviews">
-            <div className="cb-action-card-body">
-              <span className="cb-action-icon" aria-hidden="true">📅</span>
-              <div>
-                <h3 className="cb-action-title">My Interviews</h3>
-                <p className="cb-action-desc">
-                  View scheduled dates, durations, meeting links, and recruiter notes.
-                </p>
-              </div>
-            </div>
-          </Link>
-
-          <Link to="/app/student/profile" className="cb-action-card" data-testid="quick-link-profile">
-            <div className="cb-action-card-body">
-              <span className="cb-action-icon" aria-hidden="true">👤</span>
-              <div>
-                <h3 className="cb-action-title">My Profile & Resume</h3>
-                <p className="cb-action-desc">
-                  Update your contact details, education, skills, and resume document.
-                </p>
-              </div>
-            </div>
-          </Link>
-        </div>
-      </section>
+      {/* 8. Career Insights (Extensible Future Intelligence) */}
+      <CareerInsightsCard
+        hasSkills={hasSkills}
+        hasProjects={hasProjects}
+        hasExperiences={hasExperiences}
+      />
     </div>
   );
 };

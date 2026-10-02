@@ -3,7 +3,9 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { StudentDashboardView } from '../StudentDashboardView';
 import * as dashboardsApi from '@/api/dashboards';
+import * as passportApi from '@/api/passport';
 import { StudentDashboard } from '@/types/dashboard';
+import { PassportResponse } from '@/types/passport';
 
 const mockPopulatedDashboard: StudentDashboard = {
   total_applications: 8,
@@ -23,9 +25,45 @@ const mockZeroDashboard: StudentDashboard = {
   upcoming_interviews: 0,
 };
 
-describe('StudentDashboardView Component (Phase 22)', () => {
+const mockPassportData: PassportResponse = {
+  identity: {
+    user_id: 1,
+    email: 'student@example.com',
+    full_name: 'Shreyas Manju',
+    college: 'University Institute of Technology',
+    degree: 'B.Tech',
+    branch: 'Computer Science',
+    graduation_year: 2026,
+    bio: 'Aspiring software engineer interested in distributed systems.',
+    github_url: 'https://github.com/shreyas',
+    linkedin_url: 'https://linkedin.com/in/shreyas',
+    portfolio_url: 'https://shreyas.dev',
+    profile_image_url: null,
+    is_verified: true,
+    created_at: '2026-01-01T00:00:00Z',
+  },
+  summary: {
+    verified_experiences_count: 2,
+    public_projects_count: 3,
+    canonical_skills_count: 8,
+    completed_milestones_count: 6,
+    verified_evidence_count: 4,
+    total_evaluations_count: 2,
+    average_project_score: 92.5,
+  },
+  verified_experiences: [],
+  projects: [],
+  skills: [],
+  milestones: [],
+  verified_evidence: [],
+  resume: null,
+  is_owner: true,
+};
+
+describe('StudentDashboardView Component (Career OS)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(passportApi, 'getMyPassport').mockResolvedValue(mockPassportData);
   });
 
   it('displays loading indicator while fetching dashboard metrics', () => {
@@ -202,5 +240,35 @@ describe('StudentDashboardView Component (Phase 22)', () => {
     expect(screen.getByTestId('metric-accepted-applications')).toHaveAttribute('href', '/app/applications?status=accepted');
     expect(screen.getByTestId('metric-saved-internships')).toHaveAttribute('href', '/app/saved-jobs');
     expect(screen.getByTestId('metric-upcoming-interviews')).toHaveAttribute('href', '/app/interviews');
+  });
+
+  it('renders Student Career OS sections including Career Journey, Actions, Evidence, and Passport', async () => {
+    vi.spyOn(dashboardsApi, 'getStudentDashboard').mockResolvedValue(mockPopulatedDashboard);
+
+    render(
+      <MemoryRouter>
+        <StudentDashboardView />
+      </MemoryRouter>
+    );
+
+    await screen.findByTestId('student-dashboard-view');
+
+    // Personalized greeting & Passport name
+    expect(screen.getByText(/Shreyas Manju/i)).toBeInTheDocument();
+
+    // Section headings
+    expect(screen.getByRole('heading', { level: 2, name: /Career Journey/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /What should I do next\?/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Application Journey & Funnel/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Verified Career Evidence/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Your Career Passport/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Career Insights & Guidance/i })).toBeInTheDocument();
+
+    // Real Passport summary counts rendered
+    expect(screen.getByText(/Innovation Projects/i)).toBeInTheDocument();
+    expect(screen.getByText(/Documented Skills/i)).toBeInTheDocument();
+    expect(screen.getByText(/Verified Experiences/i)).toBeInTheDocument();
+    expect(screen.getAllByText('3').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1);
   });
 });
