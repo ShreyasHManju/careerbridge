@@ -72,7 +72,7 @@ describe('Admin Routes & Navigation Access Control (Phase F-11)', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('User Account Administration')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'User Management' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'User Management' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Recruiter Verification' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Job Moderation' })).toBeInTheDocument();
@@ -125,8 +125,8 @@ describe('Admin Routes & Navigation Access Control (Phase F-11)', () => {
       </MemoryRouter>
     );
 
-    // Should redirect to /app and NOT show Admin page
-    expect(screen.queryByText('User Account Administration')).not.toBeInTheDocument();
+    // Should redirect to /unauthorized or /app and NOT show Admin page
+    expect(screen.queryByRole('heading', { name: 'User Management' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'User Management' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Recruiter Verification' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Job Moderation' })).not.toBeInTheDocument();

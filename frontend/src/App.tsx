@@ -28,6 +28,7 @@ import { NotificationsPage } from '@/pages/NotificationsPage';
 import { AdminUsersPage } from '@/pages/AdminUsersPage';
 import { AdminRecruitersPage } from '@/pages/AdminRecruitersPage';
 import { AdminJobsPage } from '@/pages/AdminJobsPage';
+import { UnauthorizedPage } from '@/pages/UnauthorizedPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 export const App: React.FC = () => {
@@ -46,6 +47,7 @@ export const App: React.FC = () => {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/app" element={<AppHome />} />
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
           {/* Opportunity Discovery Routes (all authenticated roles) */}
           <Route path="/app/jobs" element={<JobDiscoveryPage />} />
           <Route path="/app/jobs/:jobId" element={<JobDetailPage />} />

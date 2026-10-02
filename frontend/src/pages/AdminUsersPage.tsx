@@ -117,9 +117,9 @@ export const AdminUsersPage: React.FC = () => {
     <div className="cb-admin-page-container" data-testid="admin-users-page">
       <div className="cb-page-header">
         <div className="cb-page-header-title-group">
-          <h1 className="cb-page-title">User Account Administration</h1>
+          <h1 className="cb-page-title">User Management</h1>
           <p className="cb-page-subtitle">
-            Manage user accounts, roles, verification badges, and account activity.
+            User Account Administration — Manage user accounts, roles, verification badges, and account activity.
           </p>
         </div>
         <div className="cb-page-header-actions">

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from '../ProtectedRoute';
+import { UnauthorizedPage } from '@/pages/UnauthorizedPage';
 import * as useAuthModule from '@/auth/useAuth';
 import { User } from '@/types/auth';
 
@@ -125,6 +126,7 @@ describe('ProtectedRoute', () => {
     render(
       <MemoryRouter initialEntries={['/admin-panel']}>
         <Routes>
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
             <Route path="/admin-panel" element={<div>Admin Only Content</div>} />
           </Route>

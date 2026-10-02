@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { RecruiterProfilePage } from '../RecruiterProfilePage';
+import { UnauthorizedPage } from '../UnauthorizedPage';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { AppLayout } from '@/layouts/AppLayout';
 import * as recruiterProfileApi from '@/api/recruiterProfile';
@@ -791,6 +792,7 @@ describe('RecruiterProfilePage — Comprehensive F-04 Scenarios', () => {
       render(
         <MemoryRouter initialEntries={['/app/recruiter/profile']}>
           <Routes>
+            <Route path="/unauthorized" element={<UnauthorizedPage />} />
             <Route element={<ProtectedRoute allowedRoles={['recruiter']} />}>
               <Route path="/app/recruiter/profile" element={<RecruiterProfilePage />} />
             </Route>
@@ -822,6 +824,7 @@ describe('RecruiterProfilePage — Comprehensive F-04 Scenarios', () => {
       render(
         <MemoryRouter initialEntries={['/app/recruiter/profile']}>
           <Routes>
+            <Route path="/unauthorized" element={<UnauthorizedPage />} />
             <Route element={<ProtectedRoute allowedRoles={['recruiter']} />}>
               <Route path="/app/recruiter/profile" element={<RecruiterProfilePage />} />
             </Route>

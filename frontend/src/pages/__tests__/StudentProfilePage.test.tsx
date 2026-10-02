@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { StudentProfilePage } from '../StudentProfilePage';
+import { UnauthorizedPage } from '../UnauthorizedPage';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { AppLayout } from '@/layouts/AppLayout';
 import * as studentProfileApi from '@/api/studentProfile';
@@ -749,6 +750,7 @@ describe('StudentProfilePage — Comprehensive F-03 Scenarios', () => {
     render(
       <MemoryRouter initialEntries={['/app/student/profile']}>
         <Routes>
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route element={<ProtectedRoute allowedRoles={['student']} />}>
             <Route path="/app/student/profile" element={<StudentProfilePage />} />
           </Route>
@@ -781,6 +783,7 @@ describe('StudentProfilePage — Comprehensive F-03 Scenarios', () => {
     render(
       <MemoryRouter initialEntries={['/app/student/profile']}>
         <Routes>
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route element={<ProtectedRoute allowedRoles={['student']} />}>
             <Route path="/app/student/profile" element={<StudentProfilePage />} />
           </Route>
