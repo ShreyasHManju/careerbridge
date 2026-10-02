@@ -227,6 +227,15 @@ export const InterviewCard: React.FC<InterviewCardProps> = ({
           </Link>
         ) : null}
 
+        {role === 'student' && interview.job_id ? (
+          <Link
+            to={`/app/jobs/${interview.job_id}`}
+            className="cb-btn cb-btn-outline cb-btn-sm"
+          >
+            View Opportunity
+          </Link>
+        ) : null}
+
         {role === 'student' && interview.recruiter_id ? (
           <Link
             to={`/app/messages?recipientId=${interview.recruiter_id}`}

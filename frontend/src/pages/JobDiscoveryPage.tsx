@@ -149,13 +149,22 @@ export const JobDiscoveryPage: React.FC = () => {
   return (
     <div className="cb-discovery-container">
       <header className="cb-discovery-header">
-        <div>
+        <div className="cb-discovery-header-content">
           <h1 className="cb-discovery-title">Discover Opportunities</h1>
           <p className="cb-discovery-subtitle">
-            Explore active internships and jobs curated for CareerBridge candidates.
+            Explore active internships and jobs curated for your career journey. Apply with verified evidence from your Career OS.
           </p>
         </div>
       </header>
+
+      {isStudent && (
+        <div className="cb-discovery-os-context-banner" data-testid="discovery-os-banner">
+          <div className="cb-discovery-os-badge">Career OS Discovery</div>
+          <div className="cb-discovery-os-message">
+            <span><strong>Evidence-Driven Journey:</strong> When applying to these roles, your Career Passport, verified experiences, and innovation projects will serve as verified evidence of your skills.</span>
+          </div>
+        </div>
+      )}
 
       {toastMessage && (
         <div

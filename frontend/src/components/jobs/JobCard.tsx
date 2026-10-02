@@ -147,6 +147,14 @@ export const JobCard: React.FC<JobCardProps> = ({
         )}
       </div>
 
+      {isStudent && (
+        <div className="cb-job-card-evidence-hint">
+          <span className="cb-evidence-hint-text">
+            Evidence-based role • Passport skills and projects will support your application
+          </span>
+        </div>
+      )}
+
       <div className="cb-job-card-actions">
         <Link
           to={`/app/jobs/${job.id}`}
@@ -184,3 +192,4 @@ export const JobCard: React.FC<JobCardProps> = ({
     </article>
   );
 };
+

@@ -9,6 +9,43 @@ interface NavItem {
   end?: boolean;
 }
 
+interface NavGroup {
+  domain: string;
+  label: string;
+  links: NavItem[];
+}
+
+const getStudentNavGroups = (): NavGroup[] => [
+  {
+    domain: 'career-os',
+    label: 'Career OS',
+    links: [
+      { to: '/app', label: 'Home', end: true },
+      { to: '/app/passport', label: 'Passport' },
+      { to: '/app/student/profile', label: 'My Profile' },
+      { to: '/app/projects', label: 'Projects' },
+      { to: '/app/experiences', label: 'Experiences' },
+    ],
+  },
+  {
+    domain: 'opportunities',
+    label: 'Opportunities & Funnel',
+    links: [
+      { to: '/app/jobs', label: 'Opportunities' },
+      { to: '/app/saved-jobs', label: 'Saved Jobs' },
+      { to: '/app/applications', label: 'My Applications' },
+      { to: '/app/interviews', label: 'Interviews' },
+    ],
+  },
+  {
+    domain: 'inbox',
+    label: 'Inbox',
+    links: [
+      { to: '/app/messages', label: 'Messages' },
+    ],
+  },
+];
+
 const getNavLinks = (role?: string): NavItem[] => {
   const links: NavItem[] = [
     { to: '/app', label: 'Home', end: true },
@@ -64,7 +101,7 @@ const getNavLinks = (role?: string): NavItem[] => {
 
 /**
  * Authenticated Application Shell
- * Provides responsive navigation, active route styling, user identity, and session management.
+ * Provides domain-grouped responsive navigation, active route styling, user identity, and session management.
  */
 export const AppLayout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -72,7 +109,9 @@ export const AppLayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
 
-  const navLinks = getNavLinks(user?.role);
+  const isStudent = user?.role === 'student';
+  const studentGroups = isStudent ? getStudentNavGroups() : [];
+  const standardNavLinks = getNavLinks(user?.role);
 
   const handleLogout = () => {
     setIsMobileMenuOpen(false);
@@ -127,16 +166,38 @@ export const AppLayout: React.FC = () => {
         </div>
 
         <nav className="cb-nav-links" aria-label="Main Navigation">
-          {navLinks.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.end}
-              className={({ isActive }) => `cb-nav-link ${isActive ? 'cb-nav-active' : ''}`}
-            >
-              {link.label}
-            </NavLink>
-          ))}
+          {isStudent ? (
+            <div className="cb-student-nav-domains">
+              {studentGroups.map((group) => (
+                <div key={group.domain} className={`cb-nav-domain-group cb-nav-${group.domain}`}>
+                  <span className="cb-nav-domain-label">{group.label}</span>
+                  <div className="cb-nav-domain-links">
+                    {group.links.map((link) => (
+                      <NavLink
+                        key={link.to}
+                        to={link.to}
+                        end={link.end}
+                        className={({ isActive }) => `cb-nav-link ${isActive ? 'cb-nav-active' : ''}`}
+                      >
+                        {link.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            standardNavLinks.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.end}
+                className={({ isActive }) => `cb-nav-link ${isActive ? 'cb-nav-active' : ''}`}
+              >
+                {link.label}
+              </NavLink>
+            ))
+          )}
         </nav>
 
         <div className="cb-nav-user">
@@ -166,17 +227,40 @@ export const AppLayout: React.FC = () => {
         {isMobileMenuOpen && (
           <nav id="cb-mobile-nav-panel" className="cb-mobile-nav-panel" aria-label="Mobile Navigation">
             <div className="cb-mobile-nav-links">
-              {navLinks.map((link) => (
-                <NavLink
-                  key={`mobile-${link.to}`}
-                  to={link.to}
-                  end={link.end}
-                  className={({ isActive }) => `cb-nav-link ${isActive ? 'cb-nav-active' : ''}`}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  {link.label}
-                </NavLink>
-              ))}
+              {isStudent ? (
+                <div className="cb-mobile-student-groups">
+                  {studentGroups.map((group) => (
+                    <div key={`mobile-group-${group.domain}`} className="cb-mobile-group-section">
+                      <span className="cb-mobile-group-title">{group.label}</span>
+                      <div className="cb-mobile-group-items">
+                        {group.links.map((link) => (
+                          <NavLink
+                            key={`mobile-${link.to}`}
+                            to={link.to}
+                            end={link.end}
+                            className={({ isActive }) => `cb-nav-link ${isActive ? 'cb-nav-active' : ''}`}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            {link.label}
+                          </NavLink>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                standardNavLinks.map((link) => (
+                  <NavLink
+                    key={`mobile-${link.to}`}
+                    to={link.to}
+                    end={link.end}
+                    className={({ isActive }) => `cb-nav-link ${isActive ? 'cb-nav-active' : ''}`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    {link.label}
+                  </NavLink>
+                ))
+              )}
             </div>
           </nav>
         )}
@@ -192,3 +276,4 @@ export const AppLayout: React.FC = () => {
     </div>
   );
 };
+

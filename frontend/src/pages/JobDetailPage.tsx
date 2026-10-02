@@ -335,6 +335,50 @@ export const JobDetailPage: React.FC = () => {
             </dl>
           </section>
         )}
+
+        {/* Student Career Evidence Overview */}
+        {isStudent && (
+          <section className="cb-job-detail-section cb-career-evidence-section" data-testid="job-career-evidence-section">
+            <div className="cb-evidence-section-header">
+              <h2>Your Career Evidence</h2>
+              <p className="cb-evidence-desc">
+                When you apply to this role, your CareerBridge profile evidence will accompany your application:
+              </p>
+            </div>
+
+            <div className="cb-evidence-preview-grid">
+              <div className="cb-evidence-preview-card">
+                <div className="cb-evidence-card-title">Career Passport</div>
+                <p className="cb-evidence-card-text">
+                  Your verified student credentials, academic identity, and verified skills.
+                </p>
+                <Link to="/app/passport" className="cb-link cb-link-sm">
+                  View Passport &rarr;
+                </Link>
+              </div>
+
+              <div className="cb-evidence-preview-card">
+                <div className="cb-evidence-card-title">Innovation Projects</div>
+                <p className="cb-evidence-card-text">
+                  Showcase your GitHub repositories, live demo links, and project milestones.
+                </p>
+                <Link to="/app/projects" className="cb-link cb-link-sm">
+                  View Projects &rarr;
+                </Link>
+              </div>
+
+              <div className="cb-evidence-preview-card">
+                <div className="cb-evidence-card-title">Verified Experiences</div>
+                <p className="cb-evidence-card-text">
+                  Third-party authenticated internships, leadership positions, and roles.
+                </p>
+                <Link to="/app/experiences" className="cb-link cb-link-sm">
+                  View Experiences &rarr;
+                </Link>
+              </div>
+            </div>
+          </section>
+        )}
       </article>
 
       {/* Apply Modal */}

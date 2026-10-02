@@ -10,6 +10,23 @@ interface StudentApplicationCardProps {
   isLoadingJob?: boolean;
 }
 
+const getStatusMessage = (status: string): string => {
+  switch (status) {
+    case 'applied':
+      return 'Application submitted';
+    case 'reviewing':
+      return 'Application under review';
+    case 'shortlisted':
+      return "You've been shortlisted";
+    case 'accepted':
+      return 'Application accepted';
+    case 'rejected':
+      return 'Application closed';
+    default:
+      return `Status: ${status}`;
+  }
+};
+
 export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
   application,
   job,
@@ -28,6 +45,16 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
       ? `${job.location} (Remote)`
       : 'Remote'
     : job?.location || 'Location not specified';
+
+  const statusMsg = getStatusMessage(application.status);
+  const isShortlistedOrAccepted = application.status === 'shortlisted' || application.status === 'accepted';
+
+  // Journey stage progression helpers
+  const isAppliedStep = true;
+  const isReviewingStep = application.status === 'reviewing' || application.status === 'shortlisted' || application.status === 'accepted';
+  const isShortlistedStep = application.status === 'shortlisted' || application.status === 'accepted';
+  const isInterviewStep = application.status === 'shortlisted' || application.status === 'accepted';
+  const isDecisionStep = application.status === 'accepted' || application.status === 'rejected';
 
   return (
     <article
@@ -71,6 +98,48 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
         <span className="cb-app-card-date">Applied on {formattedDate}</span>
       </div>
 
+      {/* Visual Application Journey Funnel */}
+      <div className="cb-app-journey-tracker" aria-label={`Application Journey: ${statusMsg}`}>
+        <div className="cb-app-journey-steps">
+          <div className={`cb-journey-step ${isAppliedStep ? 'cb-step-active' : ''}`}>
+            <div className="cb-step-indicator">1</div>
+            <span className="cb-step-label">Applied</span>
+          </div>
+          <div className={`cb-journey-connector ${isReviewingStep ? 'cb-conn-active' : ''}`} />
+
+          <div className={`cb-journey-step ${isReviewingStep ? 'cb-step-active' : ''}`}>
+            <div className="cb-step-indicator">2</div>
+            <span className="cb-step-label">Review</span>
+          </div>
+          <div className={`cb-journey-connector ${isShortlistedStep ? 'cb-conn-active' : ''}`} />
+
+          <div className={`cb-journey-step ${isShortlistedStep ? 'cb-step-active' : ''}`}>
+            <div className="cb-step-indicator">3</div>
+            <span className="cb-step-label">Shortlist</span>
+          </div>
+          <div className={`cb-journey-connector ${isInterviewStep ? 'cb-conn-active' : ''}`} />
+
+          <div className={`cb-journey-step ${isInterviewStep ? 'cb-step-active' : ''}`}>
+            <div className="cb-step-indicator">4</div>
+            <span className="cb-step-label">Interview</span>
+          </div>
+          <div className={`cb-journey-connector ${isDecisionStep ? 'cb-conn-active' : ''}`} />
+
+          <div className={`cb-journey-step ${isDecisionStep ? (application.status === 'accepted' ? 'cb-step-success' : 'cb-step-closed') : ''}`}>
+            <div className="cb-step-indicator">5</div>
+            <span className="cb-step-label">
+              {application.status === 'accepted' ? 'Offer' : application.status === 'rejected' ? 'Closed' : 'Outcome'}
+            </span>
+          </div>
+        </div>
+
+        <div className="cb-app-journey-status-text">
+          <span className="cb-journey-current-state">
+            <strong>Current State:</strong> {statusMsg}
+          </span>
+        </div>
+      </div>
+
       {application.cover_message && (
         <div className="cb-app-card-cover-message">
           <span className="cb-app-card-cover-label">Your Cover Note:</span>
@@ -85,7 +154,17 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
         >
           View Opportunity Details
         </Link>
+
+        {isShortlistedOrAccepted && (
+          <Link
+            to="/app/interviews"
+            className="cb-btn cb-btn-primary cb-btn-sm cb-btn-interview-link"
+          >
+            📅 View Interviews
+          </Link>
+        )}
       </div>
     </article>
   );
 };
+
