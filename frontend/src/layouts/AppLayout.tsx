@@ -1,83 +1,142 @@
-import React from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/auth/useAuth';
 import { NotificationDrawer } from '@/components/notifications/NotificationDrawer';
 
+interface NavItem {
+  to: string;
+  label: string;
+  end?: boolean;
+}
+
+const getNavLinks = (role?: string): NavItem[] => {
+  const links: NavItem[] = [
+    { to: '/app', label: 'Home', end: true },
+  ];
+
+  if (role === 'student') {
+    links.push(
+      { to: '/app/student/profile', label: 'My Profile' },
+      { to: '/app/passport', label: 'Passport' },
+      { to: '/app/projects', label: 'Projects' },
+      { to: '/app/experiences', label: 'Experiences' },
+    );
+  }
+
+  if (role === 'recruiter') {
+    links.push(
+      { to: '/app/recruiter/profile', label: 'Company Profile' },
+    );
+  }
+
+  links.push({ to: '/app/jobs', label: 'Opportunities' });
+
+  if (role === 'student') {
+    links.push(
+      { to: '/app/saved-jobs', label: 'Saved Jobs' },
+      { to: '/app/applications', label: 'My Applications' },
+      { to: '/app/interviews', label: 'Interviews' },
+    );
+  }
+
+  if (role === 'recruiter') {
+    links.push(
+      { to: '/app/recruiter/jobs', label: 'Job Postings' },
+      { to: '/app/recruiter/applications', label: 'Applications' },
+      { to: '/app/recruiter/interviews', label: 'Interviews' },
+      { to: '/app/recruiter/experiences/verification', label: 'Experience Verification' },
+    );
+  }
+
+  if (role === 'admin') {
+    links.push(
+      { to: '/app/admin/users', label: 'User Management' },
+      { to: '/app/admin/recruiters', label: 'Recruiter Verification' },
+      { to: '/app/admin/jobs', label: 'Job Moderation' },
+      { to: '/app/admin/experiences/verification', label: 'Experience Verification' },
+    );
+  }
+
+  links.push({ to: '/app/messages', label: 'Messages' });
+
+  return links;
+};
+
 /**
- * Minimal Authenticated Application Shell
- * Demonstrates CareerBridge branding, navigation, user identity, and sign-out.
+ * Authenticated Application Shell
+ * Provides responsive navigation, active route styling, user identity, and session management.
  */
 export const AppLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+
+  const navLinks = getNavLinks(user?.role);
 
   const handleLogout = () => {
+    setIsMobileMenuOpen(false);
     logout();
     navigate('/login');
   };
 
+  // Close mobile navigation on Escape key or outside click
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (headerRef.current && !headerRef.current.contains(event.target as Node)) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMobileMenuOpen]);
+
   return (
     <div className="cb-app-layout">
-      <header className="cb-navbar">
+      <header className="cb-navbar" ref={headerRef}>
         <div className="cb-nav-brand">
+          <button
+            type="button"
+            className="cb-mobile-menu-btn"
+            aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="cb-mobile-nav-panel"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            <span className="cb-mobile-menu-icon" aria-hidden="true">
+              {isMobileMenuOpen ? '✕' : '☰'}
+            </span>
+          </button>
           <Link to="/app" className="cb-logo-text">
             <strong>CareerBridge</strong>
           </Link>
-          <span className="cb-env-badge">v1.0 Foundation</span>
         </div>
 
-        <nav className="cb-nav-links">
-          <Link to="/app" className="cb-nav-link">Home</Link>
-          {user?.role === 'student' && (
-            <Link to="/app/student/profile" className="cb-nav-link">My Profile</Link>
-          )}
-          {user?.role === 'student' && (
-            <Link to="/app/passport" className="cb-nav-link">Passport</Link>
-          )}
-          {user?.role === 'student' && (
-            <Link to="/app/projects" className="cb-nav-link">Projects</Link>
-          )}
-          {user?.role === 'student' && (
-            <Link to="/app/experiences" className="cb-nav-link">Experiences</Link>
-          )}
-          {user?.role === 'recruiter' && (
-            <Link to="/app/recruiter/profile" className="cb-nav-link">Company Profile</Link>
-          )}
-          <Link to="/app/jobs" className="cb-nav-link">Opportunities</Link>
-          {user?.role === 'student' && (
-            <Link to="/app/saved-jobs" className="cb-nav-link">Saved Jobs</Link>
-          )}
-          {user?.role === 'student' && (
-            <Link to="/app/applications" className="cb-nav-link">My Applications</Link>
-          )}
-          {user?.role === 'student' && (
-            <Link to="/app/interviews" className="cb-nav-link">Interviews</Link>
-          )}
-          {user?.role === 'recruiter' && (
-            <Link to="/app/recruiter/jobs" className="cb-nav-link">Job Postings</Link>
-          )}
-          {user?.role === 'recruiter' && (
-            <Link to="/app/recruiter/applications" className="cb-nav-link">Applications</Link>
-          )}
-          {user?.role === 'recruiter' && (
-            <Link to="/app/recruiter/interviews" className="cb-nav-link">Interviews</Link>
-          )}
-          {user?.role === 'recruiter' && (
-            <Link to="/app/recruiter/experiences/verification" className="cb-nav-link">Experience Verification</Link>
-          )}
-          {user?.role === 'admin' && (
-            <Link to="/app/admin/users" className="cb-nav-link">User Management</Link>
-          )}
-          {user?.role === 'admin' && (
-            <Link to="/app/admin/recruiters" className="cb-nav-link">Recruiter Verification</Link>
-          )}
-          {user?.role === 'admin' && (
-            <Link to="/app/admin/jobs" className="cb-nav-link">Job Moderation</Link>
-          )}
-          {user?.role === 'admin' && (
-            <Link to="/app/admin/experiences/verification" className="cb-nav-link">Experience Verification</Link>
-          )}
-          <Link to="/app/messages" className="cb-nav-link">Messages</Link>
+        <nav className="cb-nav-links" aria-label="Main Navigation">
+          {navLinks.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              end={link.end}
+              className={({ isActive }) => `cb-nav-link ${isActive ? 'cb-nav-active' : ''}`}
+            >
+              {link.label}
+            </NavLink>
+          ))}
         </nav>
 
         <div className="cb-nav-user">
@@ -103,6 +162,24 @@ export const AppLayout: React.FC = () => {
             Sign Out
           </button>
         </div>
+
+        {isMobileMenuOpen && (
+          <nav id="cb-mobile-nav-panel" className="cb-mobile-nav-panel" aria-label="Mobile Navigation">
+            <div className="cb-mobile-nav-links">
+              {navLinks.map((link) => (
+                <NavLink
+                  key={`mobile-${link.to}`}
+                  to={link.to}
+                  end={link.end}
+                  className={({ isActive }) => `cb-nav-link ${isActive ? 'cb-nav-active' : ''}`}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  {link.label}
+                </NavLink>
+              ))}
+            </div>
+          </nav>
+        )}
       </header>
 
       <main className="cb-main-content">

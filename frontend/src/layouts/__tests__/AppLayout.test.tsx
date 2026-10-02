@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppLayout } from '../AppLayout';
 import * as useAuthModule from '@/auth/useAuth';
@@ -162,5 +162,83 @@ describe('AppLayout Navigation (Phase F-08 & 30B.2)', () => {
 
     expect(screen.queryByRole('button', { name: /Notifications/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/student@example.com/i)).not.toBeInTheDocument();
+  });
+
+  it('does not render the legacy "v1.0 Foundation" badge', () => {
+    setupAuth(mockStudentUser);
+
+    render(
+      <MemoryRouter>
+        <AppLayout />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByText(/v1\.0 Foundation/i)).not.toBeInTheDocument();
+  });
+
+  it('highlights the active route using cb-nav-active', () => {
+    setupAuth(mockStudentUser);
+
+    render(
+      <MemoryRouter initialEntries={['/app/jobs']}>
+        <AppLayout />
+      </MemoryRouter>
+    );
+
+    const activeLink = screen.getByRole('link', { name: /Opportunities/i });
+    expect(activeLink).toHaveClass('cb-nav-active');
+
+    const inactiveLink = screen.getByRole('link', { name: /^Home$/i });
+    expect(inactiveLink).not.toHaveClass('cb-nav-active');
+  });
+
+  it('supports accessible mobile navigation menu toggling', () => {
+    setupAuth(mockStudentUser);
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <AppLayout />
+      </MemoryRouter>
+    );
+
+    const toggleButton = screen.getByRole('button', { name: /Open navigation menu/i });
+    expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
+    expect(toggleButton).toHaveAttribute('aria-controls', 'cb-mobile-nav-panel');
+
+    // Open mobile menu
+    fireEvent.click(toggleButton);
+    expect(toggleButton).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('navigation', { name: /Mobile Navigation/i })).toBeInTheDocument();
+
+    // Close menu by clicking toggle again
+    fireEvent.click(toggleButton);
+    expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('navigation', { name: /Mobile Navigation/i })).not.toBeInTheDocument();
+  });
+
+  it('closes mobile menu on escape key and on link click', () => {
+    setupAuth(mockStudentUser);
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <AppLayout />
+      </MemoryRouter>
+    );
+
+    const toggleButton = screen.getByRole('button', { name: /Open navigation menu/i });
+    fireEvent.click(toggleButton);
+    expect(screen.getByRole('navigation', { name: /Mobile Navigation/i })).toBeInTheDocument();
+
+    // Press Escape
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('navigation', { name: /Mobile Navigation/i })).not.toBeInTheDocument();
+
+    // Open and click link inside mobile nav
+    fireEvent.click(toggleButton);
+    const mobileNav = screen.getByRole('navigation', { name: /Mobile Navigation/i });
+    const mobileOpportunities = mobileNav.querySelector('a[href="/app/jobs"]');
+    expect(mobileOpportunities).toBeInTheDocument();
+    fireEvent.click(mobileOpportunities!);
+    expect(screen.queryByRole('navigation', { name: /Mobile Navigation/i })).not.toBeInTheDocument();
   });
 });
