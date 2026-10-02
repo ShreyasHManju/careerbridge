@@ -8,6 +8,7 @@ import { exportRecruiterInterviews } from '@/api/export';
 import { Interview, InterviewFilterStatus } from '@/types/interview';
 import { InterviewCard } from '@/components/interviews/InterviewCard';
 import { RescheduleInterviewModal } from '@/components/interviews/RescheduleInterviewModal';
+import { InterviewDetailModal } from '@/components/interviews/InterviewDetailModal';
 import { ApiErrorResponse } from '@/types/api';
 
 type InterviewTab = 'upcoming' | 'past' | 'all';
@@ -27,6 +28,7 @@ export const RecruiterInterviewsPage: React.FC = () => {
 
   // Modals
   const [editingInterview, setEditingInterview] = useState<Interview | null>(null);
+  const [detailInterview, setDetailInterview] = useState<Interview | null>(null);
 
   const fetchInterviews = useCallback(async () => {
     setIsLoading(true);
@@ -349,6 +351,7 @@ export const RecruiterInterviewsPage: React.FC = () => {
                     key={interview.id}
                     interview={interview}
                     role="recruiter"
+                    onViewDetails={(target) => setDetailInterview(target)}
                     onReschedule={(target) => setEditingInterview(target)}
                     onMarkComplete={handleMarkComplete}
                     onCancel={handleCancelInterview}
@@ -368,6 +371,20 @@ export const RecruiterInterviewsPage: React.FC = () => {
           interview={editingInterview}
           onClose={() => setEditingInterview(null)}
           onSuccess={handleRescheduleSuccess}
+        />
+      )}
+
+      {/* Full Interview Detail Modal */}
+      {detailInterview && (
+        <InterviewDetailModal
+          isOpen={Boolean(detailInterview)}
+          interview={detailInterview}
+          role="recruiter"
+          onClose={() => setDetailInterview(null)}
+          onReschedule={(target) => setEditingInterview(target)}
+          onMarkComplete={handleMarkComplete}
+          onCancel={handleCancelInterview}
+          isMutating={mutatingInterviewId === detailInterview.id}
         />
       )}
     </div>

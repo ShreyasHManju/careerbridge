@@ -79,7 +79,7 @@ describe('RegisterPage', () => {
     );
 
     const emailInput = screen.getByLabelText(/Email Address/i);
-    const passwordInput = screen.getByLabelText(/Password/i);
+    const passwordInput = screen.getByLabelText(/^Password$/i);
     const submitBtn = screen.getByRole('button', { name: /Register/i });
 
     fireEvent.change(emailInput, { target: { value: 'newuser@example.com' } });
@@ -104,7 +104,7 @@ describe('RegisterPage', () => {
     );
 
     const emailInput = screen.getByLabelText(/Email Address/i);
-    const passwordInput = screen.getByLabelText(/Password/i);
+    const passwordInput = screen.getByLabelText(/^Password$/i);
     const submitBtn = screen.getByRole('button', { name: /Register/i });
 
     fireEvent.change(emailInput, { target: { value: '  newstudent@example.com  ' } });
@@ -119,5 +119,28 @@ describe('RegisterPage', () => {
       });
       expect(screen.getByRole('alert')).toHaveTextContent('Account created successfully');
     });
+  });
+
+  it('supports toggling password visibility without form submission', () => {
+    render(
+      <MemoryRouter>
+        <RegisterPage />
+      </MemoryRouter>
+    );
+
+    const passwordInput = screen.getByLabelText(/^Password$/i) as HTMLInputElement;
+    const toggleBtn = screen.getByTestId('password-toggle-btn');
+
+    expect(passwordInput.type).toBe('password');
+    expect(toggleBtn).toHaveAttribute('aria-label', 'Show password');
+
+    fireEvent.click(toggleBtn);
+    expect(passwordInput.type).toBe('text');
+    expect(toggleBtn).toHaveAttribute('aria-label', 'Hide password');
+    expect(mockRegister).not.toHaveBeenCalled();
+
+    fireEvent.click(toggleBtn);
+    expect(passwordInput.type).toBe('password');
+    expect(toggleBtn).toHaveAttribute('aria-label', 'Show password');
   });
 });

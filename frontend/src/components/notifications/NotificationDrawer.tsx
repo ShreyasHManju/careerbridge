@@ -28,6 +28,8 @@ export const getNotificationDestination = (type: string, role?: string): string 
       return role === 'student' ? '/app/interviews' : '/app/recruiter/interviews';
     case 'message_received':
       return '/app/messages';
+    case 'project_evaluation_submitted':
+      return role === 'student' ? '/app/projects' : '/app/explore-projects';
     default:
       return null;
   }
@@ -107,9 +109,25 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
     }
   }, []);
 
-  // On initial mount, fetch unread count
+  // On initial mount & periodically, sync unread count
   useEffect(() => {
     fetchUnreadCount();
+
+    // Poll every 30 seconds
+    const intervalId = window.setInterval(() => {
+      fetchUnreadCount();
+    }, 30000);
+
+    // Refresh on window focus
+    const handleFocus = () => {
+      fetchUnreadCount();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [fetchUnreadCount]);
 
   // When drawer opens or active tab changes
@@ -548,6 +566,21 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
               </ul>
             )}
           </div>
+
+          {/* Dropdown Footer */}
+          <footer className="cb-notification-dropdown-footer">
+            <button
+              type="button"
+              className="cb-btn cb-btn-secondary cb-btn-sm cb-btn-block"
+              onClick={() => {
+                setIsOpen(false);
+                navigate('/app/notifications');
+              }}
+              data-testid="view-all-notifications-btn"
+            >
+              View all notifications →
+            </button>
+          </footer>
         </div>
       )}
     </div>

@@ -86,6 +86,13 @@ export const PassportExperiences: React.FC<PassportExperiencesProps> = ({ experi
           const endDate = exp.is_current ? 'Present' : formatPassportDate(exp.end_date);
           const dateRange = `${startDate} – ${endDate}`;
 
+          const skillsList =
+            exp.structured_skills && exp.structured_skills.length > 0
+              ? exp.structured_skills.map((s) => s.name)
+              : exp.skills
+              ? exp.skills.split(',').map((s) => s.trim()).filter(Boolean)
+              : [];
+
           return (
             <div
               key={exp.id}
@@ -99,21 +106,19 @@ export const PassportExperiences: React.FC<PassportExperiencesProps> = ({ experi
                     <h3 className="cb-passport-exp-title" data-testid={`exp-title-${exp.id}`}>
                       {exp.title}
                     </h3>
-                    <div className="cb-passport-exp-sub">
-                      {exp.organization_name && (
-                        <span className="cb-passport-exp-org" data-testid={`exp-org-${exp.id}`}>
-                          {exp.organization_name}
-                        </span>
-                      )}
-                      <span className="cb-passport-exp-type">
-                        • {formatExpType(exp.experience_type)}
-                      </span>
-                    </div>
+                    {exp.organization_name && (
+                      <p className="cb-passport-exp-org" data-testid={`exp-org-${exp.id}`}>
+                        🏢 {exp.organization_name}
+                      </p>
+                    )}
                   </div>
 
                   <div className="cb-passport-exp-badges">
+                    <span className="cb-badge cb-badge-secondary">
+                      {formatExpType(exp.experience_type)}
+                    </span>
                     <span
-                      className="cb-badge cb-badge-success"
+                      className="cb-badge cb-badge-success cb-badge-verified"
                       data-testid={`exp-badge-${exp.id}`}
                     >
                       ✓ {formatVerificationSourceText(exp.verification_source)}
@@ -122,7 +127,7 @@ export const PassportExperiences: React.FC<PassportExperiencesProps> = ({ experi
                 </div>
 
                 <p className="cb-passport-exp-dates" data-testid={`exp-dates-${exp.id}`}>
-                  {dateRange}
+                  📅 {dateRange}
                 </p>
 
                 <p className="cb-passport-exp-desc" data-testid={`exp-desc-${exp.id}`}>
@@ -130,27 +135,21 @@ export const PassportExperiences: React.FC<PassportExperiencesProps> = ({ experi
                 </p>
 
                 {exp.innovation_project_title && (
-                  <div className="cb-passport-linked-project">
-                    <span className="cb-passport-linked-label">Associated Project:</span>
-                    <span
-                      className="cb-badge cb-badge-info"
-                      data-testid={`exp-project-${exp.id}`}
-                    >
-                      🚀 {exp.innovation_project_title}
-                    </span>
-                  </div>
+                  <p className="cb-passport-exp-project" data-testid={`exp-project-${exp.id}`}>
+                    🚀 {exp.innovation_project_title}
+                  </p>
                 )}
 
-                {exp.structured_skills && exp.structured_skills.length > 0 && (
-                  <div
-                    className="cb-passport-exp-skills"
-                    data-testid={`exp-skills-${exp.id}`}
-                  >
-                    {exp.structured_skills.map((s) => (
-                      <span key={s.id} className="cb-badge cb-badge-secondary cb-badge-sm">
-                        {s.name}
-                      </span>
-                    ))}
+                {skillsList.length > 0 && (
+                  <div className="cb-passport-exp-skills" data-testid={`exp-skills-${exp.id}`}>
+                    <span className="cb-skills-label">Attested Skills:</span>
+                    <div className="cb-skills-tags">
+                      {skillsList.map((skill, idx) => (
+                        <span key={idx} className="cb-skill-tag cb-skill-tag-sm">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

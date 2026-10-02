@@ -12,6 +12,7 @@ import { JobPosting } from '@/types/job';
 import { RecruiterApplicationCard } from '@/components/applications/RecruiterApplicationCard';
 import { ApplicationFilterBar } from '@/components/applications/ApplicationFilterBar';
 import { ScheduleInterviewModal } from '@/components/interviews/ScheduleInterviewModal';
+import { CandidateReviewModal } from '@/components/applications/CandidateReviewModal';
 import { ApiErrorResponse } from '@/types/api';
 
 const ALL_STATUSES: { value: ApplicationStatus; label: string }[] = [
@@ -40,6 +41,9 @@ export const RecruiterApplicationsPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [updatingAppId, setUpdatingAppId] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Candidate review modal state
+  const [selectedCandidateForReview, setSelectedCandidateForReview] = useState<Application | null>(null);
 
   // Multi-select and Bulk Actions state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -438,6 +442,7 @@ export const RecruiterApplicationsPage: React.FC = () => {
                   application={app}
                   job={jobsMap.get(app.job_posting_id) || null}
                   onStatusChange={handleStatusChange}
+                  onReviewCandidate={(targetApp) => setSelectedCandidateForReview(targetApp)}
                   onScheduleInterview={(targetApp, targetJob) =>
                     setSchedulingTarget({ application: targetApp, job: targetJob })
                   }
@@ -449,6 +454,24 @@ export const RecruiterApplicationsPage: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* Candidate Review Modal */}
+      {selectedCandidateForReview && (
+        <CandidateReviewModal
+          isOpen={Boolean(selectedCandidateForReview)}
+          application={
+            applications.find((a) => a.id === selectedCandidateForReview.id) || selectedCandidateForReview
+          }
+          job={jobsMap.get(selectedCandidateForReview.job_posting_id) || null}
+          onClose={() => setSelectedCandidateForReview(null)}
+          onStatusChange={handleStatusChange}
+          onScheduleInterview={(targetApp, targetJob) => {
+            setSelectedCandidateForReview(null);
+            setSchedulingTarget({ application: targetApp, job: targetJob });
+          }}
+          isUpdating={updatingAppId === selectedCandidateForReview.id}
+        />
       )}
 
       {/* Schedule Interview Modal */}

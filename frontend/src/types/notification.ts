@@ -11,7 +11,8 @@ export type NotificationType =
   | 'interview_scheduled'
   | 'interview_rescheduled'
   | 'interview_cancelled'
-  | 'message_received';
+  | 'message_received'
+  | 'project_evaluation_submitted';
 
 export interface Notification {
   id: number;

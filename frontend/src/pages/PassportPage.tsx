@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { getMyPassport, getStudentPassport } from '@/api/passport';
 import { PassportResponse } from '@/types/passport';
 import {
@@ -10,6 +10,7 @@ import {
   PassportSkills,
   PassportSummary,
 } from '@/components/passport';
+import { ApiErrorResponse } from '@/types/api';
 
 export const PassportPage: React.FC = () => {
   const { studentId } = useParams<{ studentId?: string }>();
@@ -25,10 +26,11 @@ export const PassportPage: React.FC = () => {
         ? await getStudentPassport(parseInt(studentId, 10))
         : await getMyPassport();
       setPassport(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const apiError = err as ApiErrorResponse;
       setError(
-        err?.message ||
-          err?.detail ||
+        apiError?.message ||
+          (typeof apiError?.detail === 'string' ? apiError.detail : null) ||
           'Failed to load Experience Passport. Please try again.'
       );
     } finally {
@@ -42,6 +44,19 @@ export const PassportPage: React.FC = () => {
 
   return (
     <div className="cb-page-container cb-passport-page" data-testid="passport-page">
+      {/* Contextual navigation header when viewing specific candidate */}
+      {studentId && (
+        <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Link
+            to="/app/recruiter/applications"
+            className="cb-btn cb-btn-secondary cb-btn-sm"
+            data-testid="passport-back-to-apps-btn"
+          >
+            ← Back to Applications
+          </Link>
+        </div>
+      )}
+
       {/* Loading State */}
       {loading && (
         <div

@@ -8,6 +8,7 @@ interface RecruiterApplicationCardProps {
   application: Application;
   job?: JobPosting | null;
   onStatusChange: (applicationId: number, newStatus: ApplicationStatus) => Promise<void>;
+  onReviewCandidate?: (application: Application, job: JobPosting | null) => void;
   onScheduleInterview?: (application: Application, job: JobPosting | null) => void;
   isUpdating?: boolean;
   isSelected?: boolean;
@@ -27,6 +28,7 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
   application,
   job,
   onStatusChange,
+  onReviewCandidate,
   onScheduleInterview,
   isUpdating = false,
   isSelected = false,
@@ -188,6 +190,17 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
 
       {/* Recruiter Action Row */}
       <div className="cb-app-card-bottom-actions">
+        {onReviewCandidate && (
+          <button
+            type="button"
+            className="cb-btn cb-btn-primary cb-btn-sm"
+            onClick={() => onReviewCandidate(application, job || null)}
+            aria-label={`Review Candidate #${application.student_id || application.id}`}
+            data-testid={`review-candidate-btn-${application.id}`}
+          >
+            📋 Review Candidate
+          </button>
+        )}
         {application.student_id ? (
           <Link
             to={`/app/recruiter/passport/${application.student_id}`}

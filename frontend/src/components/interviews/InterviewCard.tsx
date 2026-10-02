@@ -6,6 +6,7 @@ import { InterviewStatusBadge } from './InterviewStatusBadge';
 interface InterviewCardProps {
   interview: Interview;
   role: 'student' | 'recruiter';
+  onViewDetails?: (interview: Interview) => void;
   onReschedule?: (interview: Interview) => void;
   onCancel?: (interview: Interview) => void;
   onMarkComplete?: (interview: Interview) => void;
@@ -44,6 +45,7 @@ const isHttpUrl = (str: string | null): boolean => {
 export const InterviewCard: React.FC<InterviewCardProps> = ({
   interview,
   role,
+  onViewDetails,
   onReschedule,
   onCancel,
   onMarkComplete,
@@ -167,64 +169,74 @@ export const InterviewCard: React.FC<InterviewCardProps> = ({
       )}
 
       {/* Action Controls */}
-      {((role === 'recruiter' && isActionable) ||
-        (role === 'recruiter' && interview.student_id) ||
-        (role === 'student' && interview.recruiter_id)) && (
-        <footer className="cb-interview-card-actions">
-          {role === 'recruiter' && isActionable && onReschedule && (
-            <button
-              type="button"
-              className="cb-btn cb-btn-secondary cb-btn-sm"
-              onClick={() => onReschedule(interview)}
-              disabled={isMutating}
-            >
-              Reschedule / Edit
-            </button>
-          )}
+      <footer className="cb-interview-card-actions">
+        {onViewDetails && (
+          <button
+            type="button"
+            className="cb-btn cb-btn-outline cb-btn-sm"
+            onClick={() => onViewDetails(interview)}
+            data-testid={`view-interview-details-btn-${interview.id}`}
+          >
+            📋 View Details
+          </button>
+        )}
 
-          {role === 'recruiter' && isActionable && onMarkComplete && (
-            <button
-              type="button"
-              className="cb-btn cb-btn-outline-success cb-btn-sm"
-              onClick={() => onMarkComplete(interview)}
-              disabled={isMutating}
-            >
-              Mark Completed
-            </button>
-          )}
+        {role === 'recruiter' && isActionable && onReschedule && (
+          <button
+            type="button"
+            className="cb-btn cb-btn-secondary cb-btn-sm"
+            onClick={() => onReschedule(interview)}
+            disabled={isMutating}
+            data-testid={`interview-reschedule-btn-${interview.id}`}
+          >
+            Reschedule / Edit
+          </button>
+        )}
 
-          {role === 'recruiter' && isActionable && onCancel && (
-            <button
-              type="button"
-              className="cb-btn cb-btn-outline-danger cb-btn-sm"
-              onClick={() => onCancel(interview)}
-              disabled={isMutating}
-            >
-              Cancel Interview
-            </button>
-          )}
+        {role === 'recruiter' && isActionable && onMarkComplete && (
+          <button
+            type="button"
+            className="cb-btn cb-btn-outline-success cb-btn-sm"
+            onClick={() => onMarkComplete(interview)}
+            disabled={isMutating}
+            data-testid={`interview-complete-btn-${interview.id}`}
+          >
+            Mark Completed
+          </button>
+        )}
 
-          {role === 'recruiter' && interview.student_id ? (
-            <Link
-              to={`/app/messages?recipientId=${interview.student_id}`}
-              className="cb-btn cb-btn-secondary cb-btn-sm"
-              data-testid={`interview-message-candidate-btn-${interview.id}`}
-            >
-              💬 Message Candidate
-            </Link>
-          ) : null}
+        {role === 'recruiter' && isActionable && onCancel && (
+          <button
+            type="button"
+            className="cb-btn cb-btn-outline-danger cb-btn-sm"
+            onClick={() => onCancel(interview)}
+            disabled={isMutating}
+            data-testid={`interview-cancel-btn-${interview.id}`}
+          >
+            Cancel Interview
+          </button>
+        )}
 
-          {role === 'student' && interview.recruiter_id ? (
-            <Link
-              to={`/app/messages?recipientId=${interview.recruiter_id}`}
-              className="cb-btn cb-btn-secondary cb-btn-sm"
-              data-testid={`interview-message-recruiter-btn-${interview.id}`}
-            >
-              💬 Message Hiring Team
-            </Link>
-          ) : null}
-        </footer>
-      )}
+        {role === 'recruiter' && interview.student_id ? (
+          <Link
+            to={`/app/messages?recipientId=${interview.student_id}`}
+            className="cb-btn cb-btn-secondary cb-btn-sm"
+            data-testid={`interview-message-candidate-btn-${interview.id}`}
+          >
+            💬 Message Candidate
+          </Link>
+        ) : null}
+
+        {role === 'student' && interview.recruiter_id ? (
+          <Link
+            to={`/app/messages?recipientId=${interview.recruiter_id}`}
+            className="cb-btn cb-btn-secondary cb-btn-sm"
+            data-testid={`interview-message-recruiter-btn-${interview.id}`}
+          >
+            💬 Message Hiring Team
+          </Link>
+        ) : null}
+      </footer>
     </article>
   );
 };

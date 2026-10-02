@@ -24,6 +24,7 @@ import { RecruiterExperienceVerificationPage } from '@/pages/RecruiterExperience
 import { AdminExperienceVerificationPage } from '@/pages/AdminExperienceVerificationPage';
 import { PassportPage } from '@/pages/PassportPage';
 import { MessagesPage } from '@/pages/MessagesPage';
+import { NotificationsPage } from '@/pages/NotificationsPage';
 import { AdminUsersPage } from '@/pages/AdminUsersPage';
 import { AdminRecruitersPage } from '@/pages/AdminRecruitersPage';
 import { AdminJobsPage } from '@/pages/AdminJobsPage';
@@ -55,6 +56,8 @@ export const App: React.FC = () => {
           <Route path="/app/passport/:studentId" element={<PassportPage />} />
           {/* Direct & Real-Time Messaging Route (all authenticated roles) */}
           <Route path="/app/messages" element={<MessagesPage />} />
+          {/* Notifications Center Route (all authenticated roles) */}
+          <Route path="/app/notifications" element={<NotificationsPage />} />
           {/* Student-only domain routes */}
           <Route element={<ProtectedRoute allowedRoles={['student']} />}>
             <Route path="/app/student/profile" element={<StudentProfilePage />} />

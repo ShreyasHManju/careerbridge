@@ -166,7 +166,11 @@ describe('PassportPage Component Foundation', () => {
   it('renders loading indicator while fetching passport', () => {
     vi.spyOn(passportApi, 'getMyPassport').mockReturnValue(new Promise(() => {}));
 
-    render(<PassportPage />);
+    render(
+      <MemoryRouter>
+        <PassportPage />
+      </MemoryRouter>
+    );
 
     expect(screen.getByTestId('passport-loading')).toBeInTheDocument();
     expect(screen.getByText('Assembling your Experience Passport...')).toBeInTheDocument();
@@ -175,7 +179,11 @@ describe('PassportPage Component Foundation', () => {
   it('renders populated passport with header, summary, and sections upon successful fetch', async () => {
     vi.spyOn(passportApi, 'getMyPassport').mockResolvedValueOnce(mockPopulatedPassport);
 
-    render(<PassportPage />);
+    render(
+      <MemoryRouter>
+        <PassportPage />
+      </MemoryRouter>
+    );
 
     await waitFor(() => {
       expect(screen.queryByTestId('passport-loading')).not.toBeInTheDocument();
@@ -192,7 +200,11 @@ describe('PassportPage Component Foundation', () => {
   it('renders clean empty state fallback messages when student has no data', async () => {
     vi.spyOn(passportApi, 'getMyPassport').mockResolvedValueOnce(mockEmptyPassport);
 
-    render(<PassportPage />);
+    render(
+      <MemoryRouter>
+        <PassportPage />
+      </MemoryRouter>
+    );
 
     await waitFor(() => {
       expect(screen.queryByTestId('passport-loading')).not.toBeInTheDocument();
@@ -214,7 +226,11 @@ describe('PassportPage Component Foundation', () => {
       })
       .mockResolvedValueOnce(mockPopulatedPassport);
 
-    render(<PassportPage />);
+    render(
+      <MemoryRouter>
+        <PassportPage />
+      </MemoryRouter>
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId('passport-error')).toBeInTheDocument();

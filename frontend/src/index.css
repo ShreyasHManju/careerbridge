@@ -320,41 +320,6 @@ body {
   color: var(--cb-text-muted);
 }
 
-.cb-auth-divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  margin: 1.25rem 0;
-  color: var(--cb-text-muted);
-  font-size: 0.85rem;
-}
-
-.cb-auth-divider::before,
-.cb-auth-divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid var(--cb-border);
-}
-
-.cb-auth-divider span {
-  padding: 0 0.75rem;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-}
-
-.cb-google-btn-wrapper {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-}
-
-.cb-google-btn-wrapper.cb-google-disabled {
-  pointer-events: none;
-  opacity: 0.6;
-}
-
 /* Alerts */
 .cb-alert {
   padding: 0.75rem 1rem;
@@ -3802,4 +3767,1133 @@ a.cb-stat-card-link:focus-visible {
 .cb-notification-item.cb-notification-actionable:focus-visible {
   outline: 2px solid var(--cb-primary, #2563eb);
   outline-offset: -2px;
+}
+
+/* ============================================================
+   CareerBridge — Authentication Redesign
+   ============================================================ */
+
+.cb-public-layout {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 35%),
+    radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.10), transparent 35%),
+    #f8fafc;
+}
+
+.cb-public-container {
+  width: 100%;
+  max-width: 460px;
+}
+
+.cb-public-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.cb-brand-title {
+  text-decoration: none;
+}
+
+.cb-brand-title h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.cb-brand-subtitle {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.cb-public-card {
+  background: #ffffff;
+  padding: 32px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
+.cb-auth-card h2 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 750;
+  color: #0f172a;
+}
+
+.cb-auth-desc {
+  margin: 8px 0 24px;
+  color: #64748b;
+}
+
+.cb-form-group {
+  margin-bottom: 18px;
+}
+
+.cb-form-group label {
+  display: block;
+  margin-bottom: 7px;
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.cb-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.95rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cb-input::placeholder {
+  color: #94a3b8;
+}
+
+.cb-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.cb-btn-primary {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.cb-btn-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.cb-btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.cb-auth-footer {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+  text-align: center;
+}
+
+.cb-auth-footer p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.cb-link {
+  color: #2563eb;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.cb-link:hover {
+  text-decoration: underline;
+}
+
+.cb-alert {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+}
+
+.cb-alert-warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.cb-alert-danger {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+@media (max-width: 520px) {
+  .cb-public-layout {
+    padding: 20px 14px;
+  }
+
+  .cb-public-card {
+    padding: 24px 20px;
+  }
+
+  .cb-brand-title h1 {
+    font-size: 1.75rem;
+  }
+}
+
+/* ============================================================
+   CareerBridge — Cinematic Glassmorphic Authentication
+   (Single Center Vertical Card & Atmospheric Background)
+   ============================================================ */
+
+.cb-public-layout {
+  min-height: 100vh;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.cb-cinematic-auth {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background-color: #061325;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  box-sizing: border-box;
+  padding: 2.5rem 1rem;
+}
+
+/* ------------------------------------------------------------
+   Cinematic Background Atmosphere & Depth
+   ------------------------------------------------------------ */
+
+.cb-auth-bg-layers {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.cb-bg-mesh {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 90% 70% at 50% 15%, #0c2548 0%, #061325 60%, #020813 100%);
+}
+
+.cb-bg-glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(120px);
+  pointer-events: none;
+}
+
+.cb-bg-glow-1 {
+  width: 520px;
+  height: 520px;
+  top: -150px;
+  left: 18%;
+  background: radial-gradient(circle, rgba(22, 139, 255, 0.18) 0%, transparent 70%);
+  animation: cb-ambient-float-1 22s ease-in-out infinite alternate;
+}
+
+.cb-bg-glow-2 {
+  width: 560px;
+  height: 560px;
+  bottom: -180px;
+  right: 14%;
+  background: radial-gradient(circle, rgba(11, 42, 85, 0.40) 0%, transparent 70%);
+  animation: cb-ambient-float-2 26s ease-in-out infinite alternate;
+}
+
+.cb-bg-glow-cyan {
+  width: 380px;
+  height: 380px;
+  top: 38%;
+  right: 22%;
+  background: radial-gradient(circle, rgba(24, 200, 217, 0.10) 0%, transparent 70%);
+  animation: cb-ambient-float-cyan 20s ease-in-out infinite alternate;
+}
+
+@keyframes cb-ambient-float-1 {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(25px, 20px);
+  }
+}
+
+@keyframes cb-ambient-float-2 {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(-20px, -20px);
+  }
+}
+
+@keyframes cb-ambient-float-cyan {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(18px, -15px);
+  }
+}
+
+.cb-bg-horizon {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 35vh;
+  background: radial-gradient(ellipse 80% 50% at 50% 100%, rgba(22, 139, 255, 0.14) 0%, rgba(24, 200, 217, 0.04) 40%, transparent 80%);
+}
+
+.cb-bg-stars {
+  position: absolute;
+  inset: 0;
+  opacity: 0.28;
+  background-image:
+    radial-gradient(1px 1px at 25px 35px, #ffffff, transparent),
+    radial-gradient(1.5px 1.5px at 140px 85px, #38bdf8, transparent),
+    radial-gradient(1px 1px at 260px 190px, #ffffff, transparent),
+    radial-gradient(1.5px 1.5px at 390px 65px, #18c8d9, transparent),
+    radial-gradient(1px 1px at 520px 230px, #ffffff, transparent),
+    radial-gradient(1.5px 1.5px at 640px 145px, #60a5fa, transparent),
+    radial-gradient(1px 1px at 760px 290px, #ffffff, transparent),
+    radial-gradient(1.5px 1.5px at 890px 95px, #38bdf8, transparent);
+  background-size: 920px 460px;
+}
+
+/* ------------------------------------------------------------
+   Single Centered Floating Glass Card
+   ------------------------------------------------------------ */
+
+.cb-auth-stage {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.cb-glass-card {
+  width: 100%;
+  max-width: 412px;
+  background: rgba(10, 25, 48, 0.72);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 20px;
+  box-shadow:
+    0 24px 50px -12px rgba(0, 0, 0, 0.62),
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 0 32px -4px rgba(22, 139, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  padding: 2.25rem 2rem 1.85rem;
+  box-sizing: border-box;
+  text-align: center;
+  color: #ffffff;
+  animation: cb-card-entrance 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@keyframes cb-card-entrance {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ------------------------------------------------------------
+   Logo & Header
+   ------------------------------------------------------------ */
+
+.cb-glass-brand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 1.15rem;
+}
+
+.cb-brand-logo-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: transform 0.2s ease;
+}
+
+.cb-brand-logo-link:hover {
+  transform: scale(1.03);
+}
+
+.cb-brand-logo-link:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+.cb-glass-logo {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+
+.cb-glass-header {
+  margin-bottom: 1.35rem;
+}
+
+.cb-glass-title {
+  font-size: 1.55rem;
+  font-weight: 750;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+  margin: 0 0 0.35rem 0;
+}
+
+.cb-glass-subtitle {
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.cb-glass-body {
+  width: 100%;
+}
+
+/* ------------------------------------------------------------
+   Glass Alerts
+   ------------------------------------------------------------ */
+
+.cb-glass-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 1.15rem;
+  padding: 10px 13px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: left;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.cb-alert-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.cb-glass-alert-warning {
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(251, 191, 36, 0.32);
+  color: #fde68a;
+}
+
+.cb-glass-alert-error {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(248, 113, 113, 0.32);
+  color: #fecaca;
+}
+
+.cb-glass-alert-success {
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.32);
+  color: #a7f3d0;
+}
+
+/* ------------------------------------------------------------
+   Google Login & Divider
+   ------------------------------------------------------------ */
+
+.cb-glass-google-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: 1.15rem;
+}
+
+.cb-glass-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 1.15rem 0 1.25rem;
+}
+
+.cb-glass-divider-line {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.cb-glass-divider-text {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------
+   Form Controls
+   ------------------------------------------------------------ */
+
+.cb-glass-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.05rem;
+  text-align: left;
+}
+
+.cb-glass-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cb-glass-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cb-glass-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #cbd5e1;
+}
+
+.cb-glass-input-box {
+  position: relative;
+  width: 100%;
+}
+
+.cb-glass-input,
+.cb-glass-select {
+  width: 100%;
+  height: 46px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: 0.92rem;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cb-glass-input::placeholder {
+  color: #64748b;
+}
+
+.cb-glass-input:hover:not(:disabled),
+.cb-glass-select:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.cb-glass-input:focus,
+.cb-glass-select:focus {
+  border-color: #168BFF;
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 0 0 3px rgba(22, 139, 255, 0.22), 0 0 16px rgba(22, 139, 255, 0.12);
+}
+
+.cb-glass-input:disabled,
+.cb-glass-select:disabled {
+  background: rgba(255, 255, 255, 0.02);
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.cb-glass-select {
+  background: #0B2A55;
+  cursor: pointer;
+}
+
+.cb-glass-select option {
+  background: #071A33;
+  color: #ffffff;
+}
+
+.cb-glass-field-hint {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+.cb-glass-input-password {
+  padding-right: 46px;
+}
+
+.cb-password-toggle-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.cb-password-toggle-btn:hover:not(:disabled) {
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.cb-password-toggle-btn:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+}
+
+.cb-password-toggle-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------
+   Primary Button
+   ------------------------------------------------------------ */
+
+.cb-glass-btn-primary {
+  width: 100%;
+  height: 46px;
+  box-sizing: border-box;
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 0.94rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+  background: linear-gradient(135deg, #168BFF 0%, #18C8D9 100%);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(22, 139, 255, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.cb-glass-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(24, 200, 217, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  filter: brightness(1.05);
+}
+
+.cb-glass-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(22, 139, 255, 0.28);
+  filter: brightness(0.98);
+}
+
+.cb-glass-btn-primary:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.cb-glass-btn-primary:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.cb-btn-spinner-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cb-btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: cb-spin 0.75s linear infinite;
+}
+
+@keyframes cb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ------------------------------------------------------------
+   Footer Navigation & Switch Links
+   ------------------------------------------------------------ */
+
+.cb-glass-footer {
+  margin-top: 1.35rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+}
+
+.cb-auth-switch-text {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.cb-auth-link {
+  color: #38bdf8;
+  font-weight: 600;
+  text-decoration: none;
+  margin-left: 4px;
+  transition: color 0.15s ease;
+}
+
+.cb-auth-link:hover {
+  color: #7dd3fc;
+  text-decoration: underline;
+}
+
+.cb-auth-link:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ------------------------------------------------------------
+   Security Reassurance
+   ------------------------------------------------------------ */
+
+.cb-glass-security {
+  margin-top: 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #64748b;
+  text-align: center;
+}
+
+.cb-glass-security svg {
+  color: #18C8D9;
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------
+   Responsive Breakpoints
+   ------------------------------------------------------------ */
+
+@media (max-width: 480px) {
+  .cb-cinematic-auth {
+    padding: 1.5rem 0.75rem;
+    align-items: flex-start;
+  }
+
+  .cb-glass-card {
+    padding: 1.75rem 1.25rem 1.5rem;
+    border-radius: 18px;
+    max-width: 100%;
+  }
+
+  .cb-glass-title {
+    font-size: 1.42rem;
+  }
+}
+
+/* ------------------------------------------------------------
+   Reduced Motion
+   ------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .cb-glass-card,
+  .cb-bg-glow-1,
+  .cb-bg-glow-2,
+  .cb-bg-glow-cyan,
+  .cb-glass-input,
+  .cb-glass-select,
+  .cb-glass-btn-primary,
+  .cb-btn-spinner,
+  .cb-auth-link,
+  .cb-brand-logo-link {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* ============================================================
+   F-08 Interview Scheduling & Management UI
+   ============================================================ */
+
+.cb-interview-card {
+  background: var(--cb-surface-card, #ffffff);
+  border: 1px solid var(--cb-border-subtle, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.cb-interview-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  border-color: var(--cb-border-accent, #cbd5e1);
+}
+
+.cb-interview-card-urgent {
+  border-left: 4px solid #3b82f6 !important;
+}
+
+.cb-interview-card-danger {
+  border-left: 4px solid #ef4444 !important;
+}
+
+.cb-interview-card-success {
+  border-left: 4px solid #10b981 !important;
+}
+
+.cb-interview-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--cb-text-muted, #64748b);
+}
+
+.cb-interviews-controls-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--cb-surface-card, #ffffff);
+  border: 1px solid var(--cb-border-subtle, #e2e8f0);
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.cb-interviews-filters-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cb-interview-detail-modal {
+  max-width: 600px;
+  width: 100%;
+}
+
+/* ============================================================
+   Phase F-06 / F-07: Recruiter Candidate Review Modal & Pipeline
+   ============================================================ */
+
+.cb-candidate-review-modal {
+  max-width: 1000px;
+  width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.cb-candidate-review-header {
+  padding: 1.25rem 1.75rem;
+  background: var(--cb-surface-card, #ffffff);
+  border-bottom: 1px solid var(--cb-border-subtle, #e2e8f0);
+}
+
+.cb-candidate-header-profile {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.cb-candidate-avatar-wrapper {
+  flex-shrink: 0;
+}
+
+.cb-candidate-avatar-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #3b82f6;
+}
+
+.cb-candidate-avatar-fallback {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #1e293b;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.cb-candidate-header-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cb-candidate-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cb-candidate-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.cb-candidate-subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: #64748b;
+  flex-wrap: wrap;
+}
+
+.cb-candidate-job-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.cb-candidate-applied-label {
+  color: #64748b;
+}
+
+.cb-candidate-job-name {
+  color: #2563eb;
+}
+
+.cb-candidate-company-name {
+  color: #64748b;
+}
+
+/* Hiring Pipeline Tracker */
+.cb-pipeline-tracker {
+  padding: 0.875rem 1.75rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.cb-pipeline-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 0.5rem;
+}
+
+.cb-pipeline-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  font-weight: 500;
+  position: relative;
+}
+
+.cb-step-bubble {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.cb-step-passed .cb-step-bubble {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.cb-step-passed {
+  color: #10b981;
+}
+
+.cb-step-current .cb-step-bubble {
+  background: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.cb-step-current {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.cb-pipeline-rejected-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #991b1b;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Review Tabs Bar */
+.cb-review-tabs-bar {
+  display: flex;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0 1.75rem;
+  gap: 0.5rem;
+  overflow-x: auto;
+}
+
+.cb-review-tab {
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.cb-review-tab:hover {
+  color: #0f172a;
+}
+
+.cb-review-tab.active {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+  font-weight: 600;
+}
+
+/* Candidate Review Body */
+.cb-candidate-review-body {
+  padding: 1.5rem 1.75rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.cb-review-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.cb-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cb-summary-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.cb-summary-value {
+  font-size: 0.9375rem;
+  color: #0f172a;
+}
+
+.cb-card-inner-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.cb-inner-box-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 0.75rem 0;
+}
+
+/* Candidate Review Footer */
+.cb-candidate-review-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.75rem;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.cb-review-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cb-review-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }

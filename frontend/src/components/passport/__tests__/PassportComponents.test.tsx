@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import {
   PassportHeader,
   PassportSummary,
@@ -37,7 +38,11 @@ describe('Passport Component Prototypes', () => {
     };
 
     it('renders full identity details, academic line, and external links', () => {
-      render(<PassportHeader identity={mockIdentity} isOwner={true} />);
+      render(
+        <MemoryRouter>
+          <PassportHeader identity={mockIdentity} isOwner={true} />
+        </MemoryRouter>
+      );
 
       expect(screen.getByTestId('passport-student-name')).toHaveTextContent('Alex Morgan');
       expect(screen.getByTestId('passport-verified-badge')).toHaveTextContent('✓ Verified Student');
@@ -68,7 +73,11 @@ describe('Passport Component Prototypes', () => {
         created_at: '2026-09-20T00:00:00Z',
       };
 
-      render(<PassportHeader identity={minimalIdentity} isOwner={false} />);
+      render(
+        <MemoryRouter>
+          <PassportHeader identity={minimalIdentity} isOwner={false} />
+        </MemoryRouter>
+      );
 
       expect(screen.getByTestId('passport-student-name')).toHaveTextContent('student@example.com');
       expect(screen.getByTestId('passport-avatar-placeholder')).toHaveTextContent('ST');

@@ -76,7 +76,7 @@ describe('LoginPage Component', () => {
 
     expect(screen.getByRole('heading', { name: /Welcome Back/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/Email Address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Password$/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Sign In/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Create an account/i })).toBeInTheDocument();
   });
@@ -110,7 +110,7 @@ describe('LoginPage Component', () => {
     fireEvent.change(screen.getByLabelText(/Email Address/i), {
       target: { value: '  student@example.com  ' },
     });
-    fireEvent.change(screen.getByLabelText(/Password/i), {
+    fireEvent.change(screen.getByLabelText(/^Password$/i), {
       target: { value: 'Password123!' },
     });
 
@@ -219,5 +219,27 @@ describe('LoginPage Component', () => {
 
     expect(mockLoginWithGoogle).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('Google authentication failed: no credential received.');
+  });
+
+  it('toggles password visibility when toggle button is clicked', () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    const passwordInput = screen.getByLabelText(/^Password$/i) as HTMLInputElement;
+    const toggleBtn = screen.getByTestId('password-toggle-btn');
+
+    expect(passwordInput.type).toBe('password');
+    expect(toggleBtn).toHaveAttribute('aria-label', 'Show password');
+
+    fireEvent.click(toggleBtn);
+    expect(passwordInput.type).toBe('text');
+    expect(toggleBtn).toHaveAttribute('aria-label', 'Hide password');
+
+    fireEvent.click(toggleBtn);
+    expect(passwordInput.type).toBe('password');
+    expect(toggleBtn).toHaveAttribute('aria-label', 'Show password');
   });
 });

@@ -129,12 +129,17 @@ export const PassportProjects: React.FC<PassportProjectsProps> = ({ projects }) 
 
             {/* Milestones execution bar */}
             {proj.milestones && proj.milestones.length > 0 && (
-              <div className="cb-passport-milestones-box" data-testid={`proj-milestones-${proj.id}`}>
+              <div
+                className="cb-passport-milestones-box"
+                data-testid={`passport-milestones-list-${proj.id}`}
+              >
                 <div className="cb-passport-milestones-header">
                   <h4 className="cb-passport-milestones-title">
                     Milestone Progress ({proj.completed_milestones} / {proj.total_milestones} completed)
                   </h4>
-                  <span className="cb-passport-milestone-pct">{proj.progress_percentage}%</span>
+                  <span className="cb-passport-milestone-pct" data-testid={`proj-milestones-${proj.id}`}>
+                    {proj.progress_percentage}%
+                  </span>
                 </div>
 
                 <div
@@ -162,7 +167,7 @@ export const PassportProjects: React.FC<PassportProjectsProps> = ({ projects }) 
                         <span className="cb-milestone-status-icon" aria-hidden="true">
                           {isDone ? '✓' : '○'}
                         </span>
-                        <span className="cb-milestone-name">{m.title}</span>
+                        <span className="cb-milestone-name" data-testid={`milestone-title-${m.id}`}>{m.title}</span>
                         <span
                           className={`cb-badge cb-badge-sm ${
                             isDone ? 'cb-badge-success' : 'cb-badge-neutral'
@@ -181,7 +186,7 @@ export const PassportProjects: React.FC<PassportProjectsProps> = ({ projects }) 
             {proj.verified_evidence && proj.verified_evidence.length > 0 && (
               <div
                 className="cb-passport-evidence-box"
-                data-testid={`proj-evidence-box-${proj.id}`}
+                data-testid={`passport-evidence-list-${proj.id}`}
                 style={{ marginTop: '1rem', borderTop: '1px solid var(--cb-border-subtle, #e2e8f0)', paddingTop: '0.75rem' }}
               >
                 <div className="cb-passport-evidence-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -231,7 +236,7 @@ export const PassportProjects: React.FC<PassportProjectsProps> = ({ projects }) 
             {proj.evaluations && proj.evaluations.length > 0 && (
               <div
                 className="cb-passport-evaluations-box"
-                data-testid={`proj-evaluations-box-${proj.id}`}
+                data-testid={`eval-score-card-${proj.id}`}
                 style={{ marginTop: '1rem', borderTop: '1px solid var(--cb-border-subtle, #e2e8f0)', paddingTop: '0.75rem' }}
               >
                 <div className="cb-passport-evaluations-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
@@ -272,7 +277,7 @@ export const PassportProjects: React.FC<PassportProjectsProps> = ({ projects }) 
                           )}
                           {ev.overall_score != null && (
                             <span className="cb-badge cb-badge-primary cb-badge-sm" data-testid={`eval-score-${ev.id}`}>
-                              ⭐ {ev.overall_score.toFixed(1)}
+                              ⭐ {ev.overall_score.toFixed(1)} / 10
                             </span>
                           )}
                         </div>
