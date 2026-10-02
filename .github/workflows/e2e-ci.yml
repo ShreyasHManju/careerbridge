@@ -57,6 +57,7 @@ jobs:
           POSTGRES_DB: internship_db
           JWT_SECRET_KEY: ci_test_jwt_secret_for_github_actions_only
           API_V1_STR: /api/v1
+          GOOGLE_CLIENT_ID: ci_test_google_client_id_for_github_actions_only
         run: alembic upgrade head
 
       - name: Start backend server
@@ -69,6 +70,7 @@ jobs:
           POSTGRES_DB: internship_db
           JWT_SECRET_KEY: ci_test_jwt_secret_for_github_actions_only
           API_V1_STR: /api/v1
+          GOOGLE_CLIENT_ID: ci_test_google_client_id_for_github_actions_only
         run: |
           nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1 &
           sleep 3
@@ -101,6 +103,7 @@ jobs:
           POSTGRES_DB: internship_db
           JWT_SECRET_KEY: ci_test_jwt_secret_for_github_actions_only
           API_V1_STR: /api/v1
+          GOOGLE_CLIENT_ID: ci_test_google_client_id_for_github_actions_only
         run: npm run test:e2e
 
       - name: Upload Playwright report
