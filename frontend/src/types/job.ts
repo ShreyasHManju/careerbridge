@@ -5,6 +5,34 @@ export type EmploymentType = 'full_time' | 'part_time' | 'contract';
 export type JobSortBy = 'created_at' | 'application_deadline' | 'salary_min';
 export type SortOrder = 'asc' | 'desc';
 
+export interface MatchedSkillItem {
+  id: number;
+  name: string;
+  slug?: string;
+  category?: string | null;
+  is_verified: boolean;
+  source: 'experience' | 'evaluation' | 'project' | 'profile' | string;
+}
+
+export interface MissingSkillItem {
+  id: number;
+  name: string;
+  slug?: string;
+  category?: string | null;
+  is_verified?: boolean;
+  created_at?: string;
+}
+
+export interface JobMatchSummary {
+  match_percentage: number;
+  total_required: number;
+  total_matched: number;
+  total_verified_matched: number;
+  total_missing: number;
+  matched_skills: MatchedSkillItem[];
+  missing_skills: (Skill | MissingSkillItem)[];
+}
+
 export interface JobPosting {
   id: number;
   recruiter_id: number;
@@ -25,6 +53,7 @@ export interface JobPosting {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  match_summary?: JobMatchSummary | null;
 }
 
 export interface JobPostingCreate {

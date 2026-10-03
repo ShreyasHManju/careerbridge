@@ -149,4 +149,113 @@ describe('JobCard Component', () => {
     expect(onApplyMock).toHaveBeenCalledTimes(1);
     expect(onApplyMock).toHaveBeenCalledWith(mockJob);
   });
+
+  it('renders student match badge with high tier for >= 75%', () => {
+    const jobWithHighMatch: JobPosting = {
+      ...mockJob,
+      match_summary: {
+        match_percentage: 85,
+        total_required: 3,
+        total_matched: 3,
+        total_verified_matched: 2,
+        total_missing: 0,
+        matched_skills: [],
+        missing_skills: [],
+      },
+    };
+
+    render(
+      <MemoryRouter>
+        <JobCard job={jobWithHighMatch} userRole="student" />
+      </MemoryRouter>
+    );
+
+    const badge = screen.getByTestId('match-badge-1');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('🎯 85% Match');
+    expect(badge).toHaveClass('cb-badge-match-high');
+  });
+
+  it('renders student match badge with medium tier for 50-74%', () => {
+    const jobWithMediumMatch: JobPosting = {
+      ...mockJob,
+      match_summary: {
+        match_percentage: 67,
+        total_required: 3,
+        total_matched: 2,
+        total_verified_matched: 1,
+        total_missing: 1,
+        matched_skills: [],
+        missing_skills: [],
+      },
+    };
+
+    render(
+      <MemoryRouter>
+        <JobCard job={jobWithMediumMatch} userRole="student" />
+      </MemoryRouter>
+    );
+
+    const badge = screen.getByTestId('match-badge-1');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('🎯 67% Match');
+    expect(badge).toHaveClass('cb-badge-match-medium');
+  });
+
+  it('renders student match badge with low tier for < 50%', () => {
+    const jobWithLowMatch: JobPosting = {
+      ...mockJob,
+      match_summary: {
+        match_percentage: 33,
+        total_required: 3,
+        total_matched: 1,
+        total_verified_matched: 0,
+        total_missing: 2,
+        matched_skills: [],
+        missing_skills: [],
+      },
+    };
+
+    render(
+      <MemoryRouter>
+        <JobCard job={jobWithLowMatch} userRole="student" />
+      </MemoryRouter>
+    );
+
+    const badge = screen.getByTestId('match-badge-1');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('🎯 33% Match');
+    expect(badge).toHaveClass('cb-badge-match-low');
+  });
+
+  it('does NOT render match badge for recruiters or admins even if match_summary is present', () => {
+    const jobWithMatch: JobPosting = {
+      ...mockJob,
+      match_summary: {
+        match_percentage: 100,
+        total_required: 2,
+        total_matched: 2,
+        total_verified_matched: 1,
+        total_missing: 0,
+        matched_skills: [],
+        missing_skills: [],
+      },
+    };
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <JobCard job={jobWithMatch} userRole="recruiter" />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByTestId('match-badge-1')).not.toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <JobCard job={jobWithMatch} userRole="admin" />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByTestId('match-badge-1')).not.toBeInTheDocument();
+  });
 });

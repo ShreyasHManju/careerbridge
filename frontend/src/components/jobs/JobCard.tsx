@@ -87,6 +87,21 @@ export const JobCard: React.FC<JobCardProps> = ({
         </div>
 
         <div className="cb-job-badges">
+          {isStudent && job.match_summary != null && (
+            <span
+              className={`cb-badge cb-badge-match cb-badge-match-${
+                job.match_summary.match_percentage >= 75
+                  ? 'high'
+                  : job.match_summary.match_percentage >= 50
+                  ? 'medium'
+                  : 'low'
+              }`}
+              data-testid={`match-badge-${job.id}`}
+              aria-label={`Match score: ${job.match_summary.match_percentage} percent`}
+            >
+              🎯 {job.match_summary.match_percentage}% Match
+            </span>
+          )}
           {isStudent && isApplied && (
             <span className="cb-badge cb-badge-applied" data-testid={`applied-badge-${job.id}`}>
               ✓ Applied
