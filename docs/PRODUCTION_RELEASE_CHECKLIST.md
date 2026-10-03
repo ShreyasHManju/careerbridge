@@ -2,16 +2,19 @@
 
 **Platform:** CareerBridge — Student Internship & Job Platform  
 **Target Environment:** Production (Docker Compose / Managed Cloud VM)  
-**Document Revision:** 1.0 (Phase 34 Final Release)
+**Document Revision:** 2.0 (Phase 35 Production Release Execution)
 
 ---
 
+# PART I — READY: Core Platform & Engineering Verification
+*(Fully validated, tested, containerized, and certified in the repository)*
+
 ## 1. Code Integrity & Repository Hygiene
 - [x] All working tree changes reviewed, verified, and free of debug statements.
-- [x] No sensitive files, private certificates, or local `.env` committed.
+- [x] Zero sensitive files, private certificates, or local `.env` files committed.
 - [x] TypeScript compilation passes with zero errors (`tsc`).
 - [x] Modern ESM build succeeds with optimized bundle chunking (`vite build`).
-- [x] Python code adheres to strict typing and PEP 8 standards.
+- [x] Python codebase adheres to strict typing, Pydantic schemas, and PEP 8 standards.
 
 ---
 
@@ -46,18 +49,7 @@
 
 ---
 
-## 5. Environment Variables & Secret Configuration
-- [x] Mandatory variables documented in `.env.example` and `backend/.env.example`.
-- [x] `JWT_SECRET_KEY`: Cryptographically secure 64-char hex key generated via `openssl rand -hex 32`.
-- [x] `POSTGRES_PASSWORD`: High-entropy database password configured.
-- [x] `GOOGLE_CLIENT_ID`: Google OAuth 2.0 Web Client ID registered and configured.
-- [x] `BACKEND_CORS_ORIGINS`: Restricted strictly to production domains (e.g. `https://careerbridge.example.com`).
-- [x] `ENVIRONMENT=production` and `DEBUG=False` set in production runtime.
-- [x] `EMAIL_PROVIDER`: Configured for `smtp` delivery with valid credentials (SendGrid, Mailgun, AWS SES).
-
----
-
-## 6. Security Hardening
+## 5. Security & RBAC Hardening
 - [x] **Authentication**: Stateless JWT with HS256, 30-minute expiration, and secure Bearer authorization.
 - [x] **Password Protection**: Argon2 / Bcrypt password hashing with dummy verification for timing attack mitigation.
 - [x] **Authorization (RBAC)**: Role guards for `student`, `recruiter`, and `admin` with IDOR checks across all entities.
@@ -68,7 +60,7 @@
 
 ---
 
-## 7. Continuous Integration & Continuous Delivery (CI/CD)
+## 6. Continuous Integration & Continuous Delivery (CI/CD)
 - [x] Automated workflow in `.github/workflows/ci.yml` triggering on `push` and `pull_request` to `main`.
 - [x] Backend job runs migrations and unit tests on PostgreSQL service container.
 - [x] Frontend job runs Vitest tests and production bundle compilation.
@@ -77,35 +69,57 @@
 
 ---
 
-## 8. Observability & Operational Reliability
+## 7. Observability & Automated Smoke Tests
 - [x] **Request Correlation**: Unique `X-Request-ID` attached to all HTTP requests, context propagation, and error envelopes.
 - [x] **Structured Logging**: Context-bound logs for authentication, security violations, and database operations.
 - [x] **Health Check Probes**:
   - `GET /health` (Backend status & database connectivity)
   - `GET /nginx-health` (Frontend Nginx container status)
 - [x] **Automated Smoke Testing**: `scripts/smoke_test.py` validates all core endpoints and SPA fallbacks.
+- [x] **Disaster Recovery & Rollback Strategy**: Documented rollback sequence and database downgrade path.
 
 ---
 
-## 9. Infrastructure, DNS & TLS Setup
-- [x] DNS A/CNAME records point to server public IP.
-- [x] TLS/SSL certificate provisioned via Let's Encrypt / Certbot (`deploy/nginx/careerbridge.conf.example`).
-- [x] Port 80 redirected to Port 443 HTTPS.
-- [x] Firewall rules restrict Port 5432 (PostgreSQL) and Port 8000 (Backend) to localhost/internal Docker network.
+# PART II — REQUIRES DEPLOYMENT-SPECIFIC INPUT
+*(Must be supplied by operator/infrastructure administrator at release deployment time)*
+
+## 8. Hosting Provider & Target Server Access
+- [ ] **Hosting Infrastructure Selected**: (e.g. AWS EC2, DigitalOcean Droplet, Hetzner, VPS, GCP Compute Engine).
+- [ ] **Target Server Provisioned**: Ubuntu 22.04 LTS / Debian 12 with Docker Engine & Docker Compose plugin.
+- [ ] **SSH & Firewall Access**: Public IP assigned, SSH key authentication configured, non-root deploy user active.
+
+## 9. Domain Name & DNS Configuration
+- [ ] **Registered Domain**: (e.g. `careerbridge.example.com` or `app.careerbridge.io`).
+- [ ] **DNS A / CNAME Records**: Configured pointing to target server public IP address.
+- [ ] **Propagation Verified**: `dig careerbridge.example.com +short` resolves to server IP.
+
+## 10. TLS / HTTPS Certificate Provisioning
+- [ ] **SSL/TLS Certificate**: Provisioned via Let's Encrypt / Certbot or managed cloud load balancer.
+- [ ] **HTTPS Redirection**: Port 80 redirected to Port 443; HSTS headers enabled.
+- [ ] **SSL Configuration**: TLS 1.2/1.3 only, modern cipher suites.
+
+## 11. Production Secrets & Credential Injection
+- [ ] **`JWT_SECRET_KEY`**: Cryptographically secure 64-char hex key (`openssl rand -hex 32`) injected via `.env`.
+- [ ] **`POSTGRES_PASSWORD`**: High-entropy database password generated and injected.
+- [ ] **`BACKEND_CORS_ORIGINS`**: Explicitly set to production domain (e.g. `["https://careerbridge.example.com"]`).
+- [ ] **`ENVIRONMENT=production`** & **`DEBUG=False`**: Verified in `.env`.
+
+## 12. Google OAuth 2.0 Production Registration
+- [ ] **Google Cloud Console Project**: Created for CareerBridge production environment.
+- [ ] **OAuth Consent Screen**: Configured with production domain and privacy policy links.
+- [ ] **`GOOGLE_CLIENT_ID`**: Production Client ID provisioned and authorized JavaScript origins/redirect URIs set.
+
+## 13. Production Email Delivery (SMTP / Transactional)
+- [ ] **Email Provider**: Configured with production credentials (SendGrid, Amazon SES, Mailgun, or Postmark).
+- [ ] **`SMTP_HOST`**, **`SMTP_PORT`**, **`SMTP_USER`**, **`SMTP_PASSWORD`**: Verified for user activation & notification emails.
+
+## 14. Off-site Backup & Disaster Recovery Storage
+- [ ] **Automated Cron Job**: Scheduled daily execution of `backend/scripts/backup_db.sh`.
+- [ ] **Off-site Cloud Storage**: Encrypted backups copied to S3 / GCS / remote storage with 30-day retention policy.
 
 ---
 
-## 10. Disaster Recovery & Rollback Strategy
-- [x] **Database Backup**: Periodic automated cron backups via `backend/scripts/backup_db.sh`.
-- [x] **Application Rollback**:
-  1. Pull previous release Git commit tag.
-  2. If schema rollback is required: `docker compose exec backend alembic downgrade <target_rev>`.
-  3. Rebuild and restart containers: `docker compose -f docker-compose.production.yml up -d --build`.
-  4. Run smoke test: `python scripts/smoke_test.py`.
-
----
-
-## 11. Final Deployment Sign-Off
+## 15. Final Engineering Sign-Off
 
 | Area | Lead Engineer Sign-Off | Status |
 | :--- | :--- | :--- |
@@ -113,4 +127,4 @@
 | **Frontend SPA & UX** | Antigravity Lead Engineer | **APPROVED** |
 | **Security & Auth Architecture** | Antigravity Lead Engineer | **APPROVED** |
 | **Docker & CI/CD Pipelines** | Antigravity Lead Engineer | **APPROVED** |
-| **Release Verdict** | **PRODUCTION READY** | **READY FOR DEPLOYMENT** |
+| **Codebase Release Verdict** | **PRODUCTION READY** | **READY FOR HOST DEPLOYMENT** |
