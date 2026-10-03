@@ -75,6 +75,7 @@ describe('AppLayout Navigation (Phase F-08 & 30B.2)', () => {
     expect(screen.getByRole('link', { name: /Opportunities/i })).toHaveAttribute('href', '/app/jobs');
     expect(screen.getByRole('link', { name: /Saved Jobs/i })).toHaveAttribute('href', '/app/saved-jobs');
     expect(screen.getByRole('link', { name: /My Applications/i })).toHaveAttribute('href', '/app/applications');
+    expect(screen.getByRole('link', { name: /Invitations/i })).toHaveAttribute('href', '/app/invitations');
     expect(screen.getByRole('link', { name: /Interviews/i })).toHaveAttribute('href', '/app/interviews');
     expect(screen.queryByRole('link', { name: /^Job Postings$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Applications$/i })).not.toBeInTheDocument();
@@ -92,6 +93,7 @@ describe('AppLayout Navigation (Phase F-08 & 30B.2)', () => {
     expect(screen.getByRole('link', { name: /Home/i })).toHaveAttribute('href', '/app');
     expect(screen.getByRole('link', { name: /Company Profile/i })).toHaveAttribute('href', '/app/recruiter/profile');
     expect(screen.getByRole('link', { name: /Opportunities/i })).toHaveAttribute('href', '/app/jobs');
+    expect(screen.getByRole('link', { name: /Talent Discovery/i })).toHaveAttribute('href', '/app/recruiter/candidates');
     expect(screen.getByRole('link', { name: /^Job Postings$/i })).toHaveAttribute('href', '/app/recruiter/jobs');
     expect(screen.getByRole('link', { name: /^Applications$/i })).toHaveAttribute('href', '/app/recruiter/applications');
     expect(screen.getByRole('link', { name: /Interviews/i })).toHaveAttribute('href', '/app/recruiter/interviews');

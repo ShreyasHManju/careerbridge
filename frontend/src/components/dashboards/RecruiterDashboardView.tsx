@@ -359,6 +359,18 @@ export const RecruiterDashboardView: React.FC = () => {
           Recruiting Actions & Tools
         </h2>
         <div className="cb-action-grid">
+          <Link to="/app/recruiter/candidates" className="cb-action-card" data-testid="quick-link-candidates">
+            <div className="cb-action-card-body">
+              <span className="cb-action-icon" aria-hidden="true">🔍</span>
+              <div>
+                <h3 className="cb-action-title">Talent Discovery</h3>
+                <p className="cb-action-desc">
+                  Proactively discover and source verified student talent by skills, Experience Passport credentials, and public projects.
+                </p>
+              </div>
+            </div>
+          </Link>
+
           <Link to="/app/recruiter/applications" className="cb-action-card" data-testid="quick-link-applications">
             <div className="cb-action-card-body">
               <span className="cb-action-icon" aria-hidden="true">👥</span>

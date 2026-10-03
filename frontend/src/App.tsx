@@ -13,9 +13,11 @@ import { ProjectDetailPage } from '@/pages/ProjectDetailPage';
 import { SavedJobsPage } from '@/pages/SavedJobsPage';
 import { RecruiterProfilePage } from '@/pages/RecruiterProfilePage';
 import { RecruiterJobsPage } from '@/pages/RecruiterJobsPage';
+import { RecruiterCandidatesPage } from '@/pages/RecruiterCandidatesPage';
 import { JobDiscoveryPage } from '@/pages/JobDiscoveryPage';
 import { JobDetailPage } from '@/pages/JobDetailPage';
 import { StudentApplicationsPage } from '@/pages/StudentApplicationsPage';
+import { StudentInvitationsPage } from '@/pages/StudentInvitationsPage';
 import { RecruiterApplicationsPage } from '@/pages/RecruiterApplicationsPage';
 import { StudentInterviewsPage } from '@/pages/StudentInterviewsPage';
 import { RecruiterInterviewsPage } from '@/pages/RecruiterInterviewsPage';
@@ -68,10 +70,13 @@ export const App: React.FC = () => {
             <Route path="/app/experiences" element={<StudentExperiencesPage />} />
             <Route path="/app/saved-jobs" element={<SavedJobsPage />} />
             <Route path="/app/applications" element={<StudentApplicationsPage />} />
+            <Route path="/app/invitations" element={<StudentInvitationsPage />} />
+            <Route path="/app/student/invitations" element={<StudentInvitationsPage />} />
             <Route path="/app/interviews" element={<StudentInterviewsPage />} />
           </Route>
           {/* Recruiter-only domain routes */}
           <Route element={<ProtectedRoute allowedRoles={['recruiter']} />}>
+            <Route path="/app/recruiter/candidates" element={<RecruiterCandidatesPage />} />
             <Route path="/app/recruiter/profile" element={<RecruiterProfilePage />} />
             <Route path="/app/recruiter/jobs" element={<RecruiterJobsPage />} />
             <Route path="/app/recruiter/applications" element={<RecruiterApplicationsPage />} />

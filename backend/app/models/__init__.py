@@ -25,6 +25,7 @@ from app.models.project_evaluation import (
     EvaluationRecommendation,
     SkillAssessmentProficiency,
 )
+from app.models.job_invitation import JobInvitation, InvitationStatus
 
 __all__ = [
     "Base",
@@ -74,4 +75,6 @@ __all__ = [
     "EvaluationStatus",
     "EvaluationRecommendation",
     "SkillAssessmentProficiency",
+    "JobInvitation",
+    "InvitationStatus",
 ]

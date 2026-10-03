@@ -89,6 +89,10 @@ describe('AppLayout Role-Aware Navigation', () => {
     expect(verifyLink).toBeInTheDocument();
     expect(verifyLink).toHaveAttribute('href', '/app/recruiter/experiences/verification');
 
+    const talentLink = screen.getByRole('link', { name: 'Talent Discovery' });
+    expect(talentLink).toBeInTheDocument();
+    expect(talentLink).toHaveAttribute('href', '/app/recruiter/candidates');
+
     // Recruiter should not see student-only "Experiences" link
     expect(screen.queryByRole('link', { name: 'Experiences' })).not.toBeInTheDocument();
   });

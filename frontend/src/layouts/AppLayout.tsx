@@ -34,6 +34,7 @@ const getStudentNavGroups = (): NavGroup[] => [
       { to: '/app/jobs', label: 'Opportunities' },
       { to: '/app/saved-jobs', label: 'Saved Jobs' },
       { to: '/app/applications', label: 'My Applications' },
+      { to: '/app/invitations', label: 'Invitations' },
       { to: '/app/interviews', label: 'Interviews' },
     ],
   },
@@ -78,6 +79,7 @@ const getNavLinks = (role?: string): NavItem[] => {
 
   if (role === 'recruiter') {
     links.push(
+      { to: '/app/recruiter/candidates', label: 'Talent Discovery' },
       { to: '/app/recruiter/jobs', label: 'Job Postings' },
       { to: '/app/recruiter/applications', label: 'Applications' },
       { to: '/app/recruiter/interviews', label: 'Interviews' },

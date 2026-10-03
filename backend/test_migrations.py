@@ -38,7 +38,8 @@ def test_migrations():
     assert "project_evidence_verifications" in Base.metadata.tables, "Table 'project_evidence_verifications' missing from Base.metadata"
     assert "project_evaluations" in Base.metadata.tables, "Table 'project_evaluations' missing from Base.metadata"
     assert "evaluation_skill_assessments" in Base.metadata.tables, "Table 'evaluation_skill_assessments' missing from Base.metadata"
-    print("  -> Base.metadata contains innovation projects, milestones, evidence, verifications, experience records, and evaluations tables.")
+    assert "job_invitations" in Base.metadata.tables, "Table 'job_invitations' missing from Base.metadata"
+    print("  -> Base.metadata contains innovation projects, milestones, evidence, verifications, experience records, evaluations, and job invitations tables.")
 
     print("[3/11] Verifying database schema after migration")
     inspector = inspect(engine)
@@ -70,6 +71,7 @@ def test_migrations():
     assert "experience_skills" in tables, "Table 'experience_skills' not found in database!"
     assert "project_evaluations" in tables, "Table 'project_evaluations' not found in database!"
     assert "evaluation_skill_assessments" in tables, "Table 'evaluation_skill_assessments' not found in database!"
+    assert "job_invitations" in tables, "Table 'job_invitations' not found in database!"
     assert "alembic_version" in tables, "Table 'alembic_version' not found in database!"
 
     print("[4/9] Verifying 'users' table columns and indexes")
