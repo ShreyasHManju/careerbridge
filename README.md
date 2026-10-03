@@ -1534,6 +1534,8 @@ docker compose -f docker-compose.production.yml up -d --build
 python scripts/smoke_test.py
 ```
 
-### 6. Production Release Checklist
+### 6. Production Release & Deployment Documentation
 
-For step-by-step pre-flight verification before live deployment, refer to [`docs/PRODUCTION_RELEASE_CHECKLIST.md`](docs/PRODUCTION_RELEASE_CHECKLIST.md).
+- **Pre-Flight Verification Checklist**: [`docs/PRODUCTION_RELEASE_CHECKLIST.md`](docs/PRODUCTION_RELEASE_CHECKLIST.md)
+- **Host VM Deployment Runbook**: [`docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md`](docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md)
+
