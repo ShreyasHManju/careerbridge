@@ -31,7 +31,11 @@ from sqlalchemy import delete, select
 from app.core.database import SessionLocal
 from app.core.security import create_access_token, hash_password
 from app.main import app
+from app.models.application import Application
+from app.models.interview import Interview
+from app.models.job_invitation import JobInvitation
 from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
+from app.models.saved_job import SavedJob
 from app.models.user import User, UserRole
 
 client = TestClient(app)
@@ -42,7 +46,7 @@ TEST_PASSWORD = "SearchTestPassword123!"
 
 
 def cleanup_test_data():
-    """Remove test users and their job postings."""
+    """Remove test users and their job postings, plus any dangling job postings to ensure test isolation."""
     with SessionLocal() as db:
         test_emails = [SEARCH_RECRUITER_EMAIL, SEARCH_STUDENT_EMAIL]
         users = db.scalars(select(User).where(User.email.in_(test_emails))).all()
@@ -50,7 +54,14 @@ def cleanup_test_data():
         if user_ids:
             db.execute(delete(JobPosting).where(JobPosting.recruiter_id.in_(user_ids)))
             db.execute(delete(User).where(User.id.in_(user_ids)))
-            db.commit()
+        
+        # Clean up any lingering job postings and dependent records for deterministic total count assertions
+        db.execute(delete(Interview))
+        db.execute(delete(JobInvitation))
+        db.execute(delete(SavedJob))
+        db.execute(delete(Application))
+        db.execute(delete(JobPosting))
+        db.commit()
 
 
 def test_job_search_workflow():

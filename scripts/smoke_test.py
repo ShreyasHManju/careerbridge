@@ -105,6 +105,18 @@ def run_smoke_tests(backend_url: str, frontend_url: str) -> bool:
         print(f"FAIL (HTTP {status})")
         all_passed = False
 
+    # 6. Optional: Nginx Container Health Endpoint (if frontend is Nginx container)
+    fe_health_url = f"{frontend_url.rstrip('/')}/nginx-health"
+    ok, status, body = check_url(fe_health_url)
+    if ok:
+        print(f"[*] Checking Frontend Nginx Health: {fe_health_url} ... PASS (HTTP {status})")
+
+    # 7. Reverse Proxy Check via Frontend Port (if unified Nginx routing)
+    proxy_health_url = f"{frontend_url.rstrip('/')}/health"
+    ok, status, body = check_url(proxy_health_url)
+    if ok:
+        print(f"[*] Checking Nginx -> Backend Proxy (/health): {proxy_health_url} ... PASS (HTTP {status})")
+
     print("---------------------------------------------------------------------------")
     if all_passed:
         print("RESULT: ALL SMOKE CHECKS PASSED SUCCESSFULLY.")

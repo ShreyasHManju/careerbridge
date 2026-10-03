@@ -1508,3 +1508,32 @@ The automated GitHub Actions workflow validates every commit and pull request ag
 - All credentials (`JWT_SECRET_KEY`, `POSTGRES_PASSWORD`, `GOOGLE_CLIENT_ID`, `SMTP_PASSWORD`) are injected exclusively via environment variables.
 - Production `.env` files are excluded from Git via `.gitignore`.
 - Dummy test secrets with explicit `ci_test_*` prefixes are used in CI services only.
+
+### 5. Production Operations, Logs & Maintenance
+
+```bash
+# View aggregated production container logs
+docker compose -f docker-compose.production.yml logs -f --tail=100
+
+# Inspect backend service logs specifically
+docker compose -f docker-compose.production.yml logs -f backend
+
+# Graceful restart of services
+docker compose -f docker-compose.production.yml restart
+
+# Database backup creation
+./backend/scripts/backup_db.sh
+
+# Database restore verification
+./backend/scripts/restore_db.sh /path/to/backup.sql.gz
+
+# Rollback procedure (if required)
+git checkout <previous_release_tag>
+docker compose -f docker-compose.production.yml exec backend alembic downgrade <target_rev>
+docker compose -f docker-compose.production.yml up -d --build
+python scripts/smoke_test.py
+```
+
+### 6. Production Release Checklist
+
+For step-by-step pre-flight verification before live deployment, refer to [`docs/PRODUCTION_RELEASE_CHECKLIST.md`](docs/PRODUCTION_RELEASE_CHECKLIST.md).
