@@ -1311,6 +1311,91 @@ body {
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 0.25rem;
+  flex-wrap: wrap;
+}
+
+/* --- Application Card Interview Preview (Phase 4 Step 3) --- */
+.cb-app-interview-preview {
+  background: var(--cb-bg-subtle, #f8fafc);
+  border: 1px solid var(--cb-border, #e2e8f0);
+  border-left: 4px solid var(--cb-primary, #2563eb);
+  border-radius: var(--cb-radius-md, 8px);
+  padding: 0.875rem 1rem;
+  margin: 0.25rem 0;
+}
+
+.cb-app-interview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.625rem;
+  flex-wrap: wrap;
+}
+
+.cb-app-interview-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cb-app-interview-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--cb-text, #0f172a);
+  margin: 0;
+}
+
+.cb-app-interview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.625rem;
+  font-size: 0.85rem;
+}
+
+.cb-app-interview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.cb-app-interview-item-full {
+  grid-column: 1 / -1;
+}
+
+.cb-app-interview-item-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cb-text-muted, #64748b);
+}
+
+.cb-app-interview-item-value {
+  font-weight: 600;
+  color: var(--cb-text, #1e293b);
+}
+
+.cb-app-interview-notes {
+  margin: 0.2rem 0 0 0;
+  font-size: 0.85rem;
+  color: var(--cb-text-muted, #475569);
+  line-height: 1.4;
+}
+
+.cb-btn-join-meeting {
+  background-color: #16a34a !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-decoration: none;
+}
+
+.cb-btn-join-meeting:hover {
+  background-color: #15803d !important;
+  color: #ffffff !important;
 }
 
 /* --- Recruiter Specific Card Controls --- */

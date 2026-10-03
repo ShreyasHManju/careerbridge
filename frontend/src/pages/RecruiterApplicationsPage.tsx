@@ -24,8 +24,10 @@ const ALL_STATUSES: { value: ApplicationStatus; label: string }[] = [
 ];
 
 export const RecruiterApplicationsPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialStatusParam = searchParams.get('status') as ApplicationFilterStatus | null;
+  const jobIdParam = searchParams.get('job_id');
+  const targetJobId = jobIdParam ? parseInt(jobIdParam, 10) : null;
   const validStatuses: ApplicationFilterStatus[] = [
     'all',
     'applied',
@@ -75,7 +77,10 @@ export const RecruiterApplicationsPage: React.FC = () => {
 
       // Collect unique job IDs to prevent duplicate/N+1 requests
       const uniqueJobIds = Array.from(
-        new Set(apps.map((app) => app.job_posting_id))
+        new Set([
+          ...apps.map((app) => app.job_posting_id),
+          ...(targetJobId !== null && !isNaN(targetJobId) ? [targetJobId] : []),
+        ])
       );
 
       if (uniqueJobIds.length > 0) {
@@ -111,7 +116,7 @@ export const RecruiterApplicationsPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [targetJobId]);
 
   useEffect(() => {
     fetchApplicationsAndJobs();
@@ -157,6 +162,11 @@ export const RecruiterApplicationsPage: React.FC = () => {
   // Client-side filtered list
   const filteredApplications = useMemo(() => {
     return applications.filter((app) => {
+      // 0. Job ID Filter (URL query parameter)
+      if (targetJobId !== null && !isNaN(targetJobId) && app.job_posting_id !== targetJobId) {
+        return false;
+      }
+
       // 1. Status Filter
       if (statusFilter !== 'all' && app.status !== statusFilter) {
         return false;
@@ -182,7 +192,7 @@ export const RecruiterApplicationsPage: React.FC = () => {
 
       return true;
     });
-  }, [applications, jobsMap, statusFilter, searchQuery]);
+  }, [applications, jobsMap, statusFilter, searchQuery, targetJobId]);
 
   const allFilteredSelected =
     filteredApplications.length > 0 &&
@@ -261,9 +271,20 @@ export const RecruiterApplicationsPage: React.FC = () => {
     }
   };
 
+  const handleClearJobFilter = () => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('job_id');
+    setSearchParams(newParams);
+  };
+
   const handleResetFilters = () => {
     setStatusFilter('all');
     setSearchQuery('');
+    if (searchParams.has('job_id')) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('job_id');
+      setSearchParams(newParams);
+    }
   };
 
   return (
@@ -347,6 +368,42 @@ export const RecruiterApplicationsPage: React.FC = () => {
             filteredCount={filteredApplications.length}
             searchPlaceholder="Search by candidate ID, job title, cover message, or status..."
           />
+
+          {/* Active Job Filter Indicator */}
+          {targetJobId !== null && !isNaN(targetJobId) && (
+            <div
+              className="cb-job-filter-indicator"
+              data-testid="job-filter-indicator"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.75rem 1rem',
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                gap: '1rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 600, color: '#1d4ed8' }}>
+                  Filtering by Job:
+                </span>
+                <span style={{ fontWeight: 700, color: '#1e293b' }}>
+                  {jobsMap.get(targetJobId)?.title || `Job #${targetJobId}`}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="cb-btn cb-btn-secondary cb-btn-xs"
+                onClick={handleClearJobFilter}
+                data-testid="clear-job-filter-btn"
+              >
+                Clear Filter
+              </button>
+            </div>
+          )}
 
           {/* Bulk Action Toolbar */}
           {filteredApplications.length > 0 && (

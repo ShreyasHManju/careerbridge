@@ -1,14 +1,47 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Application } from '@/types/application';
 import { JobPosting } from '@/types/job';
+import { Interview, InterviewType } from '@/types/interview';
 import { ApplicationStatusBadge } from './ApplicationStatusBadge';
+import { InterviewStatusBadge } from '@/components/interviews/InterviewStatusBadge';
 
-interface StudentApplicationCardProps {
+export interface StudentApplicationCardProps {
   application: Application;
   job?: JobPosting | null;
   isLoadingJob?: boolean;
+  interview?: Interview | null;
+  interviews?: Interview[];
 }
+
+const TYPE_LABELS: Record<InterviewType, { label: string; icon: string }> = {
+  online: { label: 'Online Video', icon: '💻' },
+  in_person: { label: 'In-Person', icon: '🏢' },
+  phone: { label: 'Phone Call', icon: '📞' },
+};
+
+const formatInterviewDateTime = (isoString: string): string => {
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return isoString;
+    return date.toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    });
+  } catch {
+    return isoString;
+  }
+};
+
+const isHttpUrl = (str: string | null): boolean => {
+  if (!str) return false;
+  return /^https?:\/\//i.test(str.trim());
+};
 
 const getStatusMessage = (status: string): string => {
   switch (status) {
@@ -31,6 +64,8 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
   application,
   job,
   isLoadingJob = false,
+  interview,
+  interviews,
 }) => {
   const formattedDate = new Date(application.created_at).toLocaleDateString('en-US', {
     year: 'numeric',
@@ -48,6 +83,36 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
 
   const statusMsg = getStatusMessage(application.status);
   const isShortlistedOrAccepted = application.status === 'shortlisted' || application.status === 'accepted';
+
+  // Resolve upcoming active interview
+  const resolvedInterview = useMemo(() => {
+    if (interview !== undefined) return interview;
+    if (interviews && interviews.length > 0) {
+      const appInterviews = interviews.filter((i) => i.application_id === application.id);
+      const active = appInterviews
+        .filter((i) => i.status === 'scheduled' || i.status === 'rescheduled')
+        .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+      if (active.length > 0) return active[0];
+      if (appInterviews.length > 0) return appInterviews[0];
+    }
+    return null;
+  }, [interview, interviews, application.id]);
+
+  const hasActiveInterview =
+    resolvedInterview !== null &&
+    (resolvedInterview.status === 'scheduled' || resolvedInterview.status === 'rescheduled');
+
+  const interviewTypeConfig = resolvedInterview
+    ? TYPE_LABELS[resolvedInterview.interview_type] || {
+        label: resolvedInterview.interview_type,
+        icon: '📅',
+      }
+    : null;
+
+  const hasJoinableMeetingUrl =
+    hasActiveInterview &&
+    resolvedInterview !== null &&
+    isHttpUrl(resolvedInterview.location_or_link);
 
   // Journey stage progression helpers
   const isAppliedStep = true;
@@ -147,6 +212,58 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
         </div>
       )}
 
+      {/* Upcoming Interview Preview Banner (Phase 4 Step 3) */}
+      {hasActiveInterview && resolvedInterview && interviewTypeConfig && (
+        <div
+          className="cb-app-interview-preview"
+          data-testid={`app-interview-preview-${application.id}`}
+          aria-label="Upcoming Interview Details"
+        >
+          <div className="cb-app-interview-header">
+            <div className="cb-app-interview-title-wrap">
+              <span aria-hidden="true">📅</span>
+              <strong className="cb-app-interview-title">Upcoming Interview</strong>
+            </div>
+            <InterviewStatusBadge status={resolvedInterview.status} size="sm" />
+          </div>
+
+          <div className="cb-app-interview-grid">
+            <div className="cb-app-interview-item">
+              <span className="cb-app-interview-item-label">Date & Time</span>
+              <span className="cb-app-interview-item-value">
+                {formatInterviewDateTime(resolvedInterview.scheduled_at)}
+              </span>
+            </div>
+
+            <div className="cb-app-interview-item">
+              <span className="cb-app-interview-item-label">Format & Duration</span>
+              <span className="cb-app-interview-item-value">
+                <span aria-hidden="true">{interviewTypeConfig.icon}</span>{' '}
+                {interviewTypeConfig.label} ({resolvedInterview.duration_minutes} min)
+              </span>
+            </div>
+
+            {resolvedInterview.location_or_link && (
+              <div className="cb-app-interview-item cb-app-interview-item-full">
+                <span className="cb-app-interview-item-label">
+                  {resolvedInterview.interview_type === 'online' ? 'Meeting Link / Platform' : 'Location Details'}
+                </span>
+                <span className="cb-app-interview-item-value" style={{ wordBreak: 'break-all' }}>
+                  {resolvedInterview.location_or_link}
+                </span>
+              </div>
+            )}
+
+            {resolvedInterview.notes && (
+              <div className="cb-app-interview-item cb-app-interview-item-full">
+                <span className="cb-app-interview-item-label">Notes & Instructions</span>
+                <p className="cb-app-interview-notes">{resolvedInterview.notes}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="cb-app-card-actions">
         <Link
           to={`/app/jobs/${application.job_posting_id}`}
@@ -154,6 +271,20 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
         >
           View Opportunity Details
         </Link>
+
+        {/* Direct Join Meeting Action when active interview has valid online meeting URL */}
+        {hasJoinableMeetingUrl && resolvedInterview?.location_or_link && (
+          <a
+            href={resolvedInterview.location_or_link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cb-btn cb-btn-success cb-btn-sm cb-btn-join-meeting"
+            data-testid={`join-interview-btn-${application.id}`}
+            aria-label={`Join Online Meeting for ${jobTitle}`}
+          >
+            Join Online Meeting 🎥
+          </a>
+        )}
 
         {isShortlistedOrAccepted && (
           <Link

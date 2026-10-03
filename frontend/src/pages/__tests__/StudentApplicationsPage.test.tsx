@@ -4,8 +4,10 @@ import { MemoryRouter } from 'react-router-dom';
 import { StudentApplicationsPage } from '../StudentApplicationsPage';
 import * as applicationsApi from '@/api/applications';
 import * as jobsApi from '@/api/jobs';
+import * as interviewsApi from '@/api/interviews';
 import { Application } from '@/types/application';
 import { JobPosting } from '@/types/job';
+import { Interview } from '@/types/interview';
 
 const mockApp1: Application = {
   id: 101,
@@ -79,9 +81,30 @@ const mockJob20: JobPosting = {
   updated_at: '2026-09-15T10:00:00Z',
 };
 
+const mockInterview102: Interview = {
+  id: 201,
+  application_id: 102,
+  recruiter_id: 2,
+  student_id: 5,
+  job_id: 10,
+  job_title: 'Full Stack React Engineer',
+  company_name: 'Nexus Tech',
+  candidate_email: 'student@example.com',
+  recruiter_email: 'recruiter@nexustech.com',
+  scheduled_at: '2026-10-10T14:00:00Z',
+  duration_minutes: 45,
+  interview_type: 'online',
+  location_or_link: 'https://meet.google.com/xyz-abcd-efg',
+  notes: 'Technical coding session.',
+  status: 'scheduled',
+  created_at: '2026-09-19T10:00:00Z',
+  updated_at: '2026-09-19T10:00:00Z',
+};
+
 describe('StudentApplicationsPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(interviewsApi, 'getMyInterviews').mockResolvedValue([]);
   });
 
   it('displays loading state while applications are being fetched', () => {
@@ -270,5 +293,30 @@ describe('StudentApplicationsPage', () => {
     fireEvent.change(searchInput, { target: { value: 'frontend architecture' } });
     expect(screen.queryByText('Full Stack React Engineer')).not.toBeInTheDocument();
     expect(screen.getByText(/No applications match your selected filter criteria/i)).toBeInTheDocument();
+  });
+
+  it('renders upcoming interview preview banner and direct join action for scheduled interview', async () => {
+    vi.spyOn(applicationsApi, 'getMyApplications').mockResolvedValue([mockApp2]);
+    vi.spyOn(jobsApi, 'getJobById').mockResolvedValue(mockJob10);
+    vi.spyOn(interviewsApi, 'getMyInterviews').mockResolvedValue([mockInterview102]);
+
+    render(
+      <MemoryRouter>
+        <StudentApplicationsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Full Stack React Engineer')).toBeInTheDocument();
+      expect(screen.getByTestId('app-interview-preview-102')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Upcoming Interview')).toBeInTheDocument();
+    expect(screen.getByText(/45 min/)).toBeInTheDocument();
+    expect(screen.getByText(/Online Video/)).toBeInTheDocument();
+
+    const joinBtn = screen.getByTestId('join-interview-btn-102');
+    expect(joinBtn).toBeInTheDocument();
+    expect(joinBtn).toHaveAttribute('href', 'https://meet.google.com/xyz-abcd-efg');
   });
 });

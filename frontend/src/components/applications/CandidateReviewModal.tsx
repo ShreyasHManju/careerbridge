@@ -2,12 +2,23 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Application, ApplicationStatus } from '@/types/application';
 import { JobPosting } from '@/types/job';
-import { PassportResponse } from '@/types/passport';
+import { PassportResponse, PassportProjectItem } from '@/types/passport';
 import { Interview } from '@/types/interview';
+import { InnovationProject, ProjectType, ProjectStatus, ProjectVisibility } from '@/types/innovationProject';
+import { ProjectEvaluation, ProjectEvaluationCreate, ProjectEvaluationUpdate } from '@/types/projectEvaluation';
 import { getStudentPassport } from '@/api/passport';
-import { getRecruiterInterviews } from '@/api/interviews';
+import { getRecruiterInterviews, cancelInterview, updateInterview } from '@/api/interviews';
+import {
+  createProjectEvaluation,
+  updateProjectEvaluation,
+  submitProjectEvaluation,
+  getProjectEvaluations,
+} from '@/api/projectEvaluations';
 import { ApplicationStatusBadge } from './ApplicationStatusBadge';
 import { InterviewStatusBadge } from '@/components/interviews/InterviewStatusBadge';
+import { ProjectEvaluationModal } from '@/components/evaluations/ProjectEvaluationModal';
+import { ScheduleInterviewModal } from '@/components/interviews/ScheduleInterviewModal';
+import { RescheduleInterviewModal } from '@/components/interviews/RescheduleInterviewModal';
 import { ApiErrorResponse } from '@/types/api';
 
 interface CandidateReviewModalProps {
@@ -76,10 +87,24 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
   const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
   const [dataError, setDataError] = useState<string | null>(null);
 
+  const [currentStatus, setCurrentStatus] = useState<ApplicationStatus>(
+    application?.status || 'applied'
+  );
   const [isMutatingStatus, setIsMutatingStatus] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [showRejectConfirm, setShowRejectConfirm] = useState<boolean>(false);
+
+  // Direct Project Evaluation modal state
+  const [evaluatingProject, setEvaluatingProject] = useState<PassportProjectItem | null>(null);
+  const [editingEvaluation, setEditingEvaluation] = useState<ProjectEvaluation | null>(null);
+  const [isEvaluationModalOpen, setIsEvaluationModalOpen] = useState<boolean>(false);
+  const [isEvaluationSaving, setIsEvaluationSaving] = useState<boolean>(false);
+
+  // Direct Interview management modal state
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState<boolean>(false);
+  const [reschedulingInterview, setReschedulingInterview] = useState<Interview | null>(null);
+  const [isInterviewMutating, setIsInterviewMutating] = useState<boolean>(false);
 
   // Load Passport & Interview history for candidate
   const loadCandidateData = useCallback(async (studentId: number, appId: number) => {
@@ -118,9 +143,15 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
   useEffect(() => {
     if (isOpen && application) {
       setActiveTab('application');
+      setCurrentStatus(application.status);
       setActionError(null);
       setActionSuccess(null);
       setShowRejectConfirm(false);
+      setEvaluatingProject(null);
+      setEditingEvaluation(null);
+      setIsEvaluationModalOpen(false);
+      setIsScheduleModalOpen(false);
+      setReschedulingInterview(null);
       loadCandidateData(application.student_id, application.id);
     } else {
       setPassport(null);
@@ -132,7 +163,15 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        if (showRejectConfirm) {
+        if (isEvaluationModalOpen) {
+          setIsEvaluationModalOpen(false);
+          setEvaluatingProject(null);
+          setEditingEvaluation(null);
+        } else if (isScheduleModalOpen) {
+          setIsScheduleModalOpen(false);
+        } else if (reschedulingInterview) {
+          setReschedulingInterview(null);
+        } else if (showRejectConfirm) {
           setShowRejectConfirm(false);
         } else {
           onClose();
@@ -141,7 +180,7 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, showRejectConfirm, onClose]);
+  }, [isOpen, isEvaluationModalOpen, isScheduleModalOpen, reschedulingInterview, showRejectConfirm, onClose]);
 
   if (!isOpen || !application) return null;
 
@@ -158,6 +197,7 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
     setActionSuccess(null);
     try {
       await onStatusChange(application.id, newStatus);
+      setCurrentStatus(newStatus);
       setActionSuccess(`Application status successfully updated to "${newStatus}".`);
       setShowRejectConfirm(false);
     } catch (err) {
@@ -169,10 +209,138 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
   };
 
   const handleScheduleClick = () => {
-    if (onScheduleInterview) {
-      onScheduleInterview(application, job || null);
+    setIsScheduleModalOpen(true);
+    if (onScheduleInterview && application) {
+      // Optional callback hook for parent components if needed
     }
   };
+
+  const handleScheduleSuccess = async (newInterview: Interview) => {
+    setIsScheduleModalOpen(false);
+    setActionSuccess(`Interview scheduled successfully for ${formatDateTime(newInterview.scheduled_at)}.`);
+    if (application) {
+      await loadCandidateData(application.student_id, application.id);
+    }
+  };
+
+  const handleRescheduleSuccess = async (updated: Interview) => {
+    setReschedulingInterview(null);
+    setActionSuccess(`Interview rescheduled successfully to ${formatDateTime(updated.scheduled_at)}.`);
+    if (application) {
+      await loadCandidateData(application.student_id, application.id);
+    }
+  };
+
+  const handleCancelInterview = async (interviewId: number) => {
+    setIsInterviewMutating(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      await cancelInterview(interviewId);
+      setActionSuccess('Interview cancelled successfully.');
+      if (application) {
+        await loadCandidateData(application.student_id, application.id);
+      }
+    } catch (err) {
+      const apiErr = err as ApiErrorResponse;
+      setActionError(apiErr?.message || 'Failed to cancel interview.');
+    } finally {
+      setIsInterviewMutating(false);
+    }
+  };
+
+  const handleCompleteInterview = async (interviewId: number) => {
+    setIsInterviewMutating(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      await updateInterview(interviewId, { status: 'completed' });
+      setActionSuccess('Interview marked as completed.');
+      if (application) {
+        await loadCandidateData(application.student_id, application.id);
+      }
+    } catch (err) {
+      const apiErr = err as ApiErrorResponse;
+      setActionError(apiErr?.message || 'Failed to update interview.');
+    } finally {
+      setIsInterviewMutating(false);
+    }
+  };
+
+  const handleOpenEvaluateProject = async (proj: PassportProjectItem) => {
+    setEvaluatingProject(proj);
+    setEditingEvaluation(null);
+    setIsEvaluationModalOpen(true);
+    try {
+      const evals = await getProjectEvaluations(proj.id);
+      if (evals && evals.length > 0) {
+        setEditingEvaluation(evals[0]);
+      }
+    } catch {
+      // Form opens cleanly if no existing evaluations
+    }
+  };
+
+  const handleSaveEvaluation = async (
+    payload: ProjectEvaluationCreate,
+    submitImmediately = false
+  ) => {
+    if (!evaluatingProject) return;
+    setIsEvaluationSaving(true);
+    setActionError(null);
+    try {
+      let savedEval: ProjectEvaluation;
+      if (editingEvaluation) {
+        savedEval = await updateProjectEvaluation(
+          editingEvaluation.id,
+          payload as ProjectEvaluationUpdate
+        );
+      } else {
+        savedEval = await createProjectEvaluation(evaluatingProject.id, payload);
+      }
+      if (submitImmediately && savedEval.status === 'draft') {
+        await submitProjectEvaluation(savedEval.id);
+      }
+      setActionSuccess(
+        submitImmediately
+          ? `Project evaluation for "${evaluatingProject.title}" submitted successfully!`
+          : `Project evaluation for "${evaluatingProject.title}" saved as draft.`
+      );
+      setIsEvaluationModalOpen(false);
+      setEvaluatingProject(null);
+      setEditingEvaluation(null);
+      if (application) {
+        await loadCandidateData(application.student_id, application.id);
+      }
+    } catch (err) {
+      const apiErr = err as ApiErrorResponse;
+      setActionError(apiErr?.message || 'Failed to save project evaluation.');
+      throw err;
+    } finally {
+      setIsEvaluationSaving(false);
+    }
+  };
+
+  // Convert evaluating project to InnovationProject shape for ProjectEvaluationModal
+  const evaluatingInnovationProject: InnovationProject | null = evaluatingProject
+    ? {
+        id: evaluatingProject.id,
+        student_id: application.student_id,
+        title: evaluatingProject.title,
+        slug: evaluatingProject.slug || '',
+        short_description: evaluatingProject.short_description || null,
+        description: evaluatingProject.description,
+        project_type: (evaluatingProject.project_type || 'software') as ProjectType,
+        status: (evaluatingProject.status || 'active') as ProjectStatus,
+        visibility: (evaluatingProject.visibility || 'public') as ProjectVisibility,
+        repository_url: evaluatingProject.repository_url || null,
+        live_demo_url: evaluatingProject.live_demo_url || null,
+        skills: evaluatingProject.skills || null,
+        structured_skills: evaluatingProject.structured_skills || [],
+        created_at: '',
+        updated_at: '',
+      }
+    : null;
 
   // Determine active pipeline index
   const getPipelineIndex = (status: ApplicationStatus, hasInterview: boolean): number => {
@@ -187,7 +355,7 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
   const hasScheduledInterview = interviews.some(
     (i) => i.status === 'scheduled' || i.status === 'rescheduled'
   );
-  const currentPipelineIdx = getPipelineIndex(application.status, hasScheduledInterview);
+  const currentPipelineIdx = getPipelineIndex(currentStatus, hasScheduledInterview);
 
   return (
     <div className="cb-modal-backdrop" role="presentation">
@@ -663,6 +831,14 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
 
                           {/* Evidence & Project Links */}
                           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+                            <button
+                              type="button"
+                              className="cb-btn cb-btn-primary cb-btn-sm"
+                              onClick={() => handleOpenEvaluateProject(proj)}
+                              data-testid={`evaluate-project-btn-${proj.id}`}
+                            >
+                              ⭐ Evaluate Project
+                            </button>
                             {proj.repository_url && (
                               <a
                                 href={proj.repository_url}
@@ -709,54 +885,115 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
                 <div className="cb-review-section" data-testid="section-interviews">
                   {interviews.length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      {interviews.map((item) => (
-                        <div
-                          key={item.id}
-                          style={{
-                            padding: '1.25rem',
-                            background: '#ffffff',
-                            borderRadius: '10px',
-                            border: '1px solid #e2e8f0',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                          }}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                        <h4 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600, color: '#1e293b' }}>
+                          Interview History & Rounds ({interviews.length})
+                        </h4>
+                        <button
+                          type="button"
+                          className="cb-btn cb-btn-primary cb-btn-sm"
+                          onClick={handleScheduleClick}
+                          data-testid="schedule-interview-tab-btn"
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                            <strong style={{ fontSize: '0.9375rem', color: '#0f172a' }}>
-                              📅 {formatDateTime(item.scheduled_at)}
-                            </strong>
-                            <InterviewStatusBadge status={item.status} />
-                          </div>
+                          + Schedule Interview
+                        </button>
+                      </div>
 
-                          <div style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.5rem' }}>
-                            <span>⏱️ Duration: {item.duration_minutes} minutes</span> •{' '}
-                            <span>Format: {(item.interview_type || 'online').toUpperCase()}</span>
-                          </div>
-
-                          {item.location_or_link && (
-                            <div style={{ fontSize: '0.8125rem', color: '#2563eb', margin: '0.5rem 0' }}>
-                              {item.location_or_link.startsWith('http') ? (
-                                <a
-                                  href={item.location_or_link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="cb-btn cb-btn-outline-primary cb-btn-sm"
-                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}
-                                >
-                                  🔗 Join Meeting Room ↗
-                                </a>
-                              ) : (
-                                <span>📍 Location: {item.location_or_link}</span>
-                              )}
+                      {interviews.map((item) => {
+                        const isActionable =
+                          item.status === 'scheduled' || item.status === 'rescheduled';
+                        return (
+                          <div
+                            key={item.id}
+                            style={{
+                              padding: '1.25rem',
+                              background: '#ffffff',
+                              borderRadius: '10px',
+                              border: '1px solid #e2e8f0',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                            }}
+                            data-testid={`candidate-interview-item-${item.id}`}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                              <strong style={{ fontSize: '0.9375rem', color: '#0f172a' }}>
+                                📅 {formatDateTime(item.scheduled_at)}
+                              </strong>
+                              <InterviewStatusBadge status={item.status} />
                             </div>
-                          )}
 
-                          {item.notes && (
-                            <p style={{ fontSize: '0.875rem', color: '#334155', background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', margin: '0.5rem 0 0 0' }}>
-                              📝 {item.notes}
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                            <div style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.5rem' }}>
+                              <span>⏱️ Duration: {item.duration_minutes} minutes</span> •{' '}
+                              <span>Format: {(item.interview_type || 'online').toUpperCase()}</span>
+                            </div>
+
+                            {item.location_or_link && (
+                              <div style={{ fontSize: '0.8125rem', color: '#2563eb', margin: '0.5rem 0' }}>
+                                {item.location_or_link.startsWith('http') ? (
+                                  <a
+                                    href={item.location_or_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="cb-btn cb-btn-outline-primary cb-btn-sm"
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}
+                                  >
+                                    🔗 Join Meeting Room ↗
+                                  </a>
+                                ) : (
+                                  <span>📍 Location: {item.location_or_link}</span>
+                                )}
+                              </div>
+                            )}
+
+                            {item.notes && (
+                              <p style={{ fontSize: '0.875rem', color: '#334155', background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', margin: '0.5rem 0 0 0' }}>
+                                📝 {item.notes}
+                              </p>
+                            )}
+
+                            {/* Interview Management Action Controls */}
+                            {isActionable && (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  gap: '0.5rem',
+                                  flexWrap: 'wrap',
+                                  marginTop: '0.75rem',
+                                  paddingTop: '0.75rem',
+                                  borderTop: '1px solid #f1f5f9',
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  className="cb-btn cb-btn-secondary cb-btn-xs"
+                                  onClick={() => setReschedulingInterview(item)}
+                                  disabled={isInterviewMutating}
+                                  data-testid={`reschedule-interview-btn-${item.id}`}
+                                >
+                                  ✏️ Reschedule
+                                </button>
+                                <button
+                                  type="button"
+                                  className="cb-btn cb-btn-outline-success cb-btn-xs"
+                                  onClick={() => handleCompleteInterview(item.id)}
+                                  disabled={isInterviewMutating}
+                                  data-testid={`complete-interview-btn-${item.id}`}
+                                >
+                                  ✓ Mark Completed
+                                </button>
+                                <button
+                                  type="button"
+                                  className="cb-btn cb-btn-outline-danger cb-btn-xs"
+                                  onClick={() => handleCancelInterview(item.id)}
+                                  disabled={isInterviewMutating}
+                                  data-testid={`cancel-interview-btn-${item.id}`}
+                                >
+                                  ✕ Cancel Interview
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="cb-card-inner-box" style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
@@ -767,16 +1004,14 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
                       <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '1.25rem' }}>
                         Schedule a live video or in-person technical screening round with this candidate.
                       </p>
-                      {onScheduleInterview && (
-                        <button
-                          type="button"
-                          className="cb-btn cb-btn-primary cb-btn-sm"
-                          onClick={handleScheduleClick}
-                          data-testid="schedule-interview-empty-btn"
-                        >
-                          📅 Schedule Interview Now
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="cb-btn cb-btn-primary cb-btn-sm"
+                        onClick={handleScheduleClick}
+                        data-testid="schedule-interview-empty-btn"
+                      >
+                        📅 Schedule Interview Now
+                      </button>
                     </div>
                   )}
                 </div>
@@ -853,7 +1088,7 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
 
           <div className="cb-review-footer-actions">
             {/* Quick Status Transitions */}
-            {application.status !== 'reviewing' && application.status !== 'rejected' && application.status !== 'accepted' && (
+            {currentStatus !== 'reviewing' && currentStatus !== 'rejected' && currentStatus !== 'accepted' && (
               <button
                 type="button"
                 className="cb-btn cb-btn-secondary cb-btn-sm"
@@ -865,7 +1100,7 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
               </button>
             )}
 
-            {application.status !== 'shortlisted' && application.status !== 'rejected' && application.status !== 'accepted' && (
+            {currentStatus !== 'shortlisted' && currentStatus !== 'rejected' && currentStatus !== 'accepted' && (
               <button
                 type="button"
                 className="cb-btn cb-btn-outline-success cb-btn-sm"
@@ -877,7 +1112,7 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
               </button>
             )}
 
-            {onScheduleInterview && application.status !== 'rejected' && (
+            {currentStatus !== 'rejected' && (
               <button
                 type="button"
                 className="cb-btn cb-btn-primary cb-btn-sm"
@@ -888,7 +1123,7 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
               </button>
             )}
 
-            {application.status !== 'accepted' && application.status !== 'rejected' && (
+            {currentStatus !== 'accepted' && currentStatus !== 'rejected' && (
               <button
                 type="button"
                 className="cb-btn cb-btn-success cb-btn-sm"
@@ -900,7 +1135,7 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
               </button>
             )}
 
-            {application.status !== 'rejected' && application.status !== 'accepted' && (
+            {currentStatus !== 'rejected' && currentStatus !== 'accepted' && (
               <button
                 type="button"
                 className="cb-btn cb-btn-outline-danger cb-btn-sm"
@@ -923,6 +1158,45 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
           </div>
         </footer>
       </div>
+
+      {/* Direct Project Evaluation Modal */}
+      {isEvaluationModalOpen && evaluatingInnovationProject && (
+        <ProjectEvaluationModal
+          isOpen={isEvaluationModalOpen}
+          project={evaluatingInnovationProject}
+          existingEvaluation={editingEvaluation}
+          onSave={handleSaveEvaluation}
+          onClose={() => {
+            setIsEvaluationModalOpen(false);
+            setEvaluatingProject(null);
+            setEditingEvaluation(null);
+          }}
+          isLoading={isEvaluationSaving}
+        />
+      )}
+
+      {/* Direct Interview Scheduling Modal */}
+      {isScheduleModalOpen && (
+        <ScheduleInterviewModal
+          isOpen={isScheduleModalOpen}
+          applicationId={application.id}
+          candidateEmail={candidateEmail}
+          jobTitle={jobTitle}
+          companyName={companyName}
+          onClose={() => setIsScheduleModalOpen(false)}
+          onSuccess={handleScheduleSuccess}
+        />
+      )}
+
+      {/* Direct Interview Rescheduling Modal */}
+      {reschedulingInterview && (
+        <RescheduleInterviewModal
+          isOpen={Boolean(reschedulingInterview)}
+          interview={reschedulingInterview}
+          onClose={() => setReschedulingInterview(null)}
+          onSuccess={handleRescheduleSuccess}
+        />
+      )}
     </div>
   );
 };

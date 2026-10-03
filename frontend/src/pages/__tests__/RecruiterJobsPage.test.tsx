@@ -483,7 +483,7 @@ describe('RecruiterJobsPage Component', () => {
     expect(screen.getByTestId('recruiter-job-card-101')).toBeInTheDocument();
   });
 
-  it('provides navigation links to View Details and View Applications', async () => {
+  it('provides navigation links to View Details and View Applicants', async () => {
     setupAuth(mockRecruiterUser);
     vi.spyOn(jobsApi, 'getMyJobPostings').mockResolvedValueOnce(mockJobsList);
 
@@ -499,6 +499,7 @@ describe('RecruiterJobsPage Component', () => {
     expect(detailsLink).toHaveAttribute('href', '/app/jobs/101');
 
     const appsLink = screen.getByTestId('view-apps-btn-101');
-    expect(appsLink).toHaveAttribute('href', '/app/recruiter/applications');
+    expect(appsLink).toHaveAttribute('href', '/app/recruiter/applications?job_id=101');
+    expect(appsLink).toHaveTextContent('View Applicants (0)');
   });
 });

@@ -766,11 +766,11 @@ export const RecruiterJobsPage: React.FC = () => {
                       View Details
                     </Link>
                     <Link
-                      to="/app/recruiter/applications"
+                      to={`/app/recruiter/applications?job_id=${job.id}`}
                       className="cb-btn cb-btn-secondary cb-btn-sm"
                       data-testid={`view-apps-btn-${job.id}`}
                     >
-                      View Applications {stats.total > 0 ? `(${stats.total})` : ''}
+                      View Applicants ({stats.total})
                     </Link>
                   </div>
 

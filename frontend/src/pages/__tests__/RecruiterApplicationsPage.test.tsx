@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RecruiterApplicationsPage } from '../RecruiterApplicationsPage';
 import * as applicationsApi from '@/api/applications';
@@ -27,6 +27,16 @@ const mockRecruiterApp2: Application = {
   updated_at: '2026-09-18T10:00:00Z',
 };
 
+const mockRecruiterApp3: Application = {
+  id: 303,
+  job_posting_id: 42,
+  student_id: 15,
+  status: 'applied',
+  cover_message: 'Data Engineer candidate.',
+  created_at: '2026-09-20T08:00:00Z',
+  updated_at: '2026-09-20T08:00:00Z',
+};
+
 const mockJob10: JobPosting = {
   id: 10,
   recruiter_id: 2,
@@ -42,6 +52,27 @@ const mockJob10: JobPosting = {
   experience_required: '1+ years',
   salary_min: 95000,
   salary_max: 120000,
+  application_deadline: '2026-12-31T23:59:59Z',
+  is_active: true,
+  created_at: '2026-09-15T10:00:00Z',
+  updated_at: '2026-09-15T10:00:00Z',
+};
+
+const mockJob42: JobPosting = {
+  id: 42,
+  recruiter_id: 2,
+  title: 'Data Engineer',
+  description: 'Big data pipelines.',
+  opportunity_type: 'job',
+  company_name: 'Alpha Software',
+  location: 'San Jose, CA',
+  is_remote: true,
+  employment_type: 'full_time',
+  skills: 'SQL, Python',
+  minimum_qualification: 'BS in CS',
+  experience_required: '2+ years',
+  salary_min: 100000,
+  salary_max: 130000,
   application_deadline: '2026-12-31T23:59:59Z',
   is_active: true,
   created_at: '2026-09-15T10:00:00Z',
@@ -333,5 +364,45 @@ describe('RecruiterApplicationsPage', () => {
 
     const exportBtn = screen.getByTestId('export-applications-btn');
     expect(exportBtn).toBeInTheDocument();
+  });
+
+  it('filters applications by ?job_id query parameter, renders filter indicator, and clears filter', async () => {
+    vi.spyOn(applicationsApi, 'getRecruiterApplications').mockResolvedValue([
+      mockRecruiterApp1,
+      mockRecruiterApp2,
+      mockRecruiterApp3,
+    ]);
+    vi.spyOn(jobsApi, 'getJobById').mockImplementation(async (id: number) => {
+      if (id === 10) return mockJob10;
+      if (id === 42) return mockJob42;
+      throw new Error('Not found');
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/app/recruiter/applications?job_id=42']}>
+        <RecruiterApplicationsPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      const indicator = screen.getByTestId('job-filter-indicator');
+      expect(indicator).toBeInTheDocument();
+      expect(within(indicator).getByText(/Filtering by Job:/i)).toBeInTheDocument();
+      expect(within(indicator).getByText('Data Engineer')).toBeInTheDocument();
+      expect(screen.getByText('Application #303')).toBeInTheDocument();
+      expect(screen.queryByText('Application #301')).not.toBeInTheDocument();
+      expect(screen.queryByText('Application #302')).not.toBeInTheDocument();
+    });
+
+    // Clear filter
+    const clearBtn = screen.getByTestId('clear-job-filter-btn');
+    fireEvent.click(clearBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('job-filter-indicator')).not.toBeInTheDocument();
+      expect(screen.getByText('Application #301')).toBeInTheDocument();
+      expect(screen.getByText('Application #302')).toBeInTheDocument();
+      expect(screen.getByText('Application #303')).toBeInTheDocument();
+    });
   });
 });

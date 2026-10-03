@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getMyApplications } from '@/api/applications';
 import { getJobById } from '@/api/jobs';
+import { getMyInterviews } from '@/api/interviews';
 import { Application, ApplicationFilterStatus } from '@/types/application';
 import { JobPosting } from '@/types/job';
+import { Interview } from '@/types/interview';
 import { StudentApplicationCard } from '@/components/applications/StudentApplicationCard';
 import { ApplicationFilterBar } from '@/components/applications/ApplicationFilterBar';
 import { ApiErrorResponse } from '@/types/api';
@@ -22,6 +24,7 @@ export const StudentApplicationsPage: React.FC = () => {
 
   const [applications, setApplications] = useState<Application[]>([]);
   const [jobsMap, setJobsMap] = useState<Map<number, JobPosting>>(new Map());
+  const [interviewsMap, setInterviewsMap] = useState<Map<number, Interview>>(new Map());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -38,8 +41,31 @@ export const StudentApplicationsPage: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      const apps = await getMyApplications();
+      const [apps, userInterviews] = await Promise.all([
+        getMyApplications(),
+        getMyInterviews().catch(() => [] as Interview[]),
+      ]);
       setApplications(apps);
+
+      // Map interviews by application_id prioritizing upcoming active interviews
+      const iMap = new Map<number, Interview>();
+      userInterviews.forEach((inv) => {
+        const existing = iMap.get(inv.application_id);
+        if (!existing) {
+          iMap.set(inv.application_id, inv);
+        } else {
+          const isCurrentActive = inv.status === 'scheduled' || inv.status === 'rescheduled';
+          const isExistingActive = existing.status === 'scheduled' || existing.status === 'rescheduled';
+          if (isCurrentActive && !isExistingActive) {
+            iMap.set(inv.application_id, inv);
+          } else if (isCurrentActive && isExistingActive) {
+            if (new Date(inv.scheduled_at).getTime() < new Date(existing.scheduled_at).getTime()) {
+              iMap.set(inv.application_id, inv);
+            }
+          }
+        }
+      });
+      setInterviewsMap(iMap);
 
       // Collect unique job IDs to prevent duplicate/N+1 requests
       const uniqueJobIds = Array.from(
@@ -206,6 +232,7 @@ export const StudentApplicationsPage: React.FC = () => {
                   key={app.id}
                   application={app}
                   job={jobsMap.get(app.job_posting_id) || null}
+                  interview={interviewsMap.get(app.id) || null}
                 />
               ))}
             </div>
