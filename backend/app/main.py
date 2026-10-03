@@ -1,13 +1,17 @@
 import re
 import uuid
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.core.config import settings
 from app.core.database import check_db_connection
 from app.core.error_handlers import register_error_handlers
+from app.core.health import check_liveness, check_system_readiness
 from app.core.logging import reset_request_id, set_request_id, setup_logging
+from app.core.security_validator import assert_production_configuration_or_fail
 from app.routers import (
     admin_router,
     applications_router,
@@ -197,9 +201,20 @@ TAGS_METADATA = [
 ]
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan context manager:
+    - Enforces production configuration security validation gate prior to serving traffic.
+    """
+    assert_production_configuration_or_fail(settings)
+    yield
+
+
 app = FastAPI(
     title="CareerBridge API",
     version="1.0.0",
+    lifespan=lifespan,
     description="""
 # CareerBridge API
 
@@ -316,6 +331,27 @@ def health_check():
         "database": "connected",
         "service": "CareerBridge API",
     }
+
+
+@app.get(
+    "/health/live",
+    tags=["Health"],
+    summary="Application liveness probe",
+    description="Lightweight probe verifying that the application process is alive without querying dependencies.",
+)
+def liveness_probe():
+    return check_liveness()
+
+
+@app.get(
+    "/health/ready",
+    tags=["Health"],
+    summary="Application dependency readiness probe",
+    description="Deep probe verifying database connectivity, migration alignment, and storage readiness.",
+)
+def readiness_probe():
+    http_code, payload = check_system_readiness()
+    return JSONResponse(status_code=http_code, content=payload)
 
 
 @app.get("/test-error-500", tags=["Diagnostic"], include_in_schema=False)

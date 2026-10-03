@@ -4,8 +4,10 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_role
+from app.core.rate_limit import rate_limiter
 from app.models.application import Application, ApplicationStatus
 from app.models.job_posting import JobPosting
 from app.models.notification import NotificationType
@@ -43,12 +45,22 @@ def apply_to_job_posting(
 ):
     """
     Apply to a job posting:
+    - Enforces rate limiting on application submissions.
     - Verifies job exists (404).
     - Verifies job is active (400).
     - Checks duplicate application (409).
     - Derives student_id strictly from current_user.id.
     - Sets initial status to 'applied'.
     """
+    if settings.RATE_LIMIT_APPLICATION_ENABLED:
+        rate_key = f"app_submit:{current_user.id}"
+        rate_limiter.check_and_record_rate_limit(
+            key=rate_key,
+            max_attempts=settings.RATE_LIMIT_APPLICATION_MAX_ATTEMPTS,
+            window_seconds=settings.RATE_LIMIT_APPLICATION_WINDOW_SECONDS,
+            message="Too many application submissions. Please try again later.",
+        )
+
     job = db.scalar(select(JobPosting).where(JobPosting.id == job_id))
     if not job:
         raise HTTPException(

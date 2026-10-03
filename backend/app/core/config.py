@@ -69,7 +69,36 @@ class Settings(BaseSettings):
     )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    # Document & Resume Upload Configuration
+    # Storage Provider & Upload Configuration (Phase 5.1)
+    STORAGE_PROVIDER: str = Field(
+        default="local",
+        validation_alias=AliasChoices("STORAGE_PROVIDER", "STORAGE_BACKEND"),
+        description="Storage provider: 'local' or 's3'",
+    )
+    STORAGE_BUCKET: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("STORAGE_BUCKET", "S3_BUCKET", "AWS_S3_BUCKET"),
+        description="Target S3 / Cloudflare R2 / MinIO bucket name",
+    )
+    STORAGE_REGION: str = Field(
+        default="us-east-1",
+        validation_alias=AliasChoices("STORAGE_REGION", "AWS_REGION", "AWS_DEFAULT_REGION"),
+        description="Target S3 / Cloudflare R2 region",
+    )
+    STORAGE_ENDPOINT_URL: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("STORAGE_ENDPOINT_URL", "S3_ENDPOINT_URL"),
+        description="Custom endpoint URL for Cloudflare R2 or MinIO",
+    )
+    AWS_ACCESS_KEY_ID: Optional[str] = Field(
+        default=None,
+        description="AWS / R2 Access Key ID",
+    )
+    AWS_SECRET_ACCESS_KEY: Optional[str] = Field(
+        default=None,
+        description="AWS / R2 Secret Access Key",
+    )
+
     UPLOAD_DIR: str = "uploads"
     MAX_RESUME_SIZE_MB: int = Field(
         default=5,
@@ -111,6 +140,18 @@ class Settings(BaseSettings):
     RATE_LIMIT_LOGIN_ENABLED: bool = True
     RATE_LIMIT_LOGIN_MAX_ATTEMPTS: int = 5
     RATE_LIMIT_LOGIN_WINDOW_SECONDS: int = 60
+
+    RATE_LIMIT_PASSWORD_RESET_ENABLED: bool = True
+    RATE_LIMIT_PASSWORD_RESET_MAX_ATTEMPTS: int = 3
+    RATE_LIMIT_PASSWORD_RESET_WINDOW_SECONDS: int = 300
+
+    RATE_LIMIT_MESSAGING_ENABLED: bool = True
+    RATE_LIMIT_MESSAGING_MAX_ATTEMPTS: int = 30
+    RATE_LIMIT_MESSAGING_WINDOW_SECONDS: int = 60
+
+    RATE_LIMIT_APPLICATION_ENABLED: bool = True
+    RATE_LIMIT_APPLICATION_MAX_ATTEMPTS: int = 10
+    RATE_LIMIT_APPLICATION_WINDOW_SECONDS: int = 60
 
     # Optional explicit DATABASE_URL
     DATABASE_URL: Optional[str] = None

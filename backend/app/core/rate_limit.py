@@ -1,7 +1,14 @@
 """
 CareerBridge Rate Limiting Module
 Provides thread-safe in-memory sliding window rate limiting for authentication
-and sensitive endpoints to mitigate brute-force and credential-stuffing attacks.
+and abuse-sensitive endpoints (login, password reset, messaging, applications).
+
+Architecture Note:
+This implementation is thread-safe within a single application process and
+suitable for development, test, and single-instance deployments. It is NOT
+globally distributed across multiple container instances or worker processes.
+For horizontally scaled multi-instance production environments, this interface
+serves as the boundary for future distributed store adapters (e.g., Redis).
 """
 
 import threading
@@ -15,6 +22,9 @@ class RateLimiter:
     """
     Thread-safe in-memory sliding-window rate limiter.
     Maintains timestamp history of attempts within a rolling time window.
+    - Thread-safe within one process via threading.Lock.
+    - Architectural limitation: In-memory state is local to each worker/container process.
+    - Extensible interface ready for distributed backend adapters in future phases.
     """
 
     def __init__(self) -> None:
@@ -43,7 +53,11 @@ class RateLimiter:
             return False, 0
 
     def check_rate_limit(
-        self, key: str, max_attempts: int, window_seconds: int
+        self,
+        key: str,
+        max_attempts: int,
+        window_seconds: int,
+        message: Optional[str] = None,
     ) -> None:
         """
         Evaluate rate limit for a key. If exceeded, immediately raises
@@ -51,8 +65,9 @@ class RateLimiter:
         """
         limited, retry_after = self.is_rate_limited(key, max_attempts, window_seconds)
         if limited:
+            msg = message or f"Too many failed attempts. Please try again after {retry_after} seconds."
             raise RateLimitExceededException(
-                message=f"Too many failed attempts. Please try again after {retry_after} seconds.",
+                message=msg,
                 detail=f"Rate limit exceeded. Try again in {retry_after} seconds.",
                 retry_after=retry_after,
             )
@@ -66,6 +81,36 @@ class RateLimiter:
             if key not in self._attempts:
                 self._attempts[key] = []
             self._attempts[key].append(now)
+
+    def check_and_record_rate_limit(
+        self,
+        key: str,
+        max_attempts: int,
+        window_seconds: int,
+        message: Optional[str] = None,
+    ) -> None:
+        """
+        Atomically evaluate and record an attempt under a sliding-window rate limit.
+        If max_attempts is exceeded within window_seconds, raises RateLimitExceededException (HTTP 429).
+        Otherwise, records the current timestamp as a new attempt.
+        """
+        with self._lock:
+            now = time.time()
+            cutoff = now - window_seconds
+            timestamps = [t for t in self._attempts.get(key, []) if t > cutoff]
+            self._attempts[key] = timestamps
+
+            if len(timestamps) >= max_attempts:
+                oldest = timestamps[0]
+                retry_after = max(1, int(window_seconds - (now - oldest)))
+                msg = message or f"Too many requests. Please try again after {retry_after} seconds."
+                raise RateLimitExceededException(
+                    message=msg,
+                    detail=f"Rate limit exceeded. Try again in {retry_after} seconds.",
+                    retry_after=retry_after,
+                )
+
+            timestamps.append(now)
 
     def clear(self, key: Optional[str] = None) -> None:
         """

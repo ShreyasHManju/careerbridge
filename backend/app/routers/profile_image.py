@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
@@ -6,7 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_role
-from app.core.storage import delete_stored_file, save_profile_image_file
+from app.core.storage import (
+    delete_stored_file,
+    file_exists_in_storage,
+    get_stored_file_response,
+    save_profile_image_file,
+)
 from app.models.profile_image import ProfileImage
 from app.models.user import User, UserRole
 from app.schemas.profile_image import ProfileImageResponse
@@ -132,17 +137,16 @@ def download_my_profile_image(
             detail="Profile image not found",
         )
 
-    file_path = Path(image.file_path)
-    if not file_path.is_file():
+    if not file_exists_in_storage(image.file_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile image file not found on disk",
         )
 
-    return FileResponse(
-        path=str(file_path),
-        media_type=image.content_type,
-        filename=image.original_filename,
+    return get_stored_file_response(
+        file_path_str=image.file_path,
+        content_type=image.content_type,
+        original_filename=image.original_filename,
     )
 
 

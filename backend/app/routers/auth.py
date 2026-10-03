@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 from sqlalchemy import select
@@ -11,9 +11,10 @@ from app.core.deps import get_current_user
 from app.core.rate_limit import rate_limiter
 from app.core.security import create_access_token, verify_password
 from app.models.user import User, UserRole
-from app.schemas.auth import LoginRequest, TokenResponse
+from app.schemas.auth import LoginRequest, PasswordResetRequest, PasswordResetResponse, TokenResponse
 from app.schemas.google_auth import GoogleLoginRequest
 from app.schemas.user import UserResponse
+from app.services.email_service import EmailService
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 security_logger = logging.getLogger("careerbridge.security")
@@ -268,3 +269,71 @@ def google_login(
         access_token=access_token,
         token_type="bearer",
     )
+
+
+@router.post(
+    "/password-reset/request",
+    response_model=PasswordResetResponse,
+    summary="Request password reset link",
+    description="Initiate a password reset flow. Dispatches a time-sensitive reset link if the account exists.",
+)
+def request_password_reset(
+    payload: PasswordResetRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Request a password reset link:
+    1. Apply dual-key sliding-window rate limiting (per email and per client IP).
+    2. Search user by email without leaking account existence.
+    3. If user exists and is active, dispatch password reset email.
+    4. Always return generic 200 response to prevent account enumeration.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    normalized_email = payload.email.strip().lower()
+    rate_key_email = f"pwd_reset:email:{client_ip}:{normalized_email}"
+    rate_key_ip = f"pwd_reset:ip:{client_ip}"
+
+    if settings.RATE_LIMIT_PASSWORD_RESET_ENABLED:
+        rate_limiter.check_and_record_rate_limit(
+            key=rate_key_email,
+            max_attempts=settings.RATE_LIMIT_PASSWORD_RESET_MAX_ATTEMPTS,
+            window_seconds=settings.RATE_LIMIT_PASSWORD_RESET_WINDOW_SECONDS,
+            message="Too many password reset attempts for this email. Please try again later.",
+        )
+        rate_limiter.check_and_record_rate_limit(
+            key=rate_key_ip,
+            max_attempts=settings.RATE_LIMIT_PASSWORD_RESET_MAX_ATTEMPTS * 5,
+            window_seconds=settings.RATE_LIMIT_PASSWORD_RESET_WINDOW_SECONDS,
+            message="Too many password reset requests from this IP address. Please try again later.",
+        )
+
+    user = db.scalar(
+        select(User).where(
+            User.email == normalized_email,
+            User.auth_provider == "local",
+        )
+    )
+    if user and user.is_active:
+        reset_token = create_access_token(subject=user.id)
+        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+        EmailService.dispatch_password_reset(
+            to_email=user.email,
+            reset_url=reset_url,
+            user_name=user.email.split("@")[0],
+            background_tasks=background_tasks,
+        )
+        security_logger.info(
+            "Password reset dispatched for User ID %s from IP %s",
+            user.id,
+            client_ip,
+        )
+    else:
+        security_logger.info(
+            "Password reset requested for non-existent or inactive email '%s' from IP %s",
+            _mask_email(normalized_email),
+            client_ip,
+        )
+
+    return PasswordResetResponse()

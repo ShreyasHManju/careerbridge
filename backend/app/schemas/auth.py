@@ -18,3 +18,16 @@ class TokenPayload(BaseModel):
     """Schema for decoded JWT token payload."""
     sub: Optional[str] = None
     exp: Optional[int] = None
+
+
+class PasswordResetRequest(BaseModel):
+    """Schema for password reset request."""
+    email: EmailStr = Field(..., description="User account email address for password reset")
+
+
+class PasswordResetResponse(BaseModel):
+    """Schema for uniform password reset confirmation response."""
+    message: str = Field(
+        default="If this email is registered, a password reset link has been sent.",
+        description="Generic user-facing status message mitigating account enumeration",
+    )

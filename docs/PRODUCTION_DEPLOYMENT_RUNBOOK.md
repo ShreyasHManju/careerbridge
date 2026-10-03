@@ -1,9 +1,9 @@
 # CareerBridge v1.0.0 — Production Deployment Runbook
 
-**Document Revision:** 1.0  
-**Target Platform:** Ubuntu 22.04 LTS / Ubuntu 24.04 LTS Cloud VM  
-**Topology:** Single-Node Production Docker Compose (PostgreSQL 16 + FastAPI + Nginx SPA)  
-**Release Baseline:** `v1.0.0` (`2b01d8f`)
+**Document Revision:** 2.0 (Phase 5 Production Hardening Baseline)
+**Target Platform:** Ubuntu 22.04 LTS / Ubuntu 24.04 LTS Cloud VM / AWS EC2
+**Topology:** Single-Node Production Docker Compose (PostgreSQL 16 + FastAPI + Nginx SPA) + S3/R2 Object Storage
+**Release Baseline:** `v1.0.0`
 
 ---
 
@@ -15,6 +15,7 @@ Before initiating the deployment process, ensure you have:
 - **Operating System**: Clean installation of Ubuntu 22.04 LTS or Ubuntu 24.04 LTS (x86_64 or arm64).
 - **SSH Credentials**: Dedicated non-root user with `sudo` privileges and public-key authentication configured.
 - **Registered Domain Name**: Fully qualified domain name (e.g., `careerbridge.io` or `app.careerbridge.io`).
+- **Object Storage Bucket**: AWS S3 or Cloudflare R2 bucket provisioned for durable uploads (resumes, profile pictures).
 - **Third-Party API Accounts**:
   - Google Cloud Console project with OAuth 2.0 Web Client ID provisioned for the production domain.
   - Production SMTP service credentials (SendGrid, Amazon SES, Mailgun, or Postmark).
@@ -41,7 +42,7 @@ Before initiating the deployment process, ensure you have:
        │  │ - Serves React SPA static assets                      │  │
        │  │ - Handles SPA client-side routing fallback            │  │
        │  │ - Injects security headers & gzip compression         │  │
-       │  │ - Proxies `/api/*` and `/health` requests             │  │
+       │  │ - Proxies `/api/*`, `/health`, `/health/*`            │  │
        │  └──────────────────────────┬────────────────────────────┘  │
        │                             │                               │
        │                             ▼ Internal Docker Network       │
@@ -49,15 +50,17 @@ Before initiating the deployment process, ensure you have:
        │  │ backend container (python:3.11-slim)                  │  │
        │  │ - Unprivileged appuser execution                      │  │
        │  │ - FastAPI / Uvicorn ASGI Server (Port 8000)           │  │
-       │  │ - Persistent volume: `/app/uploads`                   │  │
-       │  └──────────────────────────┬────────────────────────────┘  │
-       │                             │                               │
-       │                             ▼ Internal Docker Network       │
-       │  ┌───────────────────────────────────────────────────────┐  │
-       │  │ db container (postgres:16)                            │  │
-       │  │ - Persistent volume: `/var/lib/postgresql/data`       │  │
-       │  │ - Bound exclusively to Docker private bridge          │  │
-       │  └───────────────────────────────────────────────────────┘  │
+       │  │ - Production config security gate validation          │  │
+       │  │ - In-memory / Durable rate limiting defense           │  │
+       │  │ - Health Probes: `/health/live`, `/health/ready`      │  │
+       │  └─────────────┬───────────────────────────┬─────────────┘  │
+       │                │                           │                │
+       │                ▼ Internal Network          ▼ HTTPS (TLS)    │
+       │  ┌──────────────────────────┐   ┌────────────────────────┐  │
+       │  │ db container             │   │ AWS S3 / Cloudflare R2 │  │
+       │  │ (postgres:16)            │   │ Durable Object Storage │  │
+       │  │ - Persistent volume data │   │ (Resumes & Avatars)    │  │
+       │  └──────────────────────────┘   └────────────────────────┘  │
        └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -171,6 +174,16 @@ cp .env.example .env
 chmod 600 .env
 ```
 
+### Production Security Gate Invariants
+
+When `ENVIRONMENT=production`, the application runs strict startup security validation (`backend/app/core/security_validator.py`). Startup will **fail immediately** if any of the following invariants are violated:
+1. `JWT_SECRET_KEY` must be $\ge$ 32 characters, non-default, and high entropy.
+2. `DEBUG` must be `False`.
+3. `POSTGRES_PASSWORD` must be non-default and non-empty.
+4. `BACKEND_CORS_ORIGINS` must not contain wildcards (`*`) or localhost domains.
+5. `STORAGE_PROVIDER` must be set to `s3` with valid `STORAGE_BUCKET` and `STORAGE_REGION` configured (local storage is prohibited in production).
+6. Rate limiting must be enabled (`RATE_LIMIT_ENABLED=True`).
+
 ### Environment Variable Contract Table
 
 | Variable | Requirement | Description | Example / Method to Generate |
@@ -181,9 +194,20 @@ chmod 600 .env
 | `POSTGRES_DB` | **Required** | Database name | `internship_db` |
 | `POSTGRES_USER` | **Required** | Database superuser account name | `postgres` |
 | `POSTGRES_PASSWORD` | **Required** | High-entropy database password | Generate with: `openssl rand -hex 24` |
+| `STORAGE_PROVIDER` | **Required (Prod)** | Durable storage engine (`s3` in production, `local` in dev) | `s3` |
+| `STORAGE_BUCKET` | **Required (Prod)** | S3 / R2 Bucket name | `careerbridge-production-uploads` |
+| `STORAGE_REGION` | **Required (Prod)** | AWS S3 region (or `auto` for Cloudflare R2) | `us-east-1` |
+| `STORAGE_ENDPOINT_URL` | Optional | Custom S3 endpoint (for Cloudflare R2 / MinIO) | `https://<account-id>.r2.cloudflarestorage.com` |
+| `AWS_ACCESS_KEY_ID` | Conditional | S3 / R2 Access Key ID | S3 access key |
+| `AWS_SECRET_ACCESS_KEY` | Conditional | S3 / R2 Secret Access Key | S3 secret access key |
 | `GOOGLE_CLIENT_ID` | **Required** | Google OAuth 2.0 Web Client ID | `xxxxxx.apps.googleusercontent.com` |
 | `BACKEND_CORS_ORIGINS` | **Required** | Allowed origins for cross-origin requests | `["https://careerbridge.yourdomain.com"]` |
-| `VITE_API_BASE_URL` | Optional | Frontend API routing base path | `/api/v1` (Default: same-origin proxy) |
+| `RATE_LIMIT_ENABLED` | Optional | Enable API rate limiting (defaults to `True`) | `True` |
+| `RATE_LIMIT_LOGIN_MAX` | Optional | Max login attempts per IP per window | `5` (Default) |
+| `RATE_LIMIT_PASSWORD_RESET_MAX` | Optional | Max password reset requests per IP / target | `3` (Default) |
+| `RATE_LIMIT_MESSAGE_MAX` | Optional | Max direct messages sent per sender | `30` (Default) |
+| `RATE_LIMIT_APPLICATION_MAX` | Optional | Max applications submitted per candidate | `10` (Default) |
+| `RATE_LIMIT_WINDOW_SECONDS` | Optional | Sliding rate limit window duration in seconds | `60` (Default) |
 | `FRONTEND_PORT` | Optional | Host port binding for frontend container | `80` (or `8080` if host reverse-proxying) |
 | `EMAIL_PROVIDER` | Optional | Email backend provider (`mock`, `console`, `smtp`) | `smtp` |
 | `SMTP_HOST` | Conditional | SMTP relay server hostname | `smtp.sendgrid.net` |
@@ -231,6 +255,12 @@ docker compose -f docker-compose.production.yml ps
 # careerbridge-backend-production      Up (healthy)            127.0.0.1:8000->8000/tcp
 # careerbridge-frontend-production     Up (healthy)            0.0.0.0:80->80/tcp
 ```
+
+### Health Probe Endpoints
+The container and orchestration layers expose specific probes:
+- **Liveness (`GET /health/live`)**: Zero-I/O process heartbeat used by container runtimes (Docker `HEALTHCHECK`, Kubernetes liveness probe). Returns `{"status": "alive"}` immediately.
+- **Readiness (`GET /health/ready`)**: Deep dependency probe validating PostgreSQL connectivity, Alembic schema head alignment, and S3 storage engine readiness. Used by load balancers, deployment gates, and AWS deployment scripts.
+- **Legacy Compatibility (`GET /health`)**: Preserved backward-compatible health probe returning system status.
 
 ---
 
@@ -288,28 +318,34 @@ If using Cloudflare proxy (orange cloud), set Cloudflare SSL mode to **Full (Str
 
 ---
 
-## 12. Production Smoke Testing & Verification
+## 12. Production Health Verification & Smoke Testing
 
-Run the automated CareerBridge deployment verification script:
+### Automated AWS Deployment Verification
+Run the deployment health verification script:
+```bash
+./deploy/aws/healthcheck.sh
+```
+This script validates:
+- Backend liveness probe (`GET /health/live`)
+- Backend readiness probe (`GET /health/ready` verifying DB, migrations, and storage)
+- Frontend Nginx health probe (`GET /nginx-health`)
+- Sanitized error output preventing secret leakage
 
+### Automated Comprehensive Smoke Test Suite
+Run the operational smoke test script across backend and frontend:
 ```bash
 python scripts/smoke_test.py --backend-url http://127.0.0.1:8000 --frontend-url http://127.0.0.1:80
 ```
 
-### Manual Probe Verification Checklist
-```bash
-# 1. Frontend container health
-curl -f http://127.0.0.1/nginx-health
-
-# 2. Backend health & PostgreSQL connectivity
-curl -f http://127.0.0.1:8000/health
-
-# 3. OpenAPI Schema
-curl -f http://127.0.0.1:8000/openapi.json
-
-# 4. SPA Route Resolution
-curl -s http://127.0.0.1/app/jobs | grep -q "root" && echo "SPA Route: OK"
-```
+The smoke test validates:
+1. `GET /health/live` returns HTTP 200 `status: alive`.
+2. `GET /health/ready` returns HTTP 200 `status: ready` with valid DB and migration checks.
+3. `GET /health` returns HTTP 200 (backward compatibility).
+4. `GET /` returns HTTP 200 root response.
+5. `GET /openapi.json` returns valid OpenAPI documentation schema.
+6. `POST /api/v1/auth/password-reset/request` returns generic 200 without exposing email existence.
+7. Rate limiting & `Retry-After` HTTP 429 contract verification on abuse-sensitive endpoints.
+8. Frontend SPA fallback returns HTTP 200 and loads root HTML for dynamic client routes.
 
 ---
 
@@ -373,12 +409,16 @@ If an operational anomaly or critical regression occurs post-release:
    ```bash
    docker compose -f docker-compose.production.yml run --rm backend alembic downgrade <TARGET_REVISION>
    ```
-3. **Rebuild and Restart Containers**:
+   *Note: Ensure no active traffic is writing to deprecated columns before schema downgrade.*
+3. **Storage Provider Considerations**:
+   * S3 object keys are immutable UUIDs; rolling back code versions will not corrupt existing uploaded assets.
+4. **Rebuild and Restart Containers**:
    ```bash
    docker compose -f docker-compose.production.yml up -d --build
    ```
-4. **Run Smoke Tests**:
+5. **Run Verification & Smoke Tests**:
    ```bash
+   ./deploy/aws/healthcheck.sh
    python scripts/smoke_test.py
    ```
 
@@ -390,6 +430,8 @@ If an operational anomaly or critical regression occurs post-release:
 - [x] **Firewall Isolation**: Only ports 22, 80, 443 permitted. PostgreSQL port 5432 closed to external interfaces.
 - [x] **Non-Root Containers**: Backend runs under unprivileged `appuser` (UID 1000), frontend under `nginx`.
 - [x] **Brute-Force Protection**: `fail2ban` installed and active for SSH service (`sudo apt-get install fail2ban`).
+- [x] **Production Config Gate**: `security_validator.py` enforces production secrets, CORS origins, and S3 storage at startup.
+- [x] **Abuse & Rate Limiting**: In-memory rate limiting with `Retry-After` headers protects login, password resets, messages, and applications.
 - [x] **Unattended Security Updates**: Enabled via `sudo apt-get install unattended-upgrades`.
 - [x] **Secret Isolation**: `.env` file set to `chmod 600` and excluded from source control.
 
@@ -399,9 +441,11 @@ If an operational anomaly or critical regression occurs post-release:
 
 | Symptom | Probable Cause | Corrective Action |
 | :--- | :--- | :--- |
-| **502 Bad Gateway on `/api/*`** | Backend container starting or crashed | Check backend logs: `docker compose logs backend`. Verify DB is healthy. |
-| **Database Connection Refused** | PostgreSQL container still initializing | Verify healthcheck: `docker compose ps db`. Check password in `.env`. |
+| **502 Bad Gateway on `/api/*`** | Backend container starting or crashed | Check backend logs: `docker compose logs backend`. Verify DB is healthy and `/health/live` is responding. |
+| **Backend Startup Fails (Security Validator)** | Insecure production configuration detected | Check backend logs for `CRITICAL: Configuration validation failed`. Ensure `STORAGE_PROVIDER=s3`, `DEBUG=False`, strong `JWT_SECRET_KEY`, and valid `BACKEND_CORS_ORIGINS`. |
+| **Database Connection Refused** | PostgreSQL container still initializing | Verify healthcheck: `docker compose ps db`. Check credentials in `.env`. |
 | **Alembic Target database is not up to date** | Migrations pending | Run `docker compose run --rm backend alembic upgrade head`. |
+| **S3 Upload Error** | Invalid credentials, bucket, or region | Verify `STORAGE_BUCKET`, `STORAGE_REGION`, and AWS credentials in `.env`. Check `/health/ready` probe output. |
+| **Rate Limit 429 Too Many Requests** | Threshold exceeded for sensitive endpoint | Wait for window expiry specified in `Retry-After` header or adjust `RATE_LIMIT_*` settings in `.env`. |
 | **CORS error in browser console** | `BACKEND_CORS_ORIGINS` mismatch | Ensure `.env` includes exact client scheme and domain `["https://yourdomain.com"]`. |
 | **Port 80 already in use** | Apache or default Nginx running on host | Stop conflicting service: `sudo systemctl stop apache2 && sudo systemctl disable apache2`. |
-| **Resume/Avatar upload fails (413)** | Payload exceeds client max body size | Nginx is configured for 10MB limit; check file size is $\le$ 5MB for PDF, $\le$ 2MB for images. |

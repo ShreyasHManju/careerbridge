@@ -6,7 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_role
-from app.core.storage import delete_stored_file, save_resume_file
+from app.core.storage import (
+    delete_stored_file,
+    file_exists_in_storage,
+    get_stored_file_response,
+    save_resume_file,
+)
 from app.models.resume import Resume
 from app.models.user import User, UserRole
 from app.schemas.resume import ResumeResponse
@@ -132,17 +137,16 @@ def download_my_resume(
             detail="Resume not found",
         )
 
-    file_path = Path(resume.file_path)
-    if not file_path.is_file():
+    if not file_exists_in_storage(resume.file_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Resume file not found on disk",
         )
 
-    return FileResponse(
-        path=str(file_path),
-        media_type=resume.content_type,
-        filename=resume.original_filename,
+    return get_stored_file_response(
+        file_path_str=resume.file_path,
+        content_type=resume.content_type,
+        original_filename=resume.original_filename,
     )
 
 

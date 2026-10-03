@@ -2,8 +2,10 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.core.rate_limit import rate_limiter
 from app.models.user import User
 from app.schemas.messaging import (
     ConversationCreate,
@@ -37,6 +39,15 @@ def create_or_get_conversation(
     Validates participant existence, active status, and prevents self-messaging.
     Returns 201 if created, or 200 if an existing conversation was reused.
     """
+    if payload.initial_message and settings.RATE_LIMIT_MESSAGING_ENABLED:
+        rate_key = f"msg:{current_user.id}"
+        rate_limiter.check_and_record_rate_limit(
+            key=rate_key,
+            max_attempts=settings.RATE_LIMIT_MESSAGING_MAX_ATTEMPTS,
+            window_seconds=settings.RATE_LIMIT_MESSAGING_WINDOW_SECONDS,
+            message="Too many messages sent. Please slow down.",
+        )
+
     conv, created, _ = MessagingService.get_or_create_conversation(
         db,
         current_user=current_user,
@@ -102,6 +113,15 @@ async def send_message(
     Dispatches an in-app notification to the recipient.
     Broadcasts real-time event to any connected WebSocket clients.
     """
+    if settings.RATE_LIMIT_MESSAGING_ENABLED:
+        rate_key = f"msg:{current_user.id}"
+        rate_limiter.check_and_record_rate_limit(
+            key=rate_key,
+            max_attempts=settings.RATE_LIMIT_MESSAGING_MAX_ATTEMPTS,
+            window_seconds=settings.RATE_LIMIT_MESSAGING_WINDOW_SECONDS,
+            message="Too many messages sent. Please slow down.",
+        )
+
     msg = MessagingService.send_message(
         db,
         conversation_id=conversation_id,
