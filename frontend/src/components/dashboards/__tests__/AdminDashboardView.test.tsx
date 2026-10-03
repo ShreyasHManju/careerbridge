@@ -169,7 +169,9 @@ describe('AdminDashboardView Component (Phase 22)', () => {
     fireEvent.change(yearInput, { target: { value: '2025' } });
     fireEvent.click(applyBtn);
 
-    expect(apiSpy).toHaveBeenCalledWith(2025);
+    await waitFor(() => {
+      expect(apiSpy).toHaveBeenCalledWith(2025);
+    });
   });
 
   it('handles error state and allows retry', async () => {
