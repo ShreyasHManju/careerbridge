@@ -1538,4 +1538,5 @@ python scripts/smoke_test.py
 
 - **Pre-Flight Verification Checklist**: [`docs/PRODUCTION_RELEASE_CHECKLIST.md`](docs/PRODUCTION_RELEASE_CHECKLIST.md)
 - **Host VM Deployment Runbook**: [`docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md`](docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md)
+- **AWS EC2 Deployment Plan**: [`docs/AWS_EC2_DEPLOYMENT_PLAN.md`](docs/AWS_EC2_DEPLOYMENT_PLAN.md)
 
