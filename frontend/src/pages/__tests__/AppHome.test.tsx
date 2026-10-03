@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { AppHome } from '../AppHome';
 import * as useAuthModule from '@/auth/useAuth';
 import * as dashboardsApi from '@/api/dashboards';
+import * as passportApi from '@/api/passport';
 import { User } from '@/types/auth';
 
 const mockStudentUser: User = {
@@ -56,6 +57,7 @@ function setupAuth(user: User | null, isLoading = false) {
 describe('AppHome Role-Based Dashboard Landing (Phase 22)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(passportApi, 'getMyPassport').mockRejectedValue(new Error('No passport'));
   });
 
   it('renders loading state while authentication session is resolving', () => {

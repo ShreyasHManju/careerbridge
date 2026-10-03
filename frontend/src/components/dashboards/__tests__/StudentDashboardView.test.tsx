@@ -220,7 +220,9 @@ describe('StudentDashboardView Component (Career OS)', () => {
     const refreshBtn = screen.getByTestId('refresh-student-dashboard-btn');
     fireEvent.click(refreshBtn);
 
-    expect(apiSpy).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(apiSpy).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('renders metric cards as accessible links with appropriate destinations and query filters', async () => {
