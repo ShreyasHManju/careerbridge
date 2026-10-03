@@ -3,20 +3,15 @@ import { Link } from 'react-router-dom';
 import { ArrowRightIcon, UserIcon, CodeFolderIcon, ShieldCheckIcon, CalendarIcon, ClipboardIcon, BookmarkIcon, SearchIcon } from './StudentDashboardIcons';
 import { StudentDashboard } from '@/types/dashboard';
 import { PassportResponse } from '@/types/passport';
+import { ActionItem } from '@/types/actionCenter';
+import { ActionCenterBadge } from '@/components/action-center/ActionCenterBadge';
 
 interface CareerActionListProps {
   dashboard: StudentDashboard;
   passport?: PassportResponse | null;
 }
 
-interface ActionItem {
-  id: string;
-  title: string;
-  description: string;
-  link: string;
-  linkText: string;
-  badgeText: string;
-  priority: 'high' | 'medium' | 'standard';
+interface StudentActionItem extends ActionItem {
   icon: React.ReactNode;
 }
 
@@ -24,7 +19,7 @@ export const CareerActionList: React.FC<CareerActionListProps> = ({
   dashboard,
   passport,
 }) => {
-  const actions: ActionItem[] = [];
+  const actions: StudentActionItem[] = [];
 
   const hasCompleteProfile = Boolean(
     passport?.identity?.full_name &&
@@ -41,10 +36,14 @@ export const CareerActionList: React.FC<CareerActionListProps> = ({
       id: 'interview-prep',
       title: 'Prepare for your upcoming interview',
       description: `You have ${dashboard.upcoming_interviews} scheduled interview round(s). Review recruiter notes and project talking points.`,
-      link: '/app/interviews',
-      linkText: 'View Interviews',
+      destination: '/app/interviews',
+      ctaLabel: 'View Interviews',
       badgeText: 'High Priority',
       priority: 'high',
+      category: 'interview',
+      sourceDomain: 'student',
+      notificationType: 'interview_scheduled',
+      count: dashboard.upcoming_interviews,
       icon: <CalendarIcon size={20} className="cb-action-item-icon" />,
     });
   }
@@ -55,10 +54,12 @@ export const CareerActionList: React.FC<CareerActionListProps> = ({
       id: 'complete-profile',
       title: 'Complete your student profile',
       description: 'Add your academic background, institution, and core skills so employers can evaluate your eligibility.',
-      link: '/app/student/profile',
-      linkText: 'Update Profile',
+      destination: '/app/student/profile',
+      ctaLabel: 'Update Profile',
       badgeText: 'Recommended',
       priority: 'high',
+      category: 'profile',
+      sourceDomain: 'student',
       icon: <UserIcon size={20} className="cb-action-item-icon" />,
     });
   }
@@ -69,10 +70,12 @@ export const CareerActionList: React.FC<CareerActionListProps> = ({
       id: 'add-project',
       title: 'Add your first innovation project',
       description: 'Showcase real-world artifacts, code repositories, and milestone evidence to stand out to recruiters.',
-      link: '/app/projects',
-      linkText: 'Add Project',
+      destination: '/app/projects',
+      ctaLabel: 'Add Project',
       badgeText: 'Evidence Building',
       priority: 'medium',
+      category: 'project_evaluation',
+      sourceDomain: 'student',
       icon: <CodeFolderIcon size={20} className="cb-action-item-icon" />,
     });
   }
@@ -83,10 +86,13 @@ export const CareerActionList: React.FC<CareerActionListProps> = ({
       id: 'build-experience',
       title: 'Build your experience evidence',
       description: 'Document internships, student organizations, or capstone roles and submit them for employer verification.',
-      link: '/app/experiences',
-      linkText: 'Manage Experiences',
+      destination: '/app/experiences',
+      ctaLabel: 'Manage Experiences',
       badgeText: 'Verification',
       priority: 'medium',
+      category: 'experience_verification',
+      sourceDomain: 'student',
+      notificationType: 'experience_verification_changed',
       icon: <ShieldCheckIcon size={20} className="cb-action-item-icon" />,
     });
   }
@@ -97,10 +103,14 @@ export const CareerActionList: React.FC<CareerActionListProps> = ({
       id: 'review-applications',
       title: 'Review your application progress',
       description: `Track status across ${dashboard.total_applications} application(s) (${dashboard.applications_under_review} in review, ${dashboard.shortlisted_applications} shortlisted).`,
-      link: '/app/applications',
-      linkText: 'View Applications',
+      destination: '/app/applications',
+      ctaLabel: 'View Applications',
       badgeText: 'Active Funnel',
       priority: 'standard',
+      category: 'application',
+      sourceDomain: 'student',
+      notificationType: 'application_status_changed',
+      count: dashboard.total_applications,
       icon: <ClipboardIcon size={20} className="cb-action-item-icon" />,
     });
   }
@@ -111,10 +121,13 @@ export const CareerActionList: React.FC<CareerActionListProps> = ({
       id: 'review-saved-jobs',
       title: 'Review your saved opportunities',
       description: `You have ${dashboard.saved_internships} opportunity bookmarks. Submit your applications before upcoming deadlines.`,
-      link: '/app/saved-jobs',
-      linkText: 'View Saved',
+      destination: '/app/saved-jobs',
+      ctaLabel: 'View Saved',
       badgeText: 'Saved Opportunities',
       priority: 'standard',
+      category: 'general',
+      sourceDomain: 'student',
+      count: dashboard.saved_internships,
       icon: <BookmarkIcon size={20} className="cb-action-item-icon" />,
     });
   }
@@ -124,10 +137,12 @@ export const CareerActionList: React.FC<CareerActionListProps> = ({
     id: 'explore-jobs',
     title: 'Explore active internships and jobs',
     description: 'Discover new vetted roles matching your skills, academic discipline, and career interests.',
-    link: '/app/jobs',
-    linkText: 'Browse Opportunities',
+    destination: '/app/jobs',
+    ctaLabel: 'Browse Opportunities',
     badgeText: 'Discovery',
     priority: 'standard',
+    category: 'talent_sourcing',
+    sourceDomain: 'student',
     icon: <SearchIcon size={20} className="cb-action-item-icon" />,
   });
 
@@ -153,16 +168,17 @@ export const CareerActionList: React.FC<CareerActionListProps> = ({
             </div>
             <div className="cb-career-action-content">
               <div className="cb-career-action-badge-row">
-                <span className={`cb-action-priority-badge cb-badge-${action.priority}`}>
-                  {action.badgeText}
-                </span>
+                <ActionCenterBadge
+                  priority={action.priority}
+                  label={action.badgeText}
+                />
               </div>
               <h3 className="cb-career-action-title">{action.title}</h3>
               <p className="cb-career-action-desc">{action.description}</p>
             </div>
             <div className="cb-career-action-cta">
-              <Link to={action.link} className="cb-btn cb-btn-secondary cb-btn-sm cb-action-link-btn">
-                <span>{action.linkText}</span>
+              <Link to={action.destination} className="cb-btn cb-btn-secondary cb-btn-sm cb-action-link-btn">
+                <span>{action.ctaLabel}</span>
                 <ArrowRightIcon size={14} />
               </Link>
             </div>
