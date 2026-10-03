@@ -90,11 +90,11 @@ class CandidateSourcingService:
                         name=ss.skill.name,
                         slug=ss.skill.slug,
                         category=ss.skill.category,
-                        is_verified=ss.is_verified,
+                        is_verified=ss.skill.is_verified,
                         created_at=ss.skill.created_at,
                     )
                     all_skills.append(sk_res)
-                    if ss.is_verified:
+                    if ss.skill.is_verified:
                         verified_skills.append(sk_res)
 
             # Filter by skills if specified
@@ -139,7 +139,7 @@ class CandidateSourcingService:
                     if ev.status == EvaluationStatus.SUBMITTED or (hasattr(ev.status, "value") and ev.status.value == "submitted")
                 ]
                 total_evaluations_count += len(submitted_evals)
-                p_eval_sum = sum(float(e.score_overall) for e in submitted_evals if e.score_overall is not None)
+                p_eval_sum = sum(float(e.overall_score) for e in submitted_evals if e.overall_score is not None)
                 p_avg_score = (p_eval_sum / len(submitted_evals)) if len(submitted_evals) > 0 else None
                 eval_score_sum += p_eval_sum
 
