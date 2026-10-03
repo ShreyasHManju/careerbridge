@@ -7,6 +7,7 @@
 **Related Documents:**
 - [`docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md`](PRODUCTION_DEPLOYMENT_RUNBOOK.md)
 - [`docs/PRODUCTION_RELEASE_CHECKLIST.md`](PRODUCTION_RELEASE_CHECKLIST.md)
+- [`deploy/aws/`](../deploy/aws/) — Production Automation Scripts (`deploy.sh`, `bootstrap-ubuntu.sh`, `backup.sh`, `rollback.sh`)
 
 ---
 
