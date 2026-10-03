@@ -76,6 +76,40 @@ class JobPostingUpdate(BaseModel):
         return self
 
 
+class MatchedSkillItem(BaseModel):
+    """
+    Represents a skill required by a job that is matched by the candidate student,
+    along with verification status and provenance source.
+    """
+    id: int
+    name: str
+    slug: str
+    category: Optional[str] = None
+    is_verified: bool = False
+    source: str = Field(
+        ...,
+        description="Origin of skill verification: 'experience', 'evaluation', 'project', or 'profile'",
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class JobMatchSummary(BaseModel):
+    """
+    Diagnostic match breakdown between a student's verified/claimed skills
+    and a job posting's required skills.
+    """
+    match_percentage: int = Field(..., ge=0, le=100, description="Match score from 0 to 100")
+    total_required: int = Field(..., ge=0, description="Total skills required by the opportunity")
+    total_matched: int = Field(..., ge=0, description="Total required skills possessed by the student")
+    total_verified_matched: int = Field(..., ge=0, description="Total matched skills backed by verified evidence")
+    total_missing: int = Field(..., ge=0, description="Total required skills missing from student profile")
+    matched_skills: List[MatchedSkillItem] = Field(default_factory=list)
+    missing_skills: List[SkillResponse] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class JobPostingResponse(BaseModel):
     """
     Safe public response schema for JobPosting.
@@ -100,6 +134,9 @@ class JobPostingResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+    # Phase 6 Additive Field: Populated only for authenticated students; None for recruiters/admins
+    match_summary: Optional[JobMatchSummary] = None
 
     model_config = ConfigDict(from_attributes=True)
 

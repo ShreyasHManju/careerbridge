@@ -273,4 +273,61 @@ describe('JobDetailPage', () => {
       expect(msgBtn).toHaveTextContent('Message Hiring Team');
     });
   });
+
+  it('renders SkillGapDiagnostics for student when match_summary is present', async () => {
+    const jobWithMatch: JobPosting = {
+      ...mockJob,
+      match_summary: {
+        match_percentage: 75,
+        total_required: 4,
+        total_matched: 3,
+        total_verified_matched: 2,
+        total_missing: 1,
+        matched_skills: [
+          { id: 1, name: 'AWS', is_verified: true, source: 'project' },
+          { id: 2, name: 'Docker', is_verified: true, source: 'experience' },
+          { id: 3, name: 'Kubernetes', is_verified: false, source: 'profile' },
+        ],
+        missing_skills: [
+          { id: 4, name: 'Terraform' },
+        ],
+      },
+    };
+
+    vi.spyOn(jobsApi, 'getJobById').mockResolvedValueOnce(jobWithMatch);
+    renderWithRouter();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('skill-gap-diagnostics')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('match-percentage-badge')).toHaveTextContent('🎯 75% Match');
+    expect(screen.getByTestId('match-ratio-text')).toHaveTextContent('3 of 4 skills matched');
+    expect(screen.getByTestId('missing-skill-4')).toHaveTextContent('Terraform');
+  });
+
+  it('does NOT render SkillGapDiagnostics for recruiter even if match_summary exists on job', async () => {
+    setupAuth(mockRecruiterUser);
+    const jobWithMatch: JobPosting = {
+      ...mockJob,
+      match_summary: {
+        match_percentage: 100,
+        total_required: 2,
+        total_matched: 2,
+        total_verified_matched: 1,
+        total_missing: 0,
+        matched_skills: [],
+        missing_skills: [],
+      },
+    };
+
+    vi.spyOn(jobsApi, 'getJobById').mockResolvedValueOnce(jobWithMatch);
+    renderWithRouter();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'Cloud Infrastructure Intern' })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('skill-gap-diagnostics')).not.toBeInTheDocument();
+  });
 });

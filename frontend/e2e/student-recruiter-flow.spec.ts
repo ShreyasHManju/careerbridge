@@ -81,7 +81,7 @@ test.describe('Student & Recruiter Application Lifecycle', () => {
     await studentPage.getByRole('button', { name: /Sign In/i }).click();
     await expect(studentPage).toHaveURL(/\/app/, { timeout: 10000 });
 
-    // 2.3 Discover Job and Submit Application
+    // 2.3 Discover Job and Observe Match Diagnostics
     await studentPage.locator('nav.cb-nav-links').getByRole('link', { name: 'Opportunities' }).click();
     await expect(studentPage).toHaveURL(/\/app\/jobs/);
 
@@ -93,8 +93,20 @@ test.describe('Student & Recruiter Application Lifecycle', () => {
     await expect(studentPage.getByRole('link', { name: jobTitle })).toBeVisible({ timeout: 10000 });
     await expect(studentPage.getByText(companyName).first()).toBeVisible();
 
-    // Click Apply button on the specific job card
-    await studentPage.getByRole('button', { name: /^Apply$/i }).first().click();
+    // Verify student sees match badge on JobCard
+    const matchBadge = studentPage.locator('.cb-badge-match').first();
+    await expect(matchBadge).toBeVisible({ timeout: 10000 });
+
+    // Open Job Detail page
+    await studentPage.getByRole('link', { name: jobTitle }).click();
+    await expect(studentPage).toHaveURL(/\/app\/jobs\/\d+/);
+
+    // Verify Skill Match & Gap Diagnostics is displayed on Job Detail
+    await expect(studentPage.getByTestId('skill-gap-diagnostics')).toBeVisible({ timeout: 10000 });
+    await expect(studentPage.getByTestId('match-percentage-badge')).toBeVisible();
+
+    // Click Apply Now button on detail page
+    await studentPage.getByTestId('detail-apply-btn').click();
 
     // Fill cover message in modal and submit
     await expect(studentPage.getByRole('heading', { name: new RegExp(`Apply for ${jobTitle}`, 'i') })).toBeVisible();
