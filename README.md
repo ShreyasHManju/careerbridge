@@ -1439,6 +1439,72 @@ A pure ASGI middleware (`SecurityHeadersMiddleware`) injects security headers ac
   - Administrative actions (user status updates, recruiter verifications, job moderations)
 - Passwords, hashes, and cryptographic tokens are strictly excluded from all log records.
 
+---
 
+## 5. Production Containerization & CI/CD (Phase 32)
 
+CareerBridge is fully containerized with production-grade multi-stage builds and automated CI/CD pipelines.
 
+### Architecture Topology
+
+```text
+       ┌───────────────────────────────┐
+       │     Frontend (Nginx / SPA)    │  Port 80 / 443
+       │    Multi-Stage Node 20 Build  │
+       └──────────────┬────────────────┘
+                      │ Proxy (/api/v1/, /health)
+       ┌──────────────▼────────────────┐
+       │   FastAPI Backend (Uvicorn)   │  Port 8000 (Internal)
+       │    Python 3.11-slim / Non-root│
+       └──────────────┬────────────────┘
+                      │ SQLAlchemy 2.0
+       ┌──────────────▼────────────────┐
+       │   PostgreSQL 16 Database      │  Port 5432 (Internal)
+       │    Persistent Named Volumes   │
+       └───────────────────────────────┘
+```
+
+### 1. Local Development Startup
+
+```bash
+# Start backend and PostgreSQL database
+docker compose up -d
+
+# Start frontend dev server
+cd frontend && npm install && npm run dev
+```
+
+### 2. Production Docker Compose Deployment
+
+```bash
+# Copy and configure production environment variables
+cp .env.example .env
+
+# Validate Compose configuration
+docker compose -f docker-compose.production.yml config
+
+# Build and start the full production stack
+docker compose -f docker-compose.production.yml up -d --build
+
+# Run database migrations
+docker compose -f docker-compose.production.yml exec backend alembic upgrade head
+
+# Run automated deployment smoke test
+python scripts/smoke_test.py --backend-url http://127.0.0.1:8000 --frontend-url http://localhost:80
+```
+
+### 3. CI/CD Validation Pipeline (`.github/workflows/ci.yml`)
+
+The automated GitHub Actions workflow validates every commit and pull request against `main`:
+
+| CI Job | Scope & Validations |
+| :--- | :--- |
+| **Backend** | Python 3.11, PostgreSQL 16 service, `pip install`, `alembic upgrade head`, `pytest -q` (352 unit & integration tests), Docker image build |
+| **Frontend** | Node.js 20, `npm ci`, `npm test` (857 Vitest unit & component tests), `npm run build` production bundle, Docker image build |
+| **E2E** | Dual FastAPI + Vite servers, headless Chromium Playwright suite (11 complete role lifecycle tests), artifact collection |
+
+### 4. Zero-Leakage Secret Safety
+
+- All credentials (`JWT_SECRET_KEY`, `POSTGRES_PASSWORD`, `GOOGLE_CLIENT_ID`, `SMTP_PASSWORD`) are injected exclusively via environment variables.
+- Production `.env` files are excluded from Git via `.gitignore`.
+- Dummy test secrets with explicit `ci_test_*` prefixes are used in CI services only.
