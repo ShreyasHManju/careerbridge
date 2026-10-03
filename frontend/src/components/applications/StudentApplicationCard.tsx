@@ -298,4 +298,3 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
     </article>
   );
 };
-

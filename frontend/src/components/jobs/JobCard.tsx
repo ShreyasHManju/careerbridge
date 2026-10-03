@@ -192,4 +192,3 @@ export const JobCard: React.FC<JobCardProps> = ({
     </article>
   );
 };
-
