@@ -56,3 +56,6 @@ storage/
 *~
 .DS_Store
 Thumbs.db
+
+# Local database backups
+local-backups/
