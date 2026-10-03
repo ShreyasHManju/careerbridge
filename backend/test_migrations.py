@@ -581,7 +581,22 @@ def test_migrations():
     )
     assert has_esa_uq, "Unique constraint on ('evaluation_id', 'skill_id') missing on evaluation_skill_assessments!"
 
-    print("[28/28] Verifying alembic_version table in PostgreSQL")
+    print("[28/29] Verifying 'job_invitations' table columns, indexes, FKs, and constraints")
+    ji_columns = {col["name"]: col for col in inspector.get_columns("job_invitations")}
+    expected_ji_cols = ["id", "job_id", "recruiter_id", "student_id", "message", "status", "created_at", "updated_at", "responded_at"]
+    for c in expected_ji_cols:
+        assert c in ji_columns, f"Column '{c}' missing from 'job_invitations' table"
+    ji_fks = inspector.get_foreign_keys("job_invitations")
+    ji_ref_tables = {fk.get("referred_table") for fk in ji_fks}
+    assert "job_postings" in ji_ref_tables, "FK to job_postings missing on job_invitations!"
+    assert "users" in ji_ref_tables, "FK to users missing on job_invitations!"
+    ji_indexes = inspector.get_indexes("job_invitations")
+    ji_idx_names = [idx["name"] for idx in ji_indexes]
+    assert any("job_id" in name for name in ji_idx_names), "Index on job_id missing on job_invitations!"
+    assert any("recruiter_id" in name for name in ji_idx_names), "Index on recruiter_id missing on job_invitations!"
+    assert any("student_id" in name for name in ji_idx_names), "Index on student_id missing on job_invitations!"
+
+    print("[29/29] Verifying alembic_version table in PostgreSQL")
     with engine.connect() as conn:
         db_version = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
         print(f"  -> Database alembic_version: {db_version}")
