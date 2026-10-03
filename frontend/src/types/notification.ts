@@ -12,7 +12,10 @@ export type NotificationType =
   | 'interview_rescheduled'
   | 'interview_cancelled'
   | 'message_received'
-  | 'project_evaluation_submitted';
+  | 'project_evaluation_submitted'
+  | 'job_invitation_received'
+  | 'job_invitation_responded'
+  | 'experience_verification_changed';
 
 export interface Notification {
   id: number;

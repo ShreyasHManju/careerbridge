@@ -22,6 +22,7 @@ class NotificationType(str, enum.Enum):
     PROJECT_EVALUATION_SUBMITTED = "project_evaluation_submitted"
     JOB_INVITATION_RECEIVED = "job_invitation_received"
     JOB_INVITATION_RESPONDED = "job_invitation_responded"
+    EXPERIENCE_VERIFICATION_CHANGED = "experience_verification_changed"
 
 
 class Notification(Base):

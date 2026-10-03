@@ -11,35 +11,17 @@ import {
   updateNotificationPreferences,
 } from '@/api/notifications';
 import { ApiErrorResponse } from '@/types/api';
+import { NotificationItem, getNotificationDestination, isActionRequired } from './NotificationItem';
+import { NotificationBadge } from './NotificationBadge';
+import { NotificationPreferencesTab } from './NotificationPreferencesTab';
 
-export const getNotificationDestination = (type: string, role?: string): string | null => {
-  switch (type) {
-    case 'application_submitted':
-      return role === 'recruiter' ? '/app/recruiter/applications' : '/app/applications';
-    case 'application_status_changed':
-      return role === 'student' ? '/app/applications' : '/app/recruiter/applications';
-    case 'recruiter_verification_changed':
-      return '/app/recruiter/profile';
-    case 'job_moderation_changed':
-      return '/app/recruiter/jobs';
-    case 'interview_scheduled':
-    case 'interview_rescheduled':
-    case 'interview_cancelled':
-      return role === 'student' ? '/app/interviews' : '/app/recruiter/interviews';
-    case 'message_received':
-      return '/app/messages';
-    case 'project_evaluation_submitted':
-      return role === 'student' ? '/app/projects' : '/app/explore-projects';
-    default:
-      return null;
-  }
-};
+export { getNotificationDestination, isActionRequired };
 
 interface NotificationDrawerProps {
   className?: string;
 }
 
-type DrawerTab = 'all' | 'unread' | 'preferences';
+export type DrawerTab = 'all' | 'action_required' | 'unread' | 'preferences';
 
 export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ className = '' }) => {
   const navigate = useNavigate();
@@ -242,31 +224,20 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
     }
   };
 
-  const formatTimestamp = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateString;
-    }
+  const handleNavigate = (destination: string) => {
+    navigate(destination);
+    setIsOpen(false);
   };
 
-  const handleItemClick = (item: Notification) => {
-    const destination = getNotificationDestination(item.notification_type, user?.role);
-    if (!item.is_read) {
-      handleMarkAsRead(item.id);
+  const filteredNotifications = notifications.filter((item) => {
+    if (activeTab === 'action_required') {
+      return isActionRequired(item.notification_type, user?.role);
     }
-    if (destination) {
-      navigate(destination);
-      setIsOpen(false);
+    if (activeTab === 'unread') {
+      return !item.is_read;
     }
-  };
+    return true;
+  });
 
   const bellAriaLabel = unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications';
 
@@ -297,11 +268,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
-        {unreadCount > 0 && (
-          <span className="cb-notification-badge" data-testid="unread-badge">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
+        <NotificationBadge count={unreadCount} />
       </button>
 
       {isOpen && (
@@ -374,6 +341,16 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
             <button
               type="button"
               role="tab"
+              className={`cb-notification-filter-tab ${activeTab === 'action_required' ? 'active' : ''}`}
+              onClick={() => setActiveTab('action_required')}
+              aria-selected={activeTab === 'action_required'}
+              data-testid="notification-action-tab"
+            >
+              Action Required
+            </button>
+            <button
+              type="button"
+              role="tab"
               className={`cb-notification-filter-tab ${activeTab === 'unread' ? 'active' : ''}`}
               onClick={() => setActiveTab('unread')}
               aria-selected={activeTab === 'unread'}
@@ -388,31 +365,21 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
               aria-selected={activeTab === 'preferences'}
               data-testid="notification-preferences-tab"
             >
-              ⚙️ Preferences
+              Preferences
             </button>
           </div>
 
           {/* Feedback Banners */}
-          {error && (
+          {error && activeTab !== 'preferences' && (
             <div className="cb-notification-error" role="alert">
               <span>{error}</span>
               <button
                 type="button"
                 className="cb-btn cb-btn-secondary cb-btn-xs"
-                onClick={() =>
-                  activeTab === 'preferences'
-                    ? fetchPreferences()
-                    : fetchNotificationsList(activeTab === 'unread')
-                }
+                onClick={() => fetchNotificationsList(activeTab === 'unread')}
               >
                 Retry
               </button>
-            </div>
-          )}
-
-          {prefSuccess && activeTab === 'preferences' && (
-            <div className="cb-alert cb-alert-success cb-notification-success-alert" role="status">
-              {prefSuccess}
             </div>
           )}
 
@@ -424,68 +391,16 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
                 <p>Loading...</p>
               </div>
             ) : activeTab === 'preferences' ? (
-              /* Notification Preferences Settings Panel */
-              <div className="cb-notification-preferences-panel" data-testid="preferences-panel">
-                <div className="cb-pref-section">
-                  <h4 className="cb-pref-section-title">Delivery Frequency</h4>
-                  <p className="cb-pref-section-desc">
-                    Choose how often you receive status and update notifications.
-                  </p>
-
-                  <div className="cb-pref-options">
-                    <label className="cb-radio-label">
-                      <input
-                        type="radio"
-                        name="notification-frequency"
-                        value="instant"
-                        checked={preference?.frequency === 'instant'}
-                        onChange={() => handlePreferenceChange('instant')}
-                        disabled={isSavingPref}
-                        data-testid="freq-instant-radio"
-                      />
-                      <div className="cb-radio-text">
-                        <span className="cb-radio-title">⚡ Instant</span>
-                        <span className="cb-radio-sub">Receive notifications immediately in real time.</span>
-                      </div>
-                    </label>
-
-                    <label className="cb-radio-label">
-                      <input
-                        type="radio"
-                        name="notification-frequency"
-                        value="digest"
-                        checked={preference?.frequency === 'digest'}
-                        onChange={() => handlePreferenceChange('digest')}
-                        disabled={isSavingPref}
-                        data-testid="freq-digest-radio"
-                      />
-                      <div className="cb-radio-text">
-                        <span className="cb-radio-title">📬 Daily Digest</span>
-                        <span className="cb-radio-sub">Consolidate periodic updates into a digest.</span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="cb-pref-section">
-                  <h4 className="cb-pref-section-title">Email Notifications</h4>
-                  <p className="cb-pref-section-desc">
-                    Send transactional confirmation and status update emails.
-                  </p>
-                  <label className="cb-checkbox-wrapper cb-pref-email-toggle">
-                    <input
-                      type="checkbox"
-                      className="cb-checkbox"
-                      checked={preference?.email_notifications ?? true}
-                      onChange={(e) => handleEmailToggle(e.target.checked)}
-                      disabled={isSavingPref}
-                      data-testid="email-notif-checkbox"
-                    />
-                    <span>Enable transactional email notifications</span>
-                  </label>
-                </div>
-              </div>
-            ) : notifications.length === 0 ? (
+              <NotificationPreferencesTab
+                preference={preference}
+                onFrequencyChange={handlePreferenceChange}
+                onEmailToggle={handleEmailToggle}
+                isSaving={isSavingPref}
+                successMessage={prefSuccess}
+                errorMessage={error}
+                onRetry={fetchPreferences}
+              />
+            ) : filteredNotifications.length === 0 ? (
               <div className="cb-notification-empty">
                 <svg
                   className="cb-empty-icon"
@@ -503,66 +418,32 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ classNam
                   <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
                 </svg>
                 <p className="cb-empty-title">
-                  {activeTab === 'unread' ? 'No unread notifications' : 'No notifications yet'}
+                  {activeTab === 'action_required'
+                    ? 'No actions required'
+                    : activeTab === 'unread'
+                    ? 'No unread notifications'
+                    : 'No notifications yet'}
                 </p>
                 <p className="cb-empty-desc">
-                  {activeTab === 'unread'
+                  {activeTab === 'action_required'
+                    ? 'You are all caught up on pending action items.'
+                    : activeTab === 'unread'
                     ? 'You have caught up with all your notifications.'
-                    : 'We will notify you here when application or interview updates occur.'}
+                    : 'We will notify you here when application, interview, or verification updates occur.'}
                 </p>
               </div>
             ) : (
               <ul className="cb-notification-list" role="list">
-                {notifications.map((item) => {
-                  const dest = getNotificationDestination(item.notification_type, user?.role);
-                  return (
-                    <li
-                      key={item.id}
-                      className={`cb-notification-item ${item.is_read ? 'cb-read' : 'cb-unread'} ${dest ? 'cb-notification-actionable' : ''}`}
-                      onClick={() => handleItemClick(item)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleItemClick(item);
-                        }
-                      }}
-                      tabIndex={dest ? 0 : undefined}
-                      role={dest ? 'button' : undefined}
-                      data-testid={`notification-item-${item.id}`}
-                    >
-                      <div className="cb-notification-item-content">
-                        <div className="cb-notification-item-header">
-                          <span className="cb-notification-item-title">{item.title}</span>
-                          {!item.is_read ? (
-                            <span className="cb-status-badge cb-badge-unread">Unread</span>
-                          ) : (
-                            <span className="cb-status-badge cb-badge-read">Read</span>
-                          )}
-                        </div>
-                        <p className="cb-notification-item-message">{item.message}</p>
-                        <div className="cb-notification-item-footer">
-                          <time className="cb-notification-time" dateTime={item.created_at}>
-                            {formatTimestamp(item.created_at)}
-                          </time>
-                          {!item.is_read && (
-                            <button
-                              type="button"
-                              className="cb-btn-link cb-item-mark-read-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMarkAsRead(item.id);
-                              }}
-                              disabled={markingReadId === item.id}
-                              aria-label={`Mark "${item.title}" as read`}
-                            >
-                              {markingReadId === item.id ? 'Marking...' : 'Mark as read'}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
+                {filteredNotifications.map((item) => (
+                  <NotificationItem
+                    key={item.id}
+                    notification={item}
+                    userRole={user?.role}
+                    onNavigate={handleNavigate}
+                    onMarkAsRead={handleMarkAsRead}
+                    isMarkingRead={markingReadId === item.id}
+                  />
+                ))}
               </ul>
             )}
           </div>

@@ -374,17 +374,70 @@ describe('NotificationDrawer Component', () => {
     expect(await screen.findByText('Application Received')).toBeInTheDocument();
   });
 
+  it('filters by action-required notifications when Action Required tab is clicked', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(notificationsApi, 'getUnreadCount').mockResolvedValue({ unread_count: 1 });
+    vi.spyOn(notificationsApi, 'getNotifications').mockResolvedValue({
+      items: [
+        {
+          id: 103,
+          user_id: 1,
+          notification_type: 'job_invitation_received',
+          title: 'Job Invitation',
+          message: 'You have been invited to apply.',
+          is_read: false,
+          created_at: '2026-09-20T08:30:00Z',
+          read_at: null,
+        },
+        {
+          id: 104,
+          user_id: 1,
+          notification_type: 'message_received',
+          title: 'New Message',
+          message: 'Hello there!',
+          is_read: true,
+          created_at: '2026-09-19T12:00:00Z',
+          read_at: '2026-09-19T13:00:00Z',
+        },
+      ],
+      page: 1,
+      page_size: 20,
+      total: 2,
+      total_pages: 1,
+    });
+
+    renderDrawer();
+
+    await user.click(screen.getByRole('button', { name: /Notifications/i }));
+    await screen.findByText('Job Invitation');
+    expect(screen.getByText('New Message')).toBeInTheDocument();
+
+    // Click Action Required tab
+    const actionTab = screen.getByTestId('notification-action-tab');
+    await user.click(actionTab);
+
+    expect(screen.getByText('Job Invitation')).toBeInTheDocument();
+    expect(screen.queryByText('New Message')).not.toBeInTheDocument();
+  });
+
   describe('Deep-linking destination logic', () => {
     it('returns correct destinations based on notification type and role', () => {
-      expect(getNotificationDestination('application_submitted', 'recruiter')).toBe('/app/recruiter/applications');
+      expect(getNotificationDestination('application_submitted', 'recruiter')).toBe('/app/recruiter/applications?status=applied');
       expect(getNotificationDestination('application_submitted', 'student')).toBe('/app/applications');
       expect(getNotificationDestination('application_status_changed', 'student')).toBe('/app/applications');
       expect(getNotificationDestination('application_status_changed', 'recruiter')).toBe('/app/recruiter/applications');
       expect(getNotificationDestination('recruiter_verification_changed', 'recruiter')).toBe('/app/recruiter/profile');
       expect(getNotificationDestination('job_moderation_changed', 'recruiter')).toBe('/app/recruiter/jobs');
+      expect(getNotificationDestination('job_moderation_changed', 'admin')).toBe('/app/admin/jobs');
       expect(getNotificationDestination('interview_scheduled', 'student')).toBe('/app/interviews');
       expect(getNotificationDestination('interview_scheduled', 'recruiter')).toBe('/app/recruiter/interviews');
+      expect(getNotificationDestination('interview_rescheduled', 'student')).toBe('/app/interviews');
+      expect(getNotificationDestination('interview_cancelled', 'student')).toBe('/app/interviews');
       expect(getNotificationDestination('message_received', 'student')).toBe('/app/messages');
+      expect(getNotificationDestination('project_evaluation_submitted', 'student')).toBe('/app/passport');
+      expect(getNotificationDestination('job_invitation_received', 'student')).toBe('/app/invitations');
+      expect(getNotificationDestination('job_invitation_responded', 'recruiter')).toBe('/app/recruiter/candidates');
+      expect(getNotificationDestination('experience_verification_changed', 'student')).toBe('/app/experiences');
     });
 
     it('returns null and remains safe for unknown/unsupported notification types', () => {

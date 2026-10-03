@@ -30,6 +30,9 @@ const TYPE_METADATA: Record<NotificationType, { label: string; icon: string; cat
   project_evaluation_submitted: { label: 'Project Evaluation', icon: '⭐', category: 'projects' },
   recruiter_verification_changed: { label: 'Recruiter Verification', icon: '🛡️', category: 'account' },
   job_moderation_changed: { label: 'Job Moderation', icon: '📋', category: 'account' },
+  job_invitation_received: { label: 'Job Invitation', icon: '✉️', category: 'invitations' },
+  job_invitation_responded: { label: 'Invitation Response', icon: '📬', category: 'invitations' },
+  experience_verification_changed: { label: 'Experience Verification', icon: '🎓', category: 'experiences' },
 };
 
 const formatFullTimestamp = (dateString: string): string => {

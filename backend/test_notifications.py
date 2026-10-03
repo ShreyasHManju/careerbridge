@@ -491,6 +491,238 @@ def test_event_job_moderation_changed_notifies_recruiter():
     assert "deactivated" in newest["message"]
 
 
+def test_event_experience_verification_approved_notifies_student():
+    student_headers = get_auth_headers(STUDENT_EMAIL)
+    admin_headers = get_auth_headers(ADMIN_EMAIL)
+
+    # 1. Student creates an experience record
+    create_resp = client.post(
+        "/api/v1/students/me/experiences",
+        headers=student_headers,
+        json={
+            "title": "Backend Engineering Intern",
+            "organization_name": "CloudTech Innovations",
+            "experience_type": "internship",
+            "start_date": "2025-01-01",
+            "end_date": "2025-06-01",
+            "is_current": False,
+            "description": "Built distributed notification pipelines and REST APIs.",
+        },
+    )
+    assert create_resp.status_code == 201
+    exp_id = create_resp.json()["id"]
+
+    # 2. Student requests verification
+    req_resp = client.post(
+        f"/api/v1/students/me/experiences/{exp_id}/request-verification",
+        headers=student_headers,
+    )
+    assert req_resp.status_code == 200
+
+    before_count = client.get("/api/v1/notifications/unread-count", headers=student_headers).json()["unread_count"]
+
+    # 3. Admin approves verification
+    decide_resp = client.post(
+        f"/api/v1/verifications/{exp_id}/decision",
+        headers=admin_headers,
+        json={"action": "approve", "notes": "Verified by Admin."},
+    )
+    assert decide_resp.status_code == 200
+    assert decide_resp.json()["status"] == "verified"
+
+    # 4. Student receives in-app notification
+    after_count = client.get("/api/v1/notifications/unread-count", headers=student_headers).json()["unread_count"]
+    assert after_count == before_count + 1
+
+    notifs = client.get("/api/v1/notifications?page=1&page_size=1", headers=student_headers).json()
+    newest = notifs["items"][0]
+    assert newest["notification_type"] == "experience_verification_changed"
+    assert newest["title"] == "Experience Verified"
+    assert "CloudTech Innovations" in newest["message"]
+    assert newest["is_read"] is False
+
+
+def test_event_experience_verification_rejected_notifies_student():
+    student_headers = get_auth_headers(STUDENT_EMAIL)
+    admin_headers = get_auth_headers(ADMIN_EMAIL)
+
+    # 1. Student creates an experience record
+    create_resp = client.post(
+        "/api/v1/students/me/experiences",
+        headers=student_headers,
+        json={
+            "title": "Frontend Developer Intern",
+            "organization_name": "WebStartup Co",
+            "experience_type": "internship",
+            "start_date": "2025-02-01",
+            "end_date": "2025-05-01",
+            "is_current": False,
+            "description": "Developed React user interfaces.",
+        },
+    )
+    assert create_resp.status_code == 201
+    exp_id = create_resp.json()["id"]
+
+    # 2. Student requests verification
+    req_resp = client.post(
+        f"/api/v1/students/me/experiences/{exp_id}/request-verification",
+        headers=student_headers,
+    )
+    assert req_resp.status_code == 200
+
+    before_count = client.get("/api/v1/notifications/unread-count", headers=student_headers).json()["unread_count"]
+
+    # 3. Admin rejects verification
+    decide_resp = client.post(
+        f"/api/v1/verifications/{exp_id}/decision",
+        headers=admin_headers,
+        json={"action": "reject", "notes": "Insufficient verification evidence."},
+    )
+    assert decide_resp.status_code == 200
+    assert decide_resp.json()["status"] == "rejected"
+
+    # 4. Student receives rejection notification
+    after_count = client.get("/api/v1/notifications/unread-count", headers=student_headers).json()["unread_count"]
+    assert after_count == before_count + 1
+
+    notifs = client.get("/api/v1/notifications?page=1&page_size=1", headers=student_headers).json()
+    newest = notifs["items"][0]
+    assert newest["notification_type"] == "experience_verification_changed"
+    assert newest["title"] == "Experience Verification Rejected"
+    assert "not approved" in newest["message"]
+    assert newest["is_read"] is False
+
+
+def test_event_experience_verification_unauthorized_no_notification():
+    student_headers = get_auth_headers(STUDENT_EMAIL)
+
+    # 1. Student creates experience and requests verification
+    create_resp = client.post(
+        "/api/v1/students/me/experiences",
+        headers=student_headers,
+        json={
+            "title": "Data Analyst Intern",
+            "organization_name": "DataCorp",
+            "experience_type": "internship",
+            "start_date": "2025-03-01",
+            "end_date": "2025-07-01",
+            "is_current": False,
+            "description": "SQL and business intelligence reports.",
+        },
+    )
+    assert create_resp.status_code == 201
+    exp_id = create_resp.json()["id"]
+
+    client.post(
+        f"/api/v1/students/me/experiences/{exp_id}/request-verification",
+        headers=student_headers,
+    )
+
+    before_count = client.get("/api/v1/notifications/unread-count", headers=student_headers).json()["unread_count"]
+
+    # 2. Student attempts self-verification -> 403 Forbidden
+    self_decide = client.post(
+        f"/api/v1/verifications/{exp_id}/decision",
+        headers=student_headers,
+        json={"action": "approve", "notes": "Self approval attempt"},
+    )
+    assert self_decide.status_code == 403
+
+    # 3. Verify no notification was generated
+    after_count = client.get("/api/v1/notifications/unread-count", headers=student_headers).json()["unread_count"]
+    assert after_count == before_count
+
+
+def test_event_experience_verification_invalid_request_no_notification():
+    student_headers = get_auth_headers(STUDENT_EMAIL)
+    admin_headers = get_auth_headers(ADMIN_EMAIL)
+
+    # 1. Student creates experience in draft status (not pending_verification)
+    create_resp = client.post(
+        "/api/v1/students/me/experiences",
+        headers=student_headers,
+        json={
+            "title": "ML Research Assistant",
+            "organization_name": "AI Lab",
+            "experience_type": "research",
+            "start_date": "2025-01-01",
+            "end_date": "2025-04-01",
+            "is_current": False,
+            "description": "PyTorch model training.",
+        },
+    )
+    assert create_resp.status_code == 201
+    exp_id = create_resp.json()["id"]
+
+    before_count = client.get("/api/v1/notifications/unread-count", headers=student_headers).json()["unread_count"]
+
+    # 2. Attempt to decide on non-pending record -> 400 Bad Request
+    invalid_decide = client.post(
+        f"/api/v1/verifications/{exp_id}/decision",
+        headers=admin_headers,
+        json={"action": "approve", "notes": "Premature decision"},
+    )
+    assert invalid_decide.status_code == 400
+
+    # 3. Attempt to decide on non-existent record -> 404 Not Found
+    not_found_decide = client.post(
+        "/api/v1/verifications/999999/decision",
+        headers=admin_headers,
+        json={"action": "approve", "notes": "Ghost record"},
+    )
+    assert not_found_decide.status_code == 404
+
+    # 4. Verify no notification was generated
+    after_count = client.get("/api/v1/notifications/unread-count", headers=student_headers).json()["unread_count"]
+    assert after_count == before_count
+
+
+def test_experience_verification_notification_cross_user_isolation():
+    student_headers = get_auth_headers(STUDENT_EMAIL)
+    student2_headers = get_auth_headers(STUDENT2_EMAIL)
+    recruiter_headers = get_auth_headers(RECRUITER_EMAIL)
+    admin_headers = get_auth_headers(ADMIN_EMAIL)
+
+    # Student 1 creates and gets experience verified
+    create_resp = client.post(
+        "/api/v1/students/me/experiences",
+        headers=student_headers,
+        json={
+            "title": "Security Analyst",
+            "organization_name": "SecureNet",
+            "experience_type": "work",
+            "start_date": "2024-06-01",
+            "end_date": "2024-12-01",
+            "is_current": False,
+            "description": "Penetration testing and security auditing.",
+        },
+    )
+    exp_id = create_resp.json()["id"]
+
+    client.post(
+        f"/api/v1/students/me/experiences/{exp_id}/request-verification",
+        headers=student_headers,
+    )
+
+    s2_before_count = client.get("/api/v1/notifications/unread-count", headers=student2_headers).json()["unread_count"]
+    rec_before_count = client.get("/api/v1/notifications/unread-count", headers=recruiter_headers).json()["unread_count"]
+
+    client.post(
+        f"/api/v1/verifications/{exp_id}/decision",
+        headers=admin_headers,
+        json={"action": "approve", "notes": "Approved by Admin."},
+    )
+
+    # Student 2 and Recruiter must NOT receive or see Student 1's notification
+    s2_after_count = client.get("/api/v1/notifications/unread-count", headers=student2_headers).json()["unread_count"]
+    rec_after_count = client.get("/api/v1/notifications/unread-count", headers=recruiter_headers).json()["unread_count"]
+    assert s2_after_count == s2_before_count
+    assert rec_after_count == rec_before_count
+
+    s2_notifs = client.get("/api/v1/notifications", headers=student2_headers).json()["items"]
+    assert not any("SecureNet" in n["message"] for n in s2_notifs)
+
+
 # --------------------------------------------------------------------------
 # Cascade Deletion Test
 # --------------------------------------------------------------------------
@@ -762,6 +994,16 @@ if __name__ == "__main__":
         print("PASS: test_event_recruiter_verification_changed_notifies_recruiter")
         test_event_job_moderation_changed_notifies_recruiter()
         print("PASS: test_event_job_moderation_changed_notifies_recruiter")
+        test_event_experience_verification_approved_notifies_student()
+        print("PASS: test_event_experience_verification_approved_notifies_student")
+        test_event_experience_verification_rejected_notifies_student()
+        print("PASS: test_event_experience_verification_rejected_notifies_student")
+        test_event_experience_verification_unauthorized_no_notification()
+        print("PASS: test_event_experience_verification_unauthorized_no_notification")
+        test_event_experience_verification_invalid_request_no_notification()
+        print("PASS: test_event_experience_verification_invalid_request_no_notification")
+        test_experience_verification_notification_cross_user_isolation()
+        print("PASS: test_experience_verification_notification_cross_user_isolation")
         test_cascade_deletion_on_user_delete()
         print("PASS: test_cascade_deletion_on_user_delete")
         test_background_jobs_sync_execution()

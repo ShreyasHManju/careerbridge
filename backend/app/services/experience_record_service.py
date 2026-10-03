@@ -11,6 +11,7 @@ from app.models.experience_record import (
     VerificationStatus,
 )
 from app.models.innovation_project import InnovationProject, ProjectStatus
+from app.models.notification import NotificationType
 from app.models.project_evidence import ProjectEvidence
 from app.models.project_evidence_verification import EvidenceVerification, EvidenceVerificationStatus
 from app.models.recruiter_profile import RecruiterProfile
@@ -23,6 +24,7 @@ from app.schemas.experience_record import (
     ExperienceRecordUpdate,
     ExperienceVerificationDecision,
 )
+from app.services.notification_service import NotificationService
 from app.services.skill_service import format_skills_string, sync_experience_skills_from_text
 
 
@@ -423,6 +425,28 @@ class ExperienceRecordService:
             experience.verifier_id = verifier.id
             experience.verified_at = None
             experience.verification_notes = decision.notes
+
+        # Create persistent in-app notification for the student owner
+        if decision.action == "approve":
+            org_name = (experience.organization_name or "").strip()
+            title = "Experience Verified"
+            message = (
+                f"Your experience at '{org_name}' has been verified!"
+                if org_name
+                else "Your experience record has been verified!"
+            )
+        else:
+            title = "Experience Verification Rejected"
+            message = "Your experience verification request was not approved. View your experience record for details."
+
+        NotificationService.create_notification(
+            db,
+            user_id=experience.student_id,
+            notification_type=NotificationType.EXPERIENCE_VERIFICATION_CHANGED,
+            title=title,
+            message=message,
+            commit=False,
+        )
 
         db.commit()
         db.refresh(experience)
