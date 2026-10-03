@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   getStudentProfileApi,
   createStudentProfileApi,
@@ -375,6 +376,47 @@ export const StudentProfilePage: React.FC = () => {
             {formError}
           </div>
         )}
+
+        {/* Career Identity & Passport Summary Banner */}
+        <div
+          className="cb-passport-banner-card"
+          style={{
+            background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.06), rgba(99, 102, 241, 0.08))',
+            border: '1px solid rgba(59, 130, 246, 0.25)',
+            borderRadius: 'var(--cb-radius, 8px)',
+            padding: '1rem 1.25rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+          }}
+          data-testid="profile-passport-banner"
+        >
+          <div style={{ flex: '1 1 300px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+              <span style={{ fontSize: '1.25rem' }} aria-hidden="true">🛡️</span>
+              <strong style={{ fontSize: '0.95rem', color: 'var(--cb-text, #1e293b)' }}>
+                Career Identity & Experience Passport
+              </strong>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--cb-text-muted, #64748b)', lineHeight: 1.5 }}>
+              Your profile identity, academic credentials, verified skills, innovation projects, and experiences automatically power your comprehensive Experience Passport for recruiters.
+            </p>
+          </div>
+          <div>
+            <Link
+              to="/app/passport"
+              className="cb-btn cb-btn-secondary cb-btn-sm"
+              data-testid="view-passport-btn"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}
+            >
+              <span>View Live Passport</span>
+              <span aria-hidden="true">↗</span>
+            </Link>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="cb-form" noValidate>
           {/* Section 1: Personal Information */}

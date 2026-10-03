@@ -41,6 +41,25 @@ export const InnovationProjectCard: React.FC<InnovationProjectCardProps> = ({
       ? project.skills.split(',').map((s) => s.trim()).filter(Boolean)
       : [];
 
+  // Derive milestone progress and evidence readiness if available on project object
+  const totalMilestones =
+    project.total_milestones ??
+    (project.milestones ? project.milestones.length : null);
+  const completedMilestones =
+    project.completed_milestones ??
+    (project.milestones
+      ? project.milestones.filter((m) => m.status === 'completed').length
+      : null);
+  const progressPct =
+    project.progress_percentage ??
+    (totalMilestones && totalMilestones > 0 && completedMilestones !== null
+      ? Math.round((completedMilestones / totalMilestones) * 100)
+      : null);
+  const evidenceCount =
+    (project as any).verified_evidence_count ??
+    (project as any).evidence_items?.length ??
+    null;
+
   return (
     <div className="cb-card cb-project-card" data-testid={`project-card-${project.id}`}>
       <div className="cb-project-card-header">
@@ -88,6 +107,37 @@ export const InnovationProjectCard: React.FC<InnovationProjectCardProps> = ({
             ))}
           </div>
         )}
+
+        {/* Milestone & Evidence Readiness */}
+        {(totalMilestones != null && totalMilestones > 0) || (evidenceCount != null && evidenceCount > 0) ? (
+          <div
+            className="cb-project-readiness"
+            style={{
+              marginTop: '0.625rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              flexWrap: 'wrap',
+              fontSize: '0.8125rem',
+              color: 'var(--cb-text-muted, #64748b)',
+            }}
+          >
+            {totalMilestones != null && totalMilestones > 0 && (
+              <span data-testid={`project-milestones-${project.id}`}>
+                🎯 Milestones: {completedMilestones ?? 0}/{totalMilestones} completed ({progressPct ?? 0}%)
+              </span>
+            )}
+            {evidenceCount != null && evidenceCount > 0 && (
+              <span
+                className="cb-badge cb-badge-success cb-badge-sm"
+                data-testid={`project-evidence-badge-${project.id}`}
+                style={{ fontSize: '0.75rem' }}
+              >
+                ✓ {evidenceCount} Verified {evidenceCount === 1 ? 'Artifact' : 'Artifacts'}
+              </span>
+            )}
+          </div>
+        ) : null}
       </div>
 
       <div className="cb-project-card-footer">

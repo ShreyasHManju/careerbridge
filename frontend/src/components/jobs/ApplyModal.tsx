@@ -141,6 +141,36 @@ export const ApplyModal: React.FC<ApplyModalProps> = ({
               uploaded resume will automatically be submitted with this application.
             </p>
 
+            {/* Passport Evidence Callout */}
+            <div
+              className="cb-passport-apply-callout"
+              data-testid="apply-passport-evidence-callout"
+              style={{
+                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.05), rgba(99, 102, 241, 0.07))',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                borderRadius: 'var(--cb-radius, 8px)',
+                padding: '0.75rem 1rem',
+                margin: '0.75rem 0 1rem 0',
+                fontSize: '0.85rem',
+                color: 'var(--cb-text, #1e293b)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.625rem',
+              }}
+            >
+              <span style={{ fontSize: '1.1rem', lineHeight: 1 }} aria-hidden="true">
+                🛡️
+              </span>
+              <div>
+                <strong style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--cb-primary, #2563eb)' }}>
+                  Verified Career Evidence Attached
+                </strong>
+                <p style={{ margin: 0, color: 'var(--cb-text-muted, #64748b)', lineHeight: 1.45, fontSize: '0.8125rem' }}>
+                  Your verified Career Passport, skills, experiences, and project evidence will be shared with this employer as part of your application.
+                </p>
+              </div>
+            </div>
+
             {errorMessage && (
               <div className="cb-alert cb-alert-danger" role="alert">
                 {errorMessage}

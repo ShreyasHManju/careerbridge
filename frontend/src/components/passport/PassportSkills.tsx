@@ -25,6 +25,8 @@ export const PassportSkills: React.FC<PassportSkillsProps> = ({ skills }) => {
         return 'Experience';
       case 'project':
         return 'Project';
+      case 'evaluation':
+        return 'Recruiter Evaluation';
       default:
         return source;
     }
