@@ -81,7 +81,10 @@ export const App: React.FC = () => {
             <Route path="/app/recruiter/jobs" element={<RecruiterJobsPage />} />
             <Route path="/app/recruiter/applications" element={<RecruiterApplicationsPage />} />
             <Route path="/app/recruiter/interviews" element={<RecruiterInterviewsPage />} />
-            <Route path="/app/recruiter/experiences/verification" element={<RecruiterExperienceVerificationPage />} />
+            <Route
+              path="/app/recruiter/experiences/verification"
+              element={<RecruiterExperienceVerificationPage />}
+            />
             <Route path="/app/recruiter/passport/:studentId" element={<PassportPage />} />
           </Route>
           {/* Admin-only domain routes */}
@@ -89,7 +92,10 @@ export const App: React.FC = () => {
             <Route path="/app/admin/users" element={<AdminUsersPage />} />
             <Route path="/app/admin/recruiters" element={<AdminRecruitersPage />} />
             <Route path="/app/admin/jobs" element={<AdminJobsPage />} />
-            <Route path="/app/admin/experiences/verification" element={<AdminExperienceVerificationPage />} />
+            <Route
+              path="/app/admin/experiences/verification"
+              element={<AdminExperienceVerificationPage />}
+            />
           </Route>
         </Route>
       </Route>
