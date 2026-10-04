@@ -339,7 +339,7 @@ export const JobDetailPage: React.FC = () => {
 
         {/* Skill Match & Gap Diagnostics */}
         {isStudent && job.match_summary != null && (
-          <SkillGapDiagnostics matchSummary={job.match_summary} />
+          <SkillGapDiagnostics matchSummary={job.match_summary} jobTitle={job.title} />
         )}
 
         {/* Student Career Evidence Overview */}

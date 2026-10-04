@@ -1,16 +1,20 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { JobMatchSummary } from '@/types/job';
 
 interface SkillGapDiagnosticsProps {
   matchSummary: JobMatchSummary;
+  jobTitle?: string;
   className?: string;
 }
 
 export const SkillGapDiagnostics: React.FC<SkillGapDiagnosticsProps> = ({
   matchSummary,
+  jobTitle,
   className = '',
 }) => {
+  const navigate = useNavigate();
+
   const {
     match_percentage,
     total_required,
@@ -19,6 +23,16 @@ export const SkillGapDiagnostics: React.FC<SkillGapDiagnosticsProps> = ({
     matched_skills,
     missing_skills,
   } = matchSummary;
+
+  const handleBridgeGap = () => {
+    navigate('/app/student/projects', {
+      state: {
+        openCreateModal: true,
+        prefilledSkills: missing_skills.map((skill) => skill.name).join(', '),
+        jobTitle: jobTitle,
+      },
+    });
+  };
 
   const getMatchTier = (pct: number): 'high' | 'medium' | 'low' => {
     if (pct >= 75) return 'high';
@@ -163,13 +177,23 @@ export const SkillGapDiagnostics: React.FC<SkillGapDiagnosticsProps> = ({
                 <span className="cb-skill-gap-callout-text">
                   Boost your candidacy by building or documenting a project demonstrating these skills.
                 </span>
-                <Link
-                  to="/app/explore-projects"
-                  className="cb-skill-gap-action-link"
-                  aria-label="Explore public projects to close skill gaps"
-                >
-                  Explore Innovation Projects →
-                </Link>
+                <div className="cb-skill-gap-callout-actions">
+                  <button
+                    type="button"
+                    className="cb-btn cb-btn-primary cb-btn-sm"
+                    data-testid="bridge-gap-button"
+                    onClick={handleBridgeGap}
+                  >
+                    Bridge This Gap
+                  </button>
+                  <Link
+                    to="/app/explore-projects"
+                    className="cb-skill-gap-action-link"
+                    aria-label="Explore public projects to close skill gaps"
+                  >
+                    Explore Innovation Projects →
+                  </Link>
+                </div>
               </div>
             </div>
           </>
