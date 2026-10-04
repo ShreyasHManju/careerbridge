@@ -41,6 +41,7 @@ class Notification(Base):
             name="notification_type",
             values_callable=lambda x: [e.value for e in x],
             native_enum=False,
+            length=64,
         ),
         nullable=False,
     )
