@@ -34,6 +34,7 @@ from app.schemas.passport import (
 )
 from app.schemas.skill import SkillResponse
 from app.services.skill_service import format_skills_string
+from app.services.student_skill_compilation_service import StudentSkillCompilationService
 
 
 class PassportService:
@@ -333,76 +334,22 @@ class PassportService:
             )
 
         # 5. Aggregate Canonical Skills Provenance
-        skill_map: Dict[int, Dict] = {}
-
-        # Profile skills
-        if profile and profile.student_skills:
-            for ss in profile.student_skills:
-                if ss.skill:
-                    s_id = ss.skill.id
-                    if s_id not in skill_map:
-                        skill_map[s_id] = {
-                            "id": ss.skill.id,
-                            "name": ss.skill.name,
-                            "slug": ss.skill.slug,
-                            "category": ss.skill.category,
-                            "is_verified": ss.skill.is_verified,
-                            "sources": set(),
-                        }
-                    skill_map[s_id]["sources"].add("profile")
-
-        # Verified experience skills
-        for exp in passport_experiences:
-            for s in exp.structured_skills:
-                if s.id not in skill_map:
-                    skill_map[s.id] = {
-                        "id": s.id,
-                        "name": s.name,
-                        "slug": s.slug,
-                        "category": s.category,
-                        "is_verified": s.is_verified,
-                        "sources": set(),
-                    }
-                skill_map[s.id]["sources"].add("experience")
-
-        # Included project skills
-        for proj in passport_projects:
-            for s in proj.structured_skills:
-                if s.id not in skill_map:
-                    skill_map[s.id] = {
-                        "id": s.id,
-                        "name": s.name,
-                        "slug": s.slug,
-                        "category": s.category,
-                        "is_verified": s.is_verified,
-                        "sources": set(),
-                    }
-                skill_map[s.id]["sources"].add("project")
-
-            # Assessed skills on submitted evaluations
-            for pe in proj.evaluations:
-                for s in pe.assessed_skills:
-                    if s.id not in skill_map:
-                        skill_map[s.id] = {
-                            "id": s.id,
-                            "name": s.name,
-                            "slug": s.slug,
-                            "category": s.category,
-                            "is_verified": s.is_verified,
-                            "sources": set(),
-                        }
-                    skill_map[s.id]["sources"].add("evaluation")
+        compiled_skills = StudentSkillCompilationService.compile_student_skills(
+            db,
+            target_student_id,
+            visibility_scope="all_owned" if (is_owner or is_admin) else "public_only",
+        )
 
         passport_skills = [
             PassportSkillItem(
-                id=v["id"],
-                name=v["name"],
-                slug=v["slug"],
-                category=v["category"],
-                is_verified=v["is_verified"],
+                id=v["skill"].id,
+                name=v["skill"].name,
+                slug=v["skill"].slug,
+                category=v["skill"].category,
+                is_verified=bool(v["is_verified"]),
                 sources=sorted(list(v["sources"])),
             )
-            for v in sorted(skill_map.values(), key=lambda x: (x["name"].lower()))
+            for v in sorted(compiled_skills.values(), key=lambda x: (x["skill"].name.lower()))
         ]
 
         # 6. Resume info (safe metadata only)

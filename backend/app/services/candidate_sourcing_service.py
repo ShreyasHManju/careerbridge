@@ -2,9 +2,9 @@ from typing import List, Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.experience_record import ExperienceRecord, VerificationStatus
-from app.models.innovation_project import InnovationProject, ProjectStatus, ProjectVisibility
-from app.models.project_evaluation import EvaluationStatus, ProjectEvaluation
+from app.models.experience_record import ExperienceRecord, ExperienceSkill, VerificationStatus
+from app.models.innovation_project import InnovationProject, ProjectSkill, ProjectStatus, ProjectVisibility
+from app.models.project_evaluation import EvaluationSkillAssessment, EvaluationStatus, ProjectEvaluation
 from app.models.project_evidence import ProjectEvidence
 from app.models.project_evidence_verification import EvidenceVerificationStatus
 from app.models.skill import Skill, StudentSkill
@@ -18,6 +18,7 @@ from app.schemas.candidate_sourcing import (
     CandidateSourcingItem,
 )
 from app.schemas.skill import SkillResponse
+from app.services.student_skill_compilation_service import StudentSkillCompilationService
 
 
 class CandidateSourcingService:
@@ -47,9 +48,10 @@ class CandidateSourcingService:
             .options(
                 selectinload(User.student_profile).selectinload(StudentProfile.student_skills).selectinload(StudentSkill.skill),
                 selectinload(User.profile_image),
-                selectinload(User.experience_records),
+                selectinload(User.experience_records).selectinload(ExperienceRecord.experience_skills).selectinload(ExperienceSkill.skill),
+                selectinload(User.innovation_projects).selectinload(InnovationProject.project_skills).selectinload(ProjectSkill.skill),
                 selectinload(User.innovation_projects).selectinload(InnovationProject.evidence_items).selectinload(ProjectEvidence.verification),
-                selectinload(User.innovation_projects).selectinload(InnovationProject.evaluations),
+                selectinload(User.innovation_projects).selectinload(InnovationProject.evaluations).selectinload(ProjectEvaluation.skill_assessments).selectinload(EvaluationSkillAssessment.skill),
             )
         )
 
@@ -80,22 +82,32 @@ class CandidateSourcingService:
             if not profile:
                 continue
 
-            # Skills
+            # Compile canonical skills using public_only visibility scope
+            compiled_skills_map = StudentSkillCompilationService.compile_student_skills_from_user(
+                student, visibility_scope="public_only"
+            )
+
             all_skills: List[SkillResponse] = []
             verified_skills: List[SkillResponse] = []
-            for ss in (profile.student_skills or []):
-                if ss.skill:
-                    sk_res = SkillResponse(
-                        id=ss.skill.id,
-                        name=ss.skill.name,
-                        slug=ss.skill.slug,
-                        category=ss.skill.category,
-                        is_verified=ss.skill.is_verified,
-                        created_at=ss.skill.created_at,
-                    )
-                    all_skills.append(sk_res)
-                    if ss.skill.is_verified:
-                        verified_skills.append(sk_res)
+
+            for s_id, entry in compiled_skills_map.items():
+                sk = entry["skill"]
+                is_ver = bool(entry["is_verified"])
+                sk_res = SkillResponse(
+                    id=sk.id,
+                    name=sk.name,
+                    slug=sk.slug,
+                    category=sk.category,
+                    is_verified=is_ver,
+                    created_at=sk.created_at,
+                )
+                all_skills.append(sk_res)
+                if is_ver:
+                    verified_skills.append(sk_res)
+
+            # Sort all_skills alphabetically by name
+            all_skills.sort(key=lambda s: s.name.lower())
+            verified_skills.sort(key=lambda s: s.name.lower())
 
             # Filter by skills if specified
             if skills and len(skills) > 0:
@@ -108,13 +120,13 @@ class CandidateSourcingService:
             if min_verified_skills and len(verified_skills) < min_verified_skills:
                 continue
 
-            # Experience records
+            # Experience records (verified only)
             verified_experiences = [
                 exp for exp in (student.experience_records or [])
                 if exp.status == VerificationStatus.VERIFIED or (hasattr(exp.status, "value") and exp.status.value == "verified")
             ]
 
-            # Innovation projects
+            # Innovation projects (public and active only)
             public_projects = [
                 p for p in (student.innovation_projects or [])
                 if (p.visibility == ProjectVisibility.PUBLIC or (hasattr(p.visibility, "value") and p.visibility.value == "public"))
@@ -159,7 +171,7 @@ class CandidateSourcingService:
                 )
 
             avg_project_score = (eval_score_sum / total_evaluations_count) if total_evaluations_count > 0 else None
-            is_passport_verified = len(verified_experiences) > 0 or total_verified_evidence > 0
+            is_passport_verified = len(verified_experiences) > 0 or total_verified_evidence > 0 or total_evaluations_count > 0
 
             if has_verified_passport and not is_passport_verified:
                 continue
