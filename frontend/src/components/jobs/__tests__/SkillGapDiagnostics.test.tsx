@@ -1,10 +1,23 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { SkillGapDiagnostics } from '../SkillGapDiagnostics';
 import { JobMatchSummary } from '@/types/job';
 
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
+
 describe('SkillGapDiagnostics Component', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders partial match with score, progress bar, matched and missing skills', () => {
     const mockSummary: JobMatchSummary = {
       match_percentage: 67,
@@ -23,7 +36,7 @@ describe('SkillGapDiagnostics Component', () => {
 
     render(
       <MemoryRouter>
-        <SkillGapDiagnostics matchSummary={mockSummary} />
+        <SkillGapDiagnostics matchSummary={mockSummary} jobTitle="Full Stack Engineer" />
       </MemoryRouter>
     );
 
@@ -47,15 +60,16 @@ describe('SkillGapDiagnostics Component', () => {
     // Missing skills
     expect(screen.getByTestId('missing-skill-3')).toHaveTextContent('Python');
 
-    // Exploration callout
+    // Exploration callout & Bridge This Gap button
     expect(screen.getByText(/Boost your candidacy by building or documenting a project/)).toBeInTheDocument();
+    expect(screen.getByTestId('bridge-gap-button')).toHaveTextContent('Bridge This Gap');
     expect(screen.getByRole('link', { name: /Explore public projects to close skill gaps/i })).toHaveAttribute(
       'href',
       '/app/explore-projects'
     );
   });
 
-  it('renders 100% full match with success banner and no missing skills', () => {
+  it('renders 100% full match with success banner and no missing skills or Bridge This Gap button', () => {
     const mockSummary: JobMatchSummary = {
       match_percentage: 100,
       total_required: 2,
@@ -71,7 +85,7 @@ describe('SkillGapDiagnostics Component', () => {
 
     render(
       <MemoryRouter>
-        <SkillGapDiagnostics matchSummary={mockSummary} />
+        <SkillGapDiagnostics matchSummary={mockSummary} jobTitle="Backend Developer" />
       </MemoryRouter>
     );
 
@@ -83,13 +97,14 @@ describe('SkillGapDiagnostics Component', () => {
       'You meet 100% of the documented skill requirements for this opportunity!'
     );
     expect(screen.queryByTestId('missing-skills-list')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('bridge-gap-button')).not.toBeInTheDocument();
 
     // Verify provenance labels
     expect(screen.getByText('Work Experience')).toBeInTheDocument();
     expect(screen.getByText('Recruiter Evaluated')).toBeInTheDocument();
   });
 
-  it('renders 0% match when student has none of the required skills', () => {
+  it('renders 0% match when student has none of the required skills and shows Bridge This Gap button', () => {
     const mockSummary: JobMatchSummary = {
       match_percentage: 0,
       total_required: 2,
@@ -105,7 +120,7 @@ describe('SkillGapDiagnostics Component', () => {
 
     render(
       <MemoryRouter>
-        <SkillGapDiagnostics matchSummary={mockSummary} />
+        <SkillGapDiagnostics matchSummary={mockSummary} jobTitle="DevOps Engineer" />
       </MemoryRouter>
     );
 
@@ -118,6 +133,47 @@ describe('SkillGapDiagnostics Component', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('missing-skill-10')).toHaveTextContent('Kubernetes');
     expect(screen.getByTestId('missing-skill-11')).toHaveTextContent('Go');
+
+    const bridgeBtn = screen.getByTestId('bridge-gap-button');
+    expect(bridgeBtn).toBeInTheDocument();
+    expect(bridgeBtn).toHaveTextContent('Bridge This Gap');
+  });
+
+  it('navigates to /app/student/projects with correct state when Bridge This Gap is clicked', () => {
+    const mockSummary: JobMatchSummary = {
+      match_percentage: 50,
+      total_required: 2,
+      total_matched: 1,
+      total_verified_matched: 0,
+      total_missing: 1,
+      matched_skills: [
+        { id: 1, name: 'React', is_verified: false, source: 'profile' },
+      ],
+      missing_skills: [
+        { id: 2, name: 'GraphQL' },
+        { id: 3, name: 'TypeScript' },
+      ],
+    };
+
+    render(
+      <MemoryRouter>
+        <SkillGapDiagnostics matchSummary={mockSummary} jobTitle="Frontend Lead" />
+      </MemoryRouter>
+    );
+
+    const bridgeBtn = screen.getByTestId('bridge-gap-button');
+    expect(bridgeBtn).toBeInTheDocument();
+
+    fireEvent.click(bridgeBtn);
+
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith('/app/student/projects', {
+      state: {
+        openCreateModal: true,
+        prefilledSkills: 'GraphQL, TypeScript',
+        jobTitle: 'Frontend Lead',
+      },
+    });
   });
 
   it('renders correctly when job has zero required skills', () => {
@@ -141,6 +197,7 @@ describe('SkillGapDiagnostics Component', () => {
     expect(badge).toHaveTextContent('🎯 100% Match');
     expect(screen.getByTestId('match-ratio-text')).toHaveTextContent('0 of 0 skills matched');
     expect(screen.getByTestId('all-skills-matched')).toBeInTheDocument();
+    expect(screen.queryByTestId('bridge-gap-button')).not.toBeInTheDocument();
   });
 
   it('has proper accessibility attributes', () => {

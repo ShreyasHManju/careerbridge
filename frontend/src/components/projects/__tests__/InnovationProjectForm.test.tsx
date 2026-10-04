@@ -140,4 +140,20 @@ describe('InnovationProjectForm Component', () => {
     fireEvent.click(screen.getByRole('button', { name: /Cancel/i }));
     expect(handleCancel).toHaveBeenCalledTimes(1);
   });
+
+  it('populates partial initialData from skill-gap prefill and renders Publish Project button', () => {
+    const partialData = {
+      title: 'Project demonstrating React, TypeScript for Frontend Engineer',
+      description: 'Targeted innovation project designed to demonstrate competencies in React, TypeScript.',
+      skills: 'React, TypeScript',
+    };
+
+    render(<InnovationProjectForm initialData={partialData} onSubmit={vi.fn()} onCancel={vi.fn()} />);
+
+    expect(screen.getByDisplayValue('Project demonstrating React, TypeScript for Frontend Engineer')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Targeted innovation project designed to demonstrate competencies in React, TypeScript.')).toBeInTheDocument();
+    expect(screen.getByText('React')).toBeInTheDocument();
+    expect(screen.getByText('TypeScript')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Publish Project/i })).toBeInTheDocument();
+  });
 });

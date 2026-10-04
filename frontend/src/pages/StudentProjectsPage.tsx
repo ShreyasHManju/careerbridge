@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   createProject,
   deleteProject,
@@ -14,6 +15,9 @@ import { InnovationProjectCard } from '@/components/projects/InnovationProjectCa
 import { InnovationProjectForm } from '@/components/projects/InnovationProjectForm';
 
 export const StudentProjectsPage: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [projects, setProjects] = useState<InnovationProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +27,7 @@ export const StudentProjectsPage: React.FC = () => {
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<InnovationProject | null>(null);
+  const [initialFormData, setInitialFormData] = useState<Partial<InnovationProject> | null>(null);
   const [deletingProject, setDeletingProject] = useState<InnovationProject | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -44,14 +49,64 @@ export const StudentProjectsPage: React.FC = () => {
     fetchProjects();
   }, []);
 
+  // Handle skill-gap navigation state from Opportunity Matching / JobDetailPage
+  useEffect(() => {
+    const state = location.state as {
+      openCreateModal?: boolean;
+      prefilledSkills?: string;
+      jobTitle?: string;
+    } | null | undefined;
+
+    if (state?.openCreateModal) {
+      const prefilledSkills = state.prefilledSkills?.trim() || '';
+      const jobTitle = state.jobTitle?.trim() || '';
+
+      let scaffoldTitle = '';
+      if (prefilledSkills && jobTitle) {
+        scaffoldTitle = `Project demonstrating ${prefilledSkills} for ${jobTitle}`;
+      } else if (prefilledSkills) {
+        scaffoldTitle = `Project demonstrating ${prefilledSkills}`;
+      } else if (jobTitle) {
+        scaffoldTitle = `Project for ${jobTitle}`;
+      }
+
+      if (scaffoldTitle.length > 150) {
+        scaffoldTitle = scaffoldTitle.slice(0, 150);
+      }
+
+      let scaffoldDescription = '';
+      if (prefilledSkills && jobTitle) {
+        scaffoldDescription = `Targeted innovation project designed to demonstrate competencies in ${prefilledSkills} for the ${jobTitle} role.`;
+      } else if (prefilledSkills) {
+        scaffoldDescription = `Targeted innovation project designed to demonstrate competencies in ${prefilledSkills}.`;
+      } else if (jobTitle) {
+        scaffoldDescription = `Targeted innovation project designed for the ${jobTitle} role.`;
+      }
+
+      setEditingProject(null);
+      setInitialFormData({
+        title: scaffoldTitle || undefined,
+        description: scaffoldDescription || undefined,
+        skills: prefilledSkills || undefined,
+      });
+      setIsModalOpen(true);
+      setFeedback(null);
+
+      // Clean up location state so refreshing or subsequent internal actions do not repeatedly reopen modal
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
+
   const handleOpenCreateModal = () => {
     setEditingProject(null);
+    setInitialFormData(null);
     setIsModalOpen(true);
     setFeedback(null);
   };
 
   const handleOpenEditModal = (proj: InnovationProject) => {
     setEditingProject(proj);
+    setInitialFormData(null);
     setIsModalOpen(true);
     setFeedback(null);
   };
@@ -59,6 +114,7 @@ export const StudentProjectsPage: React.FC = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingProject(null);
+    setInitialFormData(null);
   };
 
   const handleSaveProject = async (
@@ -77,6 +133,7 @@ export const StudentProjectsPage: React.FC = () => {
       }
       setIsModalOpen(false);
       setEditingProject(null);
+      setInitialFormData(null);
     } finally {
       setIsSaving(false);
     }
@@ -285,7 +342,7 @@ export const StudentProjectsPage: React.FC = () => {
             </div>
             <div className="cb-modal-body">
               <InnovationProjectForm
-                initialData={editingProject}
+                initialData={editingProject || initialFormData}
                 onSubmit={handleSaveProject}
                 onCancel={handleCloseModal}
                 isLoading={isSaving}

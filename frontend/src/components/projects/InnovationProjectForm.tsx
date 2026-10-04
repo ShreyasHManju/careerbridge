@@ -10,7 +10,7 @@ import {
 import { SkillTagInput } from '@/components/ui/SkillTagInput';
 
 interface InnovationProjectFormProps {
-  initialData?: InnovationProject | null;
+  initialData?: Partial<InnovationProject> | InnovationProject | null;
   onSubmit: (data: InnovationProjectCreate | InnovationProjectUpdate) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
@@ -281,7 +281,11 @@ export const InnovationProjectForm: React.FC<InnovationProjectFormProps> = ({
           className="cb-btn cb-btn-primary"
           disabled={isLoading}
         >
-          {isLoading ? 'Saving...' : initialData ? 'Update Project' : 'Publish Project'}
+          {isLoading
+            ? 'Saving...'
+            : initialData && 'id' in initialData && initialData.id
+            ? 'Update Project'
+            : 'Publish Project'}
         </button>
       </div>
     </form>
