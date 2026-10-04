@@ -62,7 +62,7 @@ class PassportSkillItem(BaseModel):
     name: str
     slug: str
     category: Optional[str] = None
-    is_verified: bool = True
+    is_verified: bool = False
     sources: List[str] = Field(default_factory=list, description="Evidence provenance (experience, project, profile, evaluation)")
 
     model_config = ConfigDict(from_attributes=True)
