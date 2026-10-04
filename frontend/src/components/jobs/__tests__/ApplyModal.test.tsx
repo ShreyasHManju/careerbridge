@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ApplyModal } from '../ApplyModal';
 import { JobPosting, Application } from '@/types/job';
 import * as applicationsApi from '@/api/applications';
+import * as passportApi from '@/api/passport';
 
 const mockJob: JobPosting = {
   id: 1,
@@ -210,5 +211,162 @@ describe('ApplyModal Component', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onCloseMock).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Phase 32: Verified Project Proof Presentation', () => {
+    it('renders verified project proof with matching target skills', async () => {
+      vi.spyOn(passportApi, 'getMyPassport').mockResolvedValueOnce({
+        identity: {
+          user_id: 5,
+          email: 'student@cb.io',
+          full_name: 'Test Student',
+          college: null,
+          degree: null,
+          branch: null,
+          graduation_year: null,
+          bio: null,
+          github_url: null,
+          linkedin_url: null,
+          portfolio_url: null,
+          profile_image_url: null,
+          is_verified: true,
+          created_at: '2026-09-19T10:00:00Z',
+        },
+        summary: {
+          verified_experiences_count: 1,
+          public_projects_count: 1,
+          canonical_skills_count: 2,
+          completed_milestones_count: 3,
+          verified_evidence_count: 1,
+        },
+        skills: [],
+        verified_experiences: [],
+        milestones: [],
+        verified_evidence: [],
+        resume: null,
+        is_owner: true,
+        projects: [
+          {
+            id: 42,
+            title: 'Autonomous Drone Swarm',
+            slug: 'autonomous-drone-swarm',
+            short_description: 'Cooperative drone mapping',
+            description: 'Cooperative drone mapping',
+            project_type: 'software',
+            status: 'active',
+            visibility: 'public',
+            skills: 'Python, FastAPI, PyTorch',
+            structured_skills: [],
+            repository_url: 'https://github.com/student/drone',
+            live_demo_url: 'https://drone.demo.io',
+            total_milestones: 2,
+            completed_milestones: 2,
+            progress_percentage: 100,
+            milestones: [],
+            verified_evidence: [
+              {
+                id: 1,
+                innovation_project_id: 42,
+                milestone_id: 10,
+                milestone_title: 'Specs',
+                title: 'Demo Video',
+                description: 'Full video walkthrough',
+                evidence_type: 'video',
+                url: 'https://youtube.com/demo',
+                verified_at: '2026-09-20T00:00:00Z',
+              },
+            ],
+            verified_evidence_count: 1,
+            evaluations: [],
+          },
+        ],
+      });
+
+      render(
+        <ApplyModal
+          isOpen={true}
+          job={mockJob}
+          onClose={vi.fn()}
+        />
+      );
+
+      expect(screen.getByTestId('verified-project-proof-section')).toBeInTheDocument();
+      expect(await screen.findByText('Autonomous Drone Swarm')).toBeInTheDocument();
+      expect(screen.getByText(/🛡️ Verified Proof/i)).toBeInTheDocument();
+      expect(screen.getByText(/✓ 1 verified artifact/i)).toBeInTheDocument();
+      // Verify skill highlighting with match target
+      expect(screen.getByText(/Python 🎯/i)).toBeInTheDocument();
+      expect(screen.getByText(/FastAPI 🎯/i)).toBeInTheDocument();
+    });
+
+    it('clearly labels unverified projects as self-declared without verified proof badges', async () => {
+      vi.spyOn(passportApi, 'getMyPassport').mockResolvedValueOnce({
+        identity: {
+          user_id: 5,
+          email: 'student@cb.io',
+          full_name: 'Test Student',
+          college: null,
+          degree: null,
+          branch: null,
+          graduation_year: null,
+          bio: null,
+          github_url: null,
+          linkedin_url: null,
+          portfolio_url: null,
+          profile_image_url: null,
+          is_verified: false,
+          created_at: '2026-09-19T10:00:00Z',
+        },
+        summary: {
+          verified_experiences_count: 0,
+          public_projects_count: 1,
+          canonical_skills_count: 1,
+          completed_milestones_count: 0,
+          verified_evidence_count: 0,
+        },
+        skills: [],
+        verified_experiences: [],
+        milestones: [],
+        verified_evidence: [],
+        resume: null,
+        is_owner: true,
+        projects: [
+          {
+            id: 99,
+            title: 'Simple Portfolio',
+            slug: 'simple-portfolio',
+            short_description: 'My basic HTML page',
+            description: 'My basic HTML page',
+            project_type: 'software',
+            status: 'draft',
+            visibility: 'public',
+            skills: 'HTML, CSS',
+            structured_skills: [],
+            repository_url: null,
+            live_demo_url: null,
+            total_milestones: 0,
+            completed_milestones: 0,
+            progress_percentage: 0,
+            milestones: [],
+            verified_evidence: [],
+            verified_evidence_count: 0,
+            evaluations: [],
+          },
+        ],
+      });
+
+      render(
+        <ApplyModal
+          isOpen={true}
+          job={mockJob}
+          onClose={vi.fn()}
+        />
+      );
+
+      expect(screen.getByTestId('verified-project-proof-section')).toBeInTheDocument();
+      expect(await screen.findByText('Simple Portfolio')).toBeInTheDocument();
+      expect(screen.getByText(/Self-declared \(Unverified\)/i)).toBeInTheDocument();
+      expect(screen.queryByText(/🛡️ Verified Proof/i)).not.toBeInTheDocument();
+    });
   });
 });

@@ -455,4 +455,130 @@ describe('CandidateReviewModal Component', () => {
       expect(screen.getByText(/Application status successfully updated to "rejected"/i)).toBeInTheDocument();
     });
   });
+
+  describe('Phase 32: Candidate Verified Project Credential Presentation', () => {
+    it('displays verified project credential badge and evidence links on projects tab', async () => {
+      const passportWithEvidence: PassportResponse = {
+        ...mockPassport,
+        projects: [
+          {
+            id: 77,
+            title: 'Neural Cash Flow Engine',
+            slug: 'neural-cash-flow-engine',
+            short_description: 'Real-time financial forecasting.',
+            description: 'Distributed microservice architecture for cash flow forecasting.',
+            project_type: 'software',
+            status: 'active',
+            visibility: 'public',
+            skills: 'Python, FastAPI, Redis',
+            structured_skills: [],
+            repository_url: 'https://github.com/alexrivera/cashflow',
+            live_demo_url: 'https://cashflow.demo',
+            total_milestones: 3,
+            completed_milestones: 3,
+            progress_percentage: 100,
+            milestones: [],
+            verified_evidence: [
+              {
+                id: 10,
+                innovation_project_id: 77,
+                milestone_id: 1,
+                milestone_title: 'Architecture',
+                title: 'Architecture Benchmark PDF',
+                description: 'Full benchmark results',
+                evidence_type: 'document',
+                url: 'https://s3.amazonaws.com/benchmark.pdf',
+                verified_at: '2026-08-20T00:00:00Z',
+              },
+            ],
+            verified_evidence_count: 1,
+            evaluations: [],
+          },
+        ],
+      };
+
+      vi.spyOn(passportApi, 'getStudentPassport').mockResolvedValueOnce(passportWithEvidence);
+
+      render(
+        <MemoryRouter>
+          <CandidateReviewModal
+            isOpen={true}
+            application={mockApplication}
+            job={mockJob}
+            onClose={vi.fn()}
+            onStatusChange={vi.fn()}
+          />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Alex Rivera')).toBeInTheDocument();
+      });
+
+      // Switch to Projects tab
+      const projectsTab = screen.getByTestId('tab-projects');
+      fireEvent.click(projectsTab);
+
+      expect(screen.getByTestId('section-projects')).toBeInTheDocument();
+      expect(screen.getByText('Neural Cash Flow Engine')).toBeInTheDocument();
+      expect(screen.getByTestId('verified-project-credential-badge-77')).toBeInTheDocument();
+      expect(screen.getByText(/🛡️ Verified Project Credential/i)).toBeInTheDocument();
+      expect(screen.getByText(/Architecture Benchmark PDF/i)).toBeInTheDocument();
+    });
+
+    it('does not display verified credential badge for projects without verified evidence', async () => {
+      const passportWithoutEvidence: PassportResponse = {
+        ...mockPassport,
+        projects: [
+          {
+            id: 88,
+            title: 'Simple Mockup App',
+            slug: 'simple-mockup-app',
+            short_description: 'Mockup app without evidence.',
+            description: 'A simple prototype.',
+            project_type: 'software',
+            status: 'draft',
+            visibility: 'public',
+            skills: 'React, CSS',
+            structured_skills: [],
+            repository_url: null,
+            live_demo_url: null,
+            total_milestones: 0,
+            completed_milestones: 0,
+            progress_percentage: 0,
+            milestones: [],
+            verified_evidence: [],
+            verified_evidence_count: 0,
+            evaluations: [],
+          },
+        ],
+      };
+
+      vi.spyOn(passportApi, 'getStudentPassport').mockResolvedValueOnce(passportWithoutEvidence);
+
+      render(
+        <MemoryRouter>
+          <CandidateReviewModal
+            isOpen={true}
+            application={mockApplication}
+            job={mockJob}
+            onClose={vi.fn()}
+            onStatusChange={vi.fn()}
+          />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Alex Rivera')).toBeInTheDocument();
+      });
+
+      // Switch to Projects tab
+      const projectsTab = screen.getByTestId('tab-projects');
+      fireEvent.click(projectsTab);
+
+      expect(screen.getByTestId('section-projects')).toBeInTheDocument();
+      expect(screen.getByText('Simple Mockup App')).toBeInTheDocument();
+      expect(screen.queryByTestId('verified-project-credential-badge-88')).not.toBeInTheDocument();
+    });
+  });
 });

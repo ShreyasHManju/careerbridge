@@ -754,10 +754,29 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div>
-                              <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#0f172a', margin: '0 0 0.25rem 0' }}>
-                                {proj.title}
-                              </h4>
-                              <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#0f172a', margin: 0 }}>
+                                  {proj.title}
+                                </h4>
+                                {((proj.verified_evidence && proj.verified_evidence.length > 0) ||
+                                  (proj.verified_evidence_count && proj.verified_evidence_count > 0)) && (
+                                  <span
+                                    style={{
+                                      fontSize: '0.75rem',
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      background: '#dbeafe',
+                                      color: '#1e40af',
+                                      fontWeight: 600,
+                                      border: '1px solid #bfdbfe',
+                                    }}
+                                    data-testid={`verified-project-credential-badge-${proj.id}`}
+                                  >
+                                    🛡️ Verified Project Credential
+                                  </span>
+                                )}
+                              </div>
+                              <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', display: 'block', marginTop: '0.25rem' }}>
                                 {proj.project_type} • {proj.status}
                               </span>
                             </div>
@@ -781,6 +800,30 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
                           <p style={{ fontSize: '0.875rem', color: '#334155', margin: '0.75rem 0', lineHeight: 1.5 }}>
                             {proj.description}
                           </p>
+
+                          {/* Project Skills */}
+                          {proj.skills && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem', margin: '0.5rem 0' }}>
+                              {proj.skills
+                                .split(',')
+                                .map((s) => s.trim())
+                                .filter(Boolean)
+                                .map((skillName, sIdx) => (
+                                  <span
+                                    key={sIdx}
+                                    style={{
+                                      fontSize: '0.75rem',
+                                      padding: '2px 6px',
+                                      background: '#f1f5f9',
+                                      borderRadius: '4px',
+                                      color: '#334155',
+                                    }}
+                                  >
+                                    {skillName}
+                                  </span>
+                                ))}
+                            </div>
+                          )}
 
                           {/* Milestones & Progress */}
                           <div style={{ margin: '0.75rem 0' }}>

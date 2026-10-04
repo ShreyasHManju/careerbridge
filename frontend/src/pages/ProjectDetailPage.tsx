@@ -16,6 +16,10 @@ import {
   updateProjectMilestone,
 } from '@/api/innovationProjects';
 import {
+  createExperienceFromVerifiedProject,
+  getMyExperiences,
+} from '@/api/experiences';
+import {
   createProjectEvaluation,
   getProjectEvaluations,
   submitProjectEvaluation,
@@ -100,6 +104,26 @@ export const ProjectDetailPage: React.FC = () => {
   const [editingEvaluation, setEditingEvaluation] = useState<ProjectEvaluation | null>(null);
   const [isEvaluationSaving, setIsEvaluationSaving] = useState(false);
 
+  // Passport Credentialization State (Phase 32)
+  const [isCredentialing, setIsCredentialing] = useState(false);
+  const [credentialError, setCredentialError] = useState<string | null>(null);
+  const [credentialSuccess, setCredentialSuccess] = useState<string | null>(null);
+  const [isCredentialed, setIsCredentialed] = useState(false);
+
+  const checkExistingCredential = async (pId: number) => {
+    if (user?.role === 'student') {
+      try {
+        const resp = await getMyExperiences();
+        const found = (resp.items || []).some((e) => e.innovation_project_id === pId);
+        if (found) {
+          setIsCredentialed(true);
+        }
+      } catch {
+        // Silently ignore non-blocking credential check
+      }
+    }
+  };
+
   const fetchMilestones = async (pId: number) => {
     setMilestonesLoading(true);
     setMilestonesError(null);
@@ -166,6 +190,7 @@ export const ProjectDetailPage: React.FC = () => {
         fetchMilestones(data.id),
         fetchEvidence(data.id),
         fetchEvaluations(data.id),
+        checkExistingCredential(data.id),
       ]);
     } catch (err: any) {
       if (err.response?.status === 404) {
@@ -346,6 +371,41 @@ export const ProjectDetailPage: React.FC = () => {
     }
   };
 
+  const hasVerifiedEvidence = evidenceList.some(
+    (ev) =>
+      ev.verification &&
+      (ev.verification.status === 'verified' ||
+        (ev.verification.status as any) === 'VERIFIED')
+  );
+
+  const handleCredentializeProject = async () => {
+    if (!project || isCredentialing || isCredentialed) return;
+    setIsCredentialing(true);
+    setCredentialError(null);
+    setCredentialSuccess(null);
+    try {
+      await createExperienceFromVerifiedProject(project.id);
+      setIsCredentialed(true);
+      setCredentialSuccess(
+        'Project successfully credentialed to your Experience Passport!'
+      );
+    } catch (err: any) {
+      const detail =
+        err.response?.data?.detail ||
+        err.message ||
+        'Failed to credentialize project to Experience Passport.';
+      setCredentialError(detail);
+      if (
+        typeof detail === 'string' &&
+        detail.toLowerCase().includes('already exists')
+      ) {
+        setIsCredentialed(true);
+      }
+    } finally {
+      setIsCredentialing(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -432,6 +492,127 @@ export const ProjectDetailPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Experience Passport Credentialization Banner (Phase 32) */}
+        {isOwner && user?.role === 'student' && (
+          <>
+            {isCredentialed ? (
+              <div
+                className="cb-passport-credential-banner cb-credentialed"
+                data-testid="project-credentialed-banner"
+                style={{
+                  margin: '1rem 0',
+                  padding: '1rem 1.25rem',
+                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(16, 185, 129, 0.12))',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  borderRadius: 'var(--cb-radius, 8px)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '1rem',
+                }}
+              >
+                <div>
+                  <strong
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      color: '#15803d',
+                      fontSize: '0.9375rem',
+                    }}
+                  >
+                    <span>✓</span> Credentialed in Experience Passport
+                  </strong>
+                  <p
+                    style={{
+                      margin: '0.25rem 0 0 0',
+                      fontSize: '0.8125rem',
+                      color: '#334155',
+                    }}
+                  >
+                    This project and its verified evidence are formalized into your verified Experience Passport and skill compilation.
+                  </p>
+                </div>
+                <Link
+                  to="/app/student/passport"
+                  className="cb-btn cb-btn-secondary cb-btn-sm"
+                  data-testid="view-passport-link"
+                >
+                  View Experience Passport &rarr;
+                </Link>
+              </div>
+            ) : hasVerifiedEvidence ? (
+              <div
+                className="cb-passport-credential-banner cb-credential-action"
+                data-testid="project-credentialize-cta-banner"
+                style={{
+                  margin: '1rem 0',
+                  padding: '1rem 1.25rem',
+                  background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.06), rgba(99, 102, 241, 0.08))',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  borderRadius: 'var(--cb-radius, 8px)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '1rem',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: '240px' }}>
+                  <strong
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      color: '#1d4ed8',
+                      fontSize: '0.9375rem',
+                    }}
+                  >
+                    <span>🛡️</span> Verified Evidence Available
+                  </strong>
+                  <p
+                    style={{
+                      margin: '0.25rem 0 0 0',
+                      fontSize: '0.8125rem',
+                      color: '#334155',
+                    }}
+                  >
+                    This project has verified milestone evidence. Add it as a verified credential to your Experience Passport to boost your opportunity matching.
+                  </p>
+                  {credentialError && (
+                    <div
+                      className="cb-alert cb-alert-danger"
+                      role="alert"
+                      style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', fontSize: '0.8125rem' }}
+                    >
+                      {credentialError}
+                    </div>
+                  )}
+                  {credentialSuccess && (
+                    <div
+                      className="cb-alert cb-alert-success"
+                      role="status"
+                      style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', fontSize: '0.8125rem' }}
+                    >
+                      {credentialSuccess}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="cb-btn cb-btn-primary cb-btn-sm"
+                  onClick={handleCredentializeProject}
+                  disabled={isCredentialing}
+                  data-testid="add-to-passport-btn"
+                >
+                  {isCredentialing ? 'Adding to Experience Passport...' : 'Add to Experience Passport'}
+                </button>
+              </div>
+            ) : null}
+          </>
+        )}
 
         {project.short_description && (
           <div className="cb-detail-section cb-detail-lead">

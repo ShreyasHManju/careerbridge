@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProjectDetailPage } from '../ProjectDetailPage';
 import * as api from '@/api/innovationProjects';
 import * as evalApi from '@/api/projectEvaluations';
+import * as expApi from '@/api/experiences';
 import * as useAuthModule from '@/auth/useAuth';
 import {
   InnovationProject,
@@ -596,5 +597,260 @@ describe('ProjectDetailPage Integration (Milestone 2.0-C Phase 5)', () => {
     expect(screen.getByText('(Initech)')).toBeInTheDocument();
     expect(screen.getByText('4.6')).toBeInTheDocument();
     expect(screen.getByText('Strongly Recommended')).toBeInTheDocument();
+  });
+
+  describe('Phase 32: Verified Project Credentialization to Experience Passport', () => {
+    it('shows "Add to Experience Passport" CTA banner when owned project has verified evidence', async () => {
+      setupAuth({
+        id: 10,
+        email: 'student@cb.io',
+        role: 'student',
+        is_active: true,
+        is_verified: true,
+        created_at: '2026-09-24T00:00:00Z',
+        updated_at: '2026-09-24T00:00:00Z',
+      });
+      vi.spyOn(api, 'getProjectById').mockResolvedValueOnce(mockProject);
+      vi.spyOn(api, 'getProjectMilestones').mockResolvedValueOnce(emptyMilestonesResponse);
+      vi.spyOn(evalApi, 'getProjectEvaluations').mockResolvedValueOnce([]);
+      vi.spyOn(expApi, 'getMyExperiences').mockResolvedValueOnce({ items: [], total: 0 });
+      vi.spyOn(api, 'getProjectEvidenceList').mockResolvedValueOnce({
+        project_id: 42,
+        total_count: 1,
+        items: [
+          {
+            id: 201,
+            innovation_project_id: 42,
+            title: 'Simulation Video',
+            evidence_type: 'video',
+            url: 'https://youtube.com/demo',
+            created_at: '2026-09-24T00:00:00Z',
+            updated_at: '2026-09-24T00:00:00Z',
+            verification: {
+              id: 301,
+              evidence_id: 201,
+              verifier_id: 2,
+              status: 'verified',
+              created_at: '2026-09-24T00:00:00Z',
+              updated_at: '2026-09-24T00:00:00Z',
+            },
+          },
+        ],
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/app/projects/42']}>
+          <Routes>
+            <Route path="/app/projects/:projectId" element={<ProjectDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      expect(await screen.findByTestId('project-credentialize-cta-banner')).toBeInTheDocument();
+      expect(screen.getByText(/Verified Evidence Available/i)).toBeInTheDocument();
+      const addBtn = screen.getByTestId('add-to-passport-btn');
+      expect(addBtn).toBeInTheDocument();
+      expect(addBtn).toHaveTextContent(/Add to Experience Passport/i);
+    });
+
+    it('does NOT show credentialize CTA when project has no verified evidence', async () => {
+      setupAuth({
+        id: 10,
+        email: 'student@cb.io',
+        role: 'student',
+        is_active: true,
+        is_verified: true,
+        created_at: '2026-09-24T00:00:00Z',
+        updated_at: '2026-09-24T00:00:00Z',
+      });
+      vi.spyOn(api, 'getProjectById').mockResolvedValueOnce(mockProject);
+      vi.spyOn(api, 'getProjectMilestones').mockResolvedValueOnce(emptyMilestonesResponse);
+      vi.spyOn(evalApi, 'getProjectEvaluations').mockResolvedValueOnce([]);
+      vi.spyOn(expApi, 'getMyExperiences').mockResolvedValueOnce({ items: [], total: 0 });
+      vi.spyOn(api, 'getProjectEvidenceList').mockResolvedValueOnce({
+        project_id: 42,
+        total_count: 1,
+        items: [
+          {
+            id: 201,
+            innovation_project_id: 42,
+            title: 'Simulation Video',
+            evidence_type: 'video',
+            url: 'https://youtube.com/demo',
+            created_at: '2026-09-24T00:00:00Z',
+            updated_at: '2026-09-24T00:00:00Z',
+            verification: {
+              id: 301,
+              evidence_id: 201,
+              verifier_id: 2,
+              status: 'pending',
+              created_at: '2026-09-24T00:00:00Z',
+              updated_at: '2026-09-24T00:00:00Z',
+            },
+          },
+        ],
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/app/projects/42']}>
+          <Routes>
+            <Route path="/app/projects/:projectId" element={<ProjectDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      expect(await screen.findByText('Autonomous Drone Swarm')).toBeInTheDocument();
+      expect(screen.queryByTestId('project-credentialize-cta-banner')).not.toBeInTheDocument();
+    });
+
+    it('successfully calls createExperienceFromVerifiedProject and shows credentialed state', async () => {
+      setupAuth({
+        id: 10,
+        email: 'student@cb.io',
+        role: 'student',
+        is_active: true,
+        is_verified: true,
+        created_at: '2026-09-24T00:00:00Z',
+        updated_at: '2026-09-24T00:00:00Z',
+      });
+      vi.spyOn(api, 'getProjectById').mockResolvedValueOnce(mockProject);
+      vi.spyOn(api, 'getProjectMilestones').mockResolvedValueOnce(emptyMilestonesResponse);
+      vi.spyOn(evalApi, 'getProjectEvaluations').mockResolvedValueOnce([]);
+      vi.spyOn(expApi, 'getMyExperiences').mockResolvedValueOnce({ items: [], total: 0 });
+      vi.spyOn(api, 'getProjectEvidenceList').mockResolvedValueOnce({
+        project_id: 42,
+        total_count: 1,
+        items: [
+          {
+            id: 201,
+            innovation_project_id: 42,
+            title: 'Simulation Video',
+            evidence_type: 'video',
+            url: 'https://youtube.com/demo',
+            created_at: '2026-09-24T00:00:00Z',
+            updated_at: '2026-09-24T00:00:00Z',
+            verification: {
+              id: 301,
+              evidence_id: 201,
+              verifier_id: 2,
+              status: 'verified',
+              created_at: '2026-09-24T00:00:00Z',
+              updated_at: '2026-09-24T00:00:00Z',
+            },
+          },
+        ],
+      });
+
+      const createExpSpy = vi.spyOn(expApi, 'createExperienceFromVerifiedProject').mockResolvedValueOnce({
+        id: 77,
+        student_id: 10,
+        title: 'Autonomous Drone Swarm',
+        organization_name: 'Innovation Project',
+        experience_type: 'project',
+        start_date: '2026-09-24',
+        end_date: null,
+        is_current: true,
+        description: 'Verified execution of innovation project',
+        status: 'verified',
+        verification_source: 'platform_project',
+        innovation_project_id: 42,
+        verifier_id: 2,
+        verified_at: '2026-09-24T00:00:00Z',
+        verification_notes: 'Derived from verified project evidence',
+        skills: 'Python, ROS2',
+        created_at: '2026-09-24T00:00:00Z',
+        updated_at: '2026-09-24T00:00:00Z',
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/app/projects/42']}>
+          <Routes>
+            <Route path="/app/projects/:projectId" element={<ProjectDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      const addBtn = await screen.findByTestId('add-to-passport-btn');
+      fireEvent.click(addBtn);
+
+      expect(createExpSpy).toHaveBeenCalledWith(42);
+      expect(await screen.findByTestId('project-credentialed-banner')).toBeInTheDocument();
+      expect(screen.getByText(/Credentialed in Experience Passport/i)).toBeInTheDocument();
+      expect(screen.getByTestId('view-passport-link')).toBeInTheDocument();
+    });
+
+    it('shows already credentialed banner and no CTA when experience record already exists', async () => {
+      setupAuth({
+        id: 10,
+        email: 'student@cb.io',
+        role: 'student',
+        is_active: true,
+        is_verified: true,
+        created_at: '2026-09-24T00:00:00Z',
+        updated_at: '2026-09-24T00:00:00Z',
+      });
+      vi.spyOn(api, 'getProjectById').mockResolvedValueOnce(mockProject);
+      vi.spyOn(api, 'getProjectMilestones').mockResolvedValueOnce(emptyMilestonesResponse);
+      vi.spyOn(evalApi, 'getProjectEvaluations').mockResolvedValueOnce([]);
+      vi.spyOn(expApi, 'getMyExperiences').mockResolvedValueOnce({
+        items: [
+          {
+            id: 77,
+            student_id: 10,
+            title: 'Autonomous Drone Swarm',
+            organization_name: 'Innovation Project',
+            experience_type: 'project',
+            start_date: '2026-09-24',
+            end_date: null,
+            is_current: true,
+            description: 'Verified execution of innovation project',
+            status: 'verified',
+            verification_source: 'platform_project',
+            innovation_project_id: 42,
+            verifier_id: 2,
+            verified_at: '2026-09-24T00:00:00Z',
+            verification_notes: 'Derived from verified project evidence',
+            skills: 'Python, ROS2',
+            created_at: '2026-09-24T00:00:00Z',
+            updated_at: '2026-09-24T00:00:00Z',
+          },
+        ],
+        total: 1,
+      });
+      vi.spyOn(api, 'getProjectEvidenceList').mockResolvedValueOnce({
+        project_id: 42,
+        total_count: 1,
+        items: [
+          {
+            id: 201,
+            innovation_project_id: 42,
+            title: 'Simulation Video',
+            evidence_type: 'video',
+            url: 'https://youtube.com/demo',
+            created_at: '2026-09-24T00:00:00Z',
+            updated_at: '2026-09-24T00:00:00Z',
+            verification: {
+              id: 301,
+              evidence_id: 201,
+              verifier_id: 2,
+              status: 'verified',
+              created_at: '2026-09-24T00:00:00Z',
+              updated_at: '2026-09-24T00:00:00Z',
+            },
+          },
+        ],
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/app/projects/42']}>
+          <Routes>
+            <Route path="/app/projects/:projectId" element={<ProjectDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      expect(await screen.findByTestId('project-credentialed-banner')).toBeInTheDocument();
+      expect(screen.queryByTestId('add-to-passport-btn')).not.toBeInTheDocument();
+    });
   });
 });
