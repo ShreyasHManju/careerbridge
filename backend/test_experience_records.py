@@ -27,6 +27,7 @@ from sqlalchemy import delete, select
 from app.core.database import SessionLocal
 from app.core.security import create_access_token, hash_password
 from app.main import app
+from app.models.application import Application, ApplicationStatus
 from app.models.experience_record import (
     ExperienceRecord,
     ExperienceSkill,
@@ -40,6 +41,7 @@ from app.models.innovation_project import (
     ProjectType,
     ProjectVisibility,
 )
+from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
 from app.models.project_evidence import EvidenceType, ProjectEvidence
 from app.models.project_evidence_verification import EvidenceVerification, EvidenceVerificationStatus
 from app.models.recruiter_profile import RecruiterProfile
@@ -61,7 +63,7 @@ RECRUITER2_COMPANY = "Globex Industries"
 
 
 def cleanup_test_data():
-    """Remove test users, profiles, projects, and experiences."""
+    """Remove test users, profiles, projects, jobs, applications, and experiences."""
     with SessionLocal() as db:
         test_emails = [
             STUDENT1_EMAIL,
@@ -74,6 +76,8 @@ def cleanup_test_data():
         user_ids = [u.id for u in users]
         if user_ids:
             db.execute(delete(ExperienceRecord).where(ExperienceRecord.student_id.in_(user_ids)))
+            db.execute(delete(Application).where(Application.student_id.in_(user_ids)))
+            db.execute(delete(JobPosting).where(JobPosting.recruiter_id.in_(user_ids)))
             db.execute(delete(InnovationProject).where(InnovationProject.student_id.in_(user_ids)))
             db.execute(delete(StudentProfile).where(StudentProfile.user_id.in_(user_ids)))
             db.execute(delete(RecruiterProfile).where(RecruiterProfile.user_id.in_(user_ids)))
@@ -634,6 +638,189 @@ def test_8_create_experience_from_verified_project():
     print("  [PASS] Duplicate experience record creation prevented with 400 Bad Request.")
 
 
+def test_9_create_experience_from_accepted_application():
+    """
+    Test Phase 33 Step 1:
+    - Accepted job application -> successful WORK experience creation.
+    - Accepted internship application -> successful INTERNSHIP experience creation.
+    - Non-ACCEPTED application -> rejected with 400.
+    - Application belonging to another student -> rejected with 403.
+    - Nonexistent application -> 404.
+    - Duplicate credentialization -> rejected with 400.
+    - VerificationSource is exactly RECRUITER_CONFIRMED.
+    - Recruiter/company attribution is correct.
+    - Student cannot forge another student's application ID (IDOR protection).
+    - Unauthenticated request is rejected with 401.
+    - Non-student role is rejected with 403.
+    """
+    cleanup_test_data()
+
+    token_s1 = get_token(STUDENT1_EMAIL, UserRole.STUDENT)
+    token_s2 = get_token(STUDENT2_EMAIL, UserRole.STUDENT)
+    token_rec1 = get_token(RECRUITER1_EMAIL, UserRole.RECRUITER, RECRUITER1_COMPANY)
+    token_admin = get_token(ADMIN_EMAIL, UserRole.ADMIN)
+
+    headers_s1 = {"Authorization": f"Bearer {token_s1}"}
+    headers_s2 = {"Authorization": f"Bearer {token_s2}"}
+    headers_rec1 = {"Authorization": f"Bearer {token_rec1}"}
+    headers_admin = {"Authorization": f"Bearer {token_admin}"}
+
+    with SessionLocal() as db:
+        s1 = db.scalar(select(User).where(User.email == STUDENT1_EMAIL))
+        s2 = db.scalar(select(User).where(User.email == STUDENT2_EMAIL))
+        rec1 = db.scalar(select(User).where(User.email == RECRUITER1_EMAIL))
+
+        # Create Job Posting 1 (Full-Time Job)
+        job_fulltime = JobPosting(
+            recruiter_id=rec1.id,
+            title="Senior Backend Engineer",
+            description="Build distributed scale backends in Python and Go.",
+            company_name=RECRUITER1_COMPANY,
+            opportunity_type=OpportunityType.JOB,
+            employment_type=EmploymentType.FULL_TIME,
+            skills="Python, Distributed Systems, FastAPI, PostgreSQL",
+            is_active=True,
+        )
+        # Create Job Posting 2 (Internship)
+        job_internship = JobPosting(
+            recruiter_id=rec1.id,
+            title="Software Engineering Intern",
+            description="Summer software engineering internship building web services.",
+            company_name=RECRUITER1_COMPANY,
+            opportunity_type=OpportunityType.INTERNSHIP,
+            employment_type=EmploymentType.FULL_TIME,
+            skills="TypeScript, React, Python",
+            is_active=True,
+        )
+        db.add_all([job_fulltime, job_internship])
+        db.commit()
+        db.refresh(job_fulltime)
+        db.refresh(job_internship)
+
+        # 1. Application 1: Student 1 to Job Fulltime (APPLIED status initially)
+        app_applied = Application(
+            job_posting_id=job_fulltime.id,
+            student_id=s1.id,
+            status=ApplicationStatus.APPLIED,
+            cover_message="I am excited about this role.",
+        )
+        # 2. Application 2: Student 1 to Job Internship (ACCEPTED status)
+        app_internship_accepted = Application(
+            job_posting_id=job_internship.id,
+            student_id=s1.id,
+            status=ApplicationStatus.ACCEPTED,
+            cover_message="Looking forward to interning at Acme.",
+        )
+        # 3. Application 3: Student 2 to Job Fulltime (ACCEPTED status)
+        app_s2_accepted = Application(
+            job_posting_id=job_fulltime.id,
+            student_id=s2.id,
+            status=ApplicationStatus.ACCEPTED,
+            cover_message="Marcus applying.",
+        )
+        db.add_all([app_applied, app_internship_accepted, app_s2_accepted])
+        db.commit()
+        db.refresh(app_applied)
+        db.refresh(app_internship_accepted)
+        db.refresh(app_s2_accepted)
+
+        app_applied_id = app_applied.id
+        app_intern_acc_id = app_internship_accepted.id
+        app_s2_acc_id = app_s2_accepted.id
+        rec1_id = rec1.id
+
+    # A. Unauthenticated request -> 401
+    res_unauth = client.post(f"/api/v1/students/me/experiences/from-accepted-application/{app_intern_acc_id}")
+    assert res_unauth.status_code == 401, f"Expected 401, got {res_unauth.status_code}"
+
+    # B. Non-student role (Recruiter/Admin) -> 403
+    res_rec = client.post(
+        f"/api/v1/students/me/experiences/from-accepted-application/{app_intern_acc_id}",
+        headers=headers_rec1,
+    )
+    assert res_rec.status_code == 403, f"Expected 403, got {res_rec.status_code}"
+
+    res_adm = client.post(
+        f"/api/v1/students/me/experiences/from-accepted-application/{app_intern_acc_id}",
+        headers=headers_admin,
+    )
+    assert res_adm.status_code == 403, f"Expected 403, got {res_adm.status_code}"
+
+    # C. Nonexistent application -> 404
+    res_404 = client.post(
+        "/api/v1/students/me/experiences/from-accepted-application/999999",
+        headers=headers_s1,
+    )
+    assert res_404.status_code == 404, f"Expected 404, got {res_404.status_code}"
+    assert "not found" in res_404.json()["detail"].lower()
+
+    # D. Non-ACCEPTED status (status=applied) -> 400 Bad Request
+    res_not_acc = client.post(
+        f"/api/v1/students/me/experiences/from-accepted-application/{app_applied_id}",
+        headers=headers_s1,
+    )
+    assert res_not_acc.status_code == 400, f"Expected 400, got {res_not_acc.status_code}"
+    assert "must be accepted" in res_not_acc.json()["detail"]
+
+    # E. IDOR Protection: Student 1 attempts to credentialize Student 2's accepted application -> 403 Forbidden
+    res_idor = client.post(
+        f"/api/v1/students/me/experiences/from-accepted-application/{app_s2_acc_id}",
+        headers=headers_s1,
+    )
+    assert res_idor.status_code == 403, f"Expected 403, got {res_idor.status_code}"
+    assert "not authorized" in res_idor.json()["detail"].lower()
+
+    # F. Successful Internship Credentialization: Student 1 credentializes accepted internship -> 201 Created
+    res_intern = client.post(
+        f"/api/v1/students/me/experiences/from-accepted-application/{app_intern_acc_id}",
+        headers=headers_s1,
+    )
+    assert res_intern.status_code == 201, f"Expected 201, got {res_intern.status_code}: {res_intern.text}"
+    exp_intern = res_intern.json()
+    assert exp_intern["title"] == "Software Engineering Intern"
+    assert exp_intern["organization_name"] == RECRUITER1_COMPANY
+    assert exp_intern["experience_type"] == "internship"
+    assert exp_intern["status"] == "verified"
+    assert exp_intern["verification_source"] == "recruiter_confirmed"
+    assert exp_intern["verifier_id"] == rec1_id
+    assert exp_intern["verified_at"] is not None
+    assert exp_intern["is_current"] is True
+    assert len(exp_intern["structured_skills"]) >= 2
+    print("  [PASS] Accepted internship application successfully converted to INTERNSHIP ExperienceRecord.")
+
+    # G. Duplicate prevention: Attempting to credentialize the same accepted internship again -> 400 Bad Request
+    res_dup = client.post(
+        f"/api/v1/students/me/experiences/from-accepted-application/{app_intern_acc_id}",
+        headers=headers_s1,
+    )
+    assert res_dup.status_code == 400, f"Expected 400, got {res_dup.status_code}"
+    assert "already exists" in res_dup.json()["detail"].lower()
+    print("  [PASS] Duplicate accepted application credentialization prevented with 400 Bad Request.")
+
+    # H. Successful Full-Time Job Credentialization: Transition application 1 to ACCEPTED, then credentialize
+    with SessionLocal() as db:
+        app1_db = db.scalar(select(Application).where(Application.id == app_applied_id))
+        app1_db.status = ApplicationStatus.ACCEPTED
+        db.commit()
+
+    res_work = client.post(
+        f"/api/v1/students/me/experiences/from-accepted-application/{app_applied_id}",
+        headers=headers_s1,
+    )
+    assert res_work.status_code == 201, f"Expected 201, got {res_work.status_code}: {res_work.text}"
+    exp_work = res_work.json()
+    assert exp_work["title"] == "Senior Backend Engineer"
+    assert exp_work["organization_name"] == RECRUITER1_COMPANY
+    assert exp_work["experience_type"] == "work"
+    assert exp_work["status"] == "verified"
+    assert exp_work["verification_source"] == "recruiter_confirmed"
+    assert exp_work["verifier_id"] == rec1_id
+    assert exp_work["verified_at"] is not None
+    assert exp_work["is_current"] is True
+    assert len(exp_work["structured_skills"]) >= 3
+    print("  [PASS] Accepted job application successfully converted to WORK ExperienceRecord.")
+
+
 def run_all():
     print("=" * 70)
     print("CAREERBRIDGE 2.0-D — VERIFIED EXPERIENCE TEST SUITE")
@@ -646,6 +833,7 @@ def run_all():
     test_6_innovation_project_link_and_cascade()
     test_7_privacy_rules_for_public_student_read()
     test_8_create_experience_from_verified_project()
+    test_9_create_experience_from_accepted_application()
     cleanup_test_data()
     print("\n" + "=" * 70)
     print("ALL 2.0-D VERIFIED EXPERIENCE TESTS PASSED!")

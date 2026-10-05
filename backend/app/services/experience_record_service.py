@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.models.application import Application, ApplicationStatus
 from app.models.experience_record import (
     ExperienceRecord,
     ExperienceType,
@@ -11,6 +12,7 @@ from app.models.experience_record import (
     VerificationStatus,
 )
 from app.models.innovation_project import InnovationProject, ProjectStatus
+from app.models.job_posting import JobPosting, OpportunityType
 from app.models.notification import NotificationType
 from app.models.project_evidence import ProjectEvidence
 from app.models.project_evidence_verification import EvidenceVerification, EvidenceVerificationStatus
@@ -599,6 +601,124 @@ class ExperienceRecordService:
         # 6. Copy canonical skills
         if project.skills:
             sync_experience_skills_from_text(db, exp_record, project.skills)
+
+        db.commit()
+        db.refresh(exp_record)
+        ExperienceRecordService._populate_derived_fields([exp_record])
+        return exp_record
+
+    @staticmethod
+    def create_experience_from_accepted_application(
+        db: Session,
+        *,
+        student_id: int,
+        application_id: int,
+    ) -> ExperienceRecord:
+        """
+        Create a verified ExperienceRecord derived directly from an accepted job application.
+        Enforces:
+        - Student ownership of the application.
+        - Application status must be ACCEPTED.
+        - Determination of ExperienceType.INTERNSHIP vs ExperienceType.WORK from job posting opportunity_type.
+        - Prevention of duplicate experience records for the same accepted application.
+        - Verification source set to RECRUITER_CONFIRMED with verifier_id bound to the hiring recruiter.
+        - Canonical skill synchronization from job posting required skills.
+        - Organization name and title mapped directly from JobPosting database record.
+        """
+        # 1. Fetch application with job posting, skills, and recruiter details
+        application = db.scalar(
+            select(Application)
+            .where(Application.id == application_id)
+            .options(
+                selectinload(Application.job_posting).selectinload(JobPosting.job_skills).selectinload(JobPosting.job_skills.property.mapper.class_.skill),
+                selectinload(Application.job_posting).selectinload(JobPosting.recruiter),
+            )
+        )
+        if not application:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Application not found",
+            )
+
+        if application.student_id != student_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to convert another student's application into an experience record",
+            )
+
+        is_accepted = (
+            application.status == ApplicationStatus.ACCEPTED
+            or getattr(application.status, "value", None) == "accepted"
+            or str(application.status).lower() == "accepted"
+        )
+        if not is_accepted:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot create verified experience: application status is '{getattr(application.status, 'value', str(application.status))}' (must be accepted)",
+            )
+
+        job = application.job_posting
+        if not job:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Application has no associated job posting",
+            )
+
+        # 2. Check for duplicate experience record for this application/placement
+        existing_exp = db.scalar(
+            select(ExperienceRecord).where(
+                ExperienceRecord.student_id == student_id,
+                ExperienceRecord.verifier_id == job.recruiter_id,
+                ExperienceRecord.verification_source == VerificationSource.RECRUITER_CONFIRMED,
+                or_(
+                    (ExperienceRecord.organization_name == job.company_name) & (ExperienceRecord.title == job.title),
+                    ExperienceRecord.verification_notes.contains(f"Application #{application.id}"),
+                ),
+            )
+        )
+        if existing_exp:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An experience record already exists for this accepted application",
+            )
+
+        # 3. Determine experience type (WORK vs INTERNSHIP)
+        is_internship = (
+            job.opportunity_type == OpportunityType.INTERNSHIP
+            or getattr(job.opportunity_type, "value", None) == "internship"
+            or str(job.opportunity_type).lower() == "internship"
+        )
+        experience_type = ExperienceType.INTERNSHIP if is_internship else ExperienceType.WORK
+
+        start_date = application.updated_at.date() if application.updated_at else datetime.now(timezone.utc).date()
+        verified_at = application.updated_at if application.updated_at else datetime.now(timezone.utc)
+
+        desc = job.description
+        if not desc or len(desc.strip()) < 10:
+            desc = f"Placement as {job.title} at {job.company_name} via CareerBridge."
+
+        # 4. Create verified experience record
+        exp_record = ExperienceRecord(
+            student_id=student_id,
+            title=job.title,
+            organization_name=job.company_name,
+            experience_type=experience_type,
+            start_date=start_date,
+            end_date=None,
+            is_current=True,
+            description=desc,
+            status=VerificationStatus.VERIFIED,
+            verification_source=VerificationSource.RECRUITER_CONFIRMED,
+            verifier_id=job.recruiter_id,
+            verified_at=verified_at,
+            verification_notes=f"Derived from accepted placement for '{job.title}' at '{job.company_name}' (Application #{application.id}).",
+        )
+        db.add(exp_record)
+        db.flush()
+
+        # 5. Copy canonical skills from job posting
+        if job.skills:
+            sync_experience_skills_from_text(db, exp_record, job.skills)
 
         db.commit()
         db.refresh(exp_record)

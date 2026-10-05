@@ -84,6 +84,28 @@ def create_experience_from_verified_project(
     )
 
 
+@router.post(
+    "/students/me/experiences/from-accepted-application/{application_id}",
+    response_model=ExperienceRecordResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add accepted application placement as an experience record",
+    description="Transforms an accepted job or internship application into a verified experience record with recruiter confirmation.",
+)
+def create_experience_from_accepted_application(
+    application_id: int = Path(..., ge=1, description="Primary key of the accepted application"),
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: Session = Depends(get_db),
+):
+    """
+    Create a verified experience record directly from an accepted job application.
+    """
+    return ExperienceRecordService.create_experience_from_accepted_application(
+        db=db,
+        student_id=current_user.id,
+        application_id=application_id,
+    )
+
+
 @router.get(
     "/students/me/experiences/{experience_id}",
     response_model=ExperienceRecordResponse,
