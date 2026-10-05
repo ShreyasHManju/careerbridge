@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Application } from '@/types/application';
 import { JobPosting } from '@/types/job';
 import { Interview, InterviewType } from '@/types/interview';
 import { ApplicationStatusBadge } from './ApplicationStatusBadge';
 import { InterviewStatusBadge } from '@/components/interviews/InterviewStatusBadge';
+import { createExperienceFromAcceptedApplication } from '@/api/experiences';
 
 export interface StudentApplicationCardProps {
   application: Application;
@@ -67,6 +68,45 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
   interview,
   interviews,
 }) => {
+  const [isCreatingExperience, setIsCreatingExperience] = useState(false);
+  const [experienceCreated, setExperienceCreated] = useState(false);
+  const [experienceError, setExperienceError] = useState<string | null>(null);
+
+  const handleCreateExperience = async () => {
+    if (
+      application.status !== 'accepted' ||
+      isCreatingExperience ||
+      experienceCreated
+    ) {
+      return;
+    }
+
+    setIsCreatingExperience(true);
+    setExperienceError(null);
+
+    try {
+      await createExperienceFromAcceptedApplication(application.id);
+      setExperienceCreated(true);
+    } catch (error: unknown) {
+      let message = 'Unable to add this accepted application to your Experience Passport.';
+
+      if (error instanceof Error && error.message) {
+        message = error.message;
+      } else if (
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        typeof error.message === 'string'
+      ) {
+        message = error.message;
+      }
+
+      setExperienceError(message);
+    } finally {
+      setIsCreatingExperience(false);
+    }
+  };
+
   const formattedDate = new Date(application.created_at).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -293,6 +333,38 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
           >
             📅 View Interviews
           </Link>
+        )}
+
+        {application.status === 'accepted' && (
+          <div className="cb-experience-passport-action">
+            <button
+              type="button"
+              className="cb-btn cb-btn-primary cb-btn-sm"
+              data-testid={`create-experience-btn-${application.id}`}
+              onClick={handleCreateExperience}
+              disabled={isCreatingExperience || experienceCreated}
+            >
+              {isCreatingExperience
+                ? 'Adding to Experience Passport...'
+                : experienceCreated
+                  ? 'Added to Experience Passport'
+                  : 'Add to Experience Passport'}
+            </button>
+
+            {experienceCreated && (
+              <p
+                data-testid={`experience-created-${application.id}`}
+              >
+                This accepted opportunity has been added to your Experience Passport.
+              </p>
+            )}
+
+            {experienceError && (
+              <div role="alert">
+                {experienceError}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </article>

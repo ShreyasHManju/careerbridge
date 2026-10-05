@@ -86,3 +86,12 @@ export const createExperienceFromVerifiedProject = async (
   );
   return response.data;
 };
+
+export const createExperienceFromAcceptedApplication = async (
+  applicationId: number
+): Promise<ExperienceRecord> => {
+  const response = await apiClient.post<ExperienceRecord>(
+    `/students/me/experiences/from-accepted-application/${applicationId}`
+  );
+  return response.data;
+};

@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { StudentApplicationCard } from '../StudentApplicationCard';
 import { Application } from '@/types/application';
 import { JobPosting } from '@/types/job';
 import { Interview } from '@/types/interview';
+import * as experiencesApi from '@/api/experiences';
 
 const mockApplication: Application = {
   id: 10,
@@ -19,6 +20,11 @@ const mockApplication: Application = {
 const mockShortlistedApp: Application = {
   ...mockApplication,
   status: 'shortlisted',
+};
+
+const mockAcceptedApp: Application = {
+  ...mockApplication,
+  status: 'accepted',
 };
 
 const mockJob: JobPosting = {
@@ -298,6 +304,148 @@ describe('StudentApplicationCard Component', () => {
         'href',
         'https://meet.google.com/abc-defg-hij'
       );
+    });
+  });
+
+  // ==========================================================================
+  // ACCEPTED APPLICATION ? EXPERIENCE PASSPORT TESTS
+  // ==========================================================================
+
+  describe('Accepted Application ? Experience Passport', () => {
+    beforeEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('shows Add to Experience Passport action only for accepted applications', () => {
+      const { rerender } = render(
+        <MemoryRouter>
+          <StudentApplicationCard
+            application={mockAcceptedApp}
+            job={mockJob}
+          />
+        </MemoryRouter>
+      );
+
+      expect(
+        screen.getByTestId('create-experience-btn-10')
+      ).toBeInTheDocument();
+
+      rerender(
+        <MemoryRouter>
+          <StudentApplicationCard
+            application={mockShortlistedApp}
+            job={mockJob}
+          />
+        </MemoryRouter>
+      );
+
+      expect(
+        screen.queryByTestId('create-experience-btn-10')
+      ).not.toBeInTheDocument();
+    });
+
+    it('does not show Experience Passport action for non-accepted applications', () => {
+      render(
+        <MemoryRouter>
+          <StudentApplicationCard
+            application={mockApplication}
+            job={mockJob}
+          />
+        </MemoryRouter>
+      );
+
+      expect(
+        screen.queryByTestId('create-experience-btn-10')
+      ).not.toBeInTheDocument();
+    });
+
+    it('creates an Experience Passport record from an accepted application', async () => {
+      const createSpy = vi
+        .spyOn(experiencesApi, 'createExperienceFromAcceptedApplication')
+        .mockResolvedValue({
+          id: 501,
+        } as never);
+
+      render(
+        <MemoryRouter>
+          <StudentApplicationCard
+            application={mockAcceptedApp}
+            job={mockJob}
+          />
+        </MemoryRouter>
+      );
+
+      const button = screen.getByTestId('create-experience-btn-10');
+
+      await button.click();
+
+      expect(createSpy).toHaveBeenCalledTimes(1);
+      expect(createSpy).toHaveBeenCalledWith(10);
+
+      expect(
+        await screen.findByTestId('experience-created-10')
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'This accepted opportunity has been added to your Experience Passport.'
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('prevents duplicate Experience Passport creation after success', async () => {
+      const createSpy = vi
+        .spyOn(experiencesApi, 'createExperienceFromAcceptedApplication')
+        .mockResolvedValue({
+          id: 501,
+        } as never);
+
+      render(
+        <MemoryRouter>
+          <StudentApplicationCard
+            application={mockAcceptedApp}
+            job={mockJob}
+          />
+        </MemoryRouter>
+      );
+
+      const button = screen.getByTestId('create-experience-btn-10');
+
+      await button.click();
+      expect(
+        await screen.findByTestId('experience-created-10')
+      ).toBeInTheDocument();
+
+      expect(button).toBeDisabled();
+
+      expect(createSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('displays an error when Experience Passport creation fails', async () => {
+      vi.spyOn(
+        experiencesApi,
+        'createExperienceFromAcceptedApplication'
+      ).mockRejectedValue(new Error('Failed to create experience'));
+
+      render(
+        <MemoryRouter>
+          <StudentApplicationCard
+            application={mockAcceptedApp}
+            job={mockJob}
+          />
+        </MemoryRouter>
+      );
+
+      const button = screen.getByTestId('create-experience-btn-10');
+
+      await button.click();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Failed to create experience'
+      );
+
+      expect(
+        screen.queryByTestId('experience-created-10')
+      ).not.toBeInTheDocument();
     });
   });
 });
