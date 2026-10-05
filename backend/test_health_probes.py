@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
@@ -74,13 +74,33 @@ class TestReadinessProbe:
         monkeypatch.setattr(settings, "STORAGE_BUCKET", "prod-careerbridge-bucket")
         monkeypatch.setattr(settings, "STORAGE_REGION", "eu-central-1")
 
-        res = client.get("/health/ready")
-        assert res.status_code == 200
-        data = res.json()
-        assert data["status"] == "ready"
-        assert data["checks"]["storage"]["provider"] == "s3"
-        assert data["checks"]["storage"]["bucket"] == "prod-careerbridge-bucket"
-        assert data["checks"]["storage"]["region"] == "eu-central-1"
+        mock_s3_client = MagicMock()
+        mock_s3_client.head_bucket.return_value = {}
+
+        with patch("app.core.storage.S3StorageProvider._get_client", return_value=mock_s3_client):
+            res = client.get("/health/ready")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["status"] == "ready"
+            assert data["checks"]["storage"]["provider"] == "s3"
+            assert data["checks"]["storage"]["bucket"] == "prod-careerbridge-bucket"
+            assert data["checks"]["storage"]["region"] == "eu-central-1"
+            mock_s3_client.head_bucket.assert_called_once_with(Bucket="prod-careerbridge-bucket")
+
+    def test_readiness_s3_storage_connectivity_failure_returns_503(self, monkeypatch):
+        monkeypatch.setattr(settings, "STORAGE_PROVIDER", "s3")
+        monkeypatch.setattr(settings, "STORAGE_BUCKET", "prod-careerbridge-bucket")
+
+        mock_s3_client = MagicMock()
+        mock_s3_client.head_bucket.side_effect = Exception("AWS S3 Connection Timeout")
+
+        with patch("app.core.storage.S3StorageProvider._get_client", return_value=mock_s3_client):
+            res = client.get("/health/ready")
+            assert res.status_code == 503
+            data = res.json()
+            assert data["status"] == "not_ready"
+            assert data["checks"]["storage"]["status"] == "unavailable"
+            assert data["checks"]["storage"]["detail"] == "storage bucket connectivity check failed"
 
     def test_readiness_error_responses_shield_sensitive_data(self):
         with patch("app.core.health.engine.connect", side_effect=Exception("FATAL: password authentication failed for user 'postgres'")):

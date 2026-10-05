@@ -357,6 +357,13 @@ class LocalStorageProvider(StorageProvider):
         )
 
 
+import logging
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError
+
+logger = logging.getLogger("careerbridge.storage")
+
+
 class S3StorageProvider(StorageProvider):
     """
     S3-compatible object storage provider (AWS S3, Cloudflare R2, MinIO).
@@ -378,9 +385,26 @@ class S3StorageProvider(StorageProvider):
         self.endpoint_url = endpoint_url or settings.STORAGE_ENDPOINT_URL
         self.access_key_id = access_key_id or settings.AWS_ACCESS_KEY_ID
         self.secret_access_key = secret_access_key or settings.AWS_SECRET_ACCESS_KEY
+        self._client = None
 
-        # In-memory mock storage dictionary for testing when credentials/endpoint are mocked
-        self._mock_objects: dict[str, bytes] = {}
+    def _get_client(self):
+        """
+        Lazily initialize the boto3 S3 client.
+        Allows standard AWS credential provider chain when explicit credentials are not provided.
+        """
+        if self._client is None:
+            client_kwargs = {}
+            if self.region:
+                client_kwargs["region_name"] = self.region
+            if self.endpoint_url:
+                client_kwargs["endpoint_url"] = self.endpoint_url
+            if self.access_key_id:
+                client_kwargs["aws_access_key_id"] = self.access_key_id
+            if self.secret_access_key:
+                client_kwargs["aws_secret_access_key"] = self.secret_access_key
+
+            self._client = boto3.client("s3", **client_kwargs)
+        return self._client
 
     def _get_object_key(self, subfolder: str, stored_filename: str) -> str:
         clean_subfolder = subfolder.strip("/\\")
@@ -429,39 +453,93 @@ class S3StorageProvider(StorageProvider):
                 )
 
             data = buffer.getvalue()
-            self._put_object(object_key, data, file.content_type or "application/octet-stream")
+            content_type = file.content_type or "application/octet-stream"
+
+            client = self._get_client()
+            client.put_object(
+                Bucket=self.bucket_name,
+                Key=object_key,
+                Body=data,
+                ContentType=content_type,
+            )
 
         except HTTPException:
             raise
-        except Exception as exc:
+        except (ClientError, BotoCoreError) as exc:
+            logger.error("S3 client error uploading object %s: %s", object_key, exc.__class__.__name__)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to upload object to S3 storage: {str(exc)}",
+                detail="Failed to upload object to S3 storage",
+            ) from exc
+        except Exception as exc:
+            logger.error("Unexpected error uploading object %s: %s", object_key, exc.__class__.__name__)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to upload object to S3 storage",
             ) from exc
 
         return stored_filename, object_key, total_size
 
-    def _put_object(self, key: str, data: bytes, content_type: str) -> None:
-        """Put binary object into S3 or internal storage buffer."""
-        self._mock_objects[key] = data
-
     def exists(self, storage_reference: str) -> bool:
         if not storage_reference:
             return False
-        return storage_reference in self._mock_objects
+        try:
+            client = self._get_client()
+            client.head_object(Bucket=self.bucket_name, Key=storage_reference)
+            return True
+        except ClientError as exc:
+            error_code = str(exc.response.get("Error", {}).get("Code", ""))
+            http_status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            if error_code in ("404", "NoSuchKey", "NotFound") or http_status == 404:
+                return False
+            logger.error("S3 error checking object existence: %s", error_code)
+            raise
+        except Exception as exc:
+            logger.error("Unexpected error checking S3 object existence: %s", exc.__class__.__name__)
+            raise
 
     def read(self, storage_reference: str) -> bytes:
-        if storage_reference not in self._mock_objects:
-            raise FileNotFoundError(f"S3 Object not found: {storage_reference}")
-        return self._mock_objects[storage_reference]
+        if not storage_reference:
+            raise FileNotFoundError("Storage reference cannot be empty")
+        try:
+            client = self._get_client()
+            response = client.get_object(Bucket=self.bucket_name, Key=storage_reference)
+            body = response.get("Body")
+            try:
+                return body.read()
+            finally:
+                if hasattr(body, "close"):
+                    body.close()
+        except ClientError as exc:
+            error_code = str(exc.response.get("Error", {}).get("Code", ""))
+            http_status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            if error_code in ("404", "NoSuchKey", "NotFound") or http_status == 404:
+                raise FileNotFoundError(f"S3 Object not found: {storage_reference}") from exc
+            logger.error("S3 error reading object: %s", error_code)
+            raise RuntimeError("Failed to read object from S3 storage") from exc
+        except FileNotFoundError:
+            raise
+        except Exception as exc:
+            logger.error("Unexpected error reading S3 object: %s", exc.__class__.__name__)
+            raise RuntimeError("Failed to read object from S3 storage") from exc
 
     def delete(self, storage_reference: str) -> bool:
         if not storage_reference:
             return False
-        if storage_reference in self._mock_objects:
-            del self._mock_objects[storage_reference]
+        try:
+            client = self._get_client()
+            client.delete_object(Bucket=self.bucket_name, Key=storage_reference)
             return True
-        return False
+        except ClientError as exc:
+            error_code = str(exc.response.get("Error", {}).get("Code", ""))
+            http_status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            if error_code in ("404", "NoSuchKey", "NotFound") or http_status == 404:
+                return False
+            logger.error("S3 error deleting object: %s", error_code)
+            return False
+        except Exception as exc:
+            logger.error("Unexpected error deleting S3 object: %s", exc.__class__.__name__)
+            return False
 
     def get_response(
         self,
@@ -484,9 +562,6 @@ class S3StorageProvider(StorageProvider):
 # =============================================================================
 # Provider Factory
 # =============================================================================
-
-_global_storage_provider: Optional[StorageProvider] = None
-
 
 def get_storage_provider(provider_type: Optional[str] = None) -> StorageProvider:
     """

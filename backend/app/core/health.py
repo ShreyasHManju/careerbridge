@@ -162,12 +162,22 @@ def check_storage_readiness() -> Tuple[bool, Dict[str, Any]]:
                     "provider": "s3",
                     "detail": "storage bucket is not configured",
                 }
-            return True, {
-                "status": "ready",
-                "provider": "s3",
-                "bucket": provider.bucket_name,
-                "region": provider.region,
-            }
+            try:
+                client = provider._get_client()
+                client.head_bucket(Bucket=provider.bucket_name)
+                return True, {
+                    "status": "ready",
+                    "provider": "s3",
+                    "bucket": provider.bucket_name,
+                    "region": provider.region,
+                }
+            except Exception as exc:
+                logger.warning("S3 storage readiness probe failed: %s", exc.__class__.__name__)
+                return False, {
+                    "status": "unavailable",
+                    "provider": "s3",
+                    "detail": "storage bucket connectivity check failed",
+                }
 
         return False, {
             "status": "unknown_provider",
