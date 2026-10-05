@@ -30,7 +30,25 @@ export const CareerActionList: React.FC<CareerActionListProps> = ({
   const projectsCount = passport?.summary?.public_projects_count ?? passport?.projects?.length ?? 0;
   const experiencesCount = passport?.summary?.verified_experiences_count ?? passport?.verified_experiences?.length ?? 0;
 
-  // 1. High priority: upcoming interview preparation
+  // 1. Highest priority: accepted placement credentialing
+  if (dashboard.accepted_applications > 0) {
+    actions.push({
+      id: 'credentialize-offer',
+      title: 'Credentialize your accepted placement',
+      description: `You have ${dashboard.accepted_applications} accepted placement offer(s). Add them to your Experience Passport to earn verified employer credentials.`,
+      destination: '/app/applications?status=accepted',
+      ctaLabel: 'Add to Passport',
+      badgeText: 'Placement Credential',
+      priority: 'high',
+      category: 'experience_verification',
+      sourceDomain: 'student',
+      notificationType: 'application_status_changed',
+      count: dashboard.accepted_applications,
+      icon: <ShieldCheckIcon size={20} className="cb-action-item-icon" />,
+    });
+  }
+
+  // 2. High priority: upcoming interview preparation
   if (dashboard.upcoming_interviews > 0) {
     actions.push({
       id: 'interview-prep',

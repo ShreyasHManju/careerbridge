@@ -113,19 +113,38 @@ describe('Student Dashboard Modular Subcomponents', () => {
       expect(screen.getByText('Applications')).toBeInTheDocument();
       expect(screen.getByText('Interviews')).toBeInTheDocument();
       expect(screen.getByText('Offers')).toBeInTheDocument();
+      expect(screen.getByText(/1 accepted offer\(s\) • Credentialize to Passport/i)).toBeInTheDocument();
     });
   });
 
   describe('CareerActionList', () => {
-    it('generates high-priority actions for scheduled interviews', () => {
+    it('generates high-priority actions for accepted placement credentialing and scheduled interviews', () => {
       render(
         <MemoryRouter>
           <CareerActionList dashboard={mockDashboard} passport={mockPassport} />
         </MemoryRouter>
       );
 
+      expect(screen.getByText(/Credentialize your accepted placement/i)).toBeInTheDocument();
+      expect(screen.getByText(/Placement Credential/i)).toBeInTheDocument();
+      expect(screen.getByText(/Add to Passport/i)).toBeInTheDocument();
       expect(screen.getByText(/Prepare for your upcoming interview/i)).toBeInTheDocument();
-      expect(screen.getByText(/Review your application progress/i)).toBeInTheDocument();
+    });
+
+    it('does not render placement credentialing card when accepted_applications is 0', () => {
+      const dashboardNoOffers: StudentDashboard = {
+        ...mockDashboard,
+        accepted_applications: 0,
+      };
+
+      render(
+        <MemoryRouter>
+          <CareerActionList dashboard={dashboardNoOffers} passport={mockPassport} />
+        </MemoryRouter>
+      );
+
+      expect(screen.queryByText(/Credentialize your accepted placement/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/Prepare for your upcoming interview/i)).toBeInTheDocument();
     });
   });
 

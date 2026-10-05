@@ -81,7 +81,10 @@ export const CareerJourneyTracker: React.FC<CareerJourneyTrackerProps> = ({
       name: 'Offers',
       link: '/app/applications?status=accepted',
       status: offersCount > 0 ? 'completed' : 'upcoming',
-      detail: offersCount > 0 ? `${offersCount} accepted offer(s)` : 'Placement milestones',
+      detail:
+        offersCount > 0
+          ? `${offersCount} accepted offer(s) • Credentialize to Passport`
+          : 'Placement milestones',
     },
   ];
 
