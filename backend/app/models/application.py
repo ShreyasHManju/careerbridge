@@ -17,6 +17,7 @@ class ApplicationStatus(str, enum.Enum):
     APPLIED = "applied"
     REVIEWING = "reviewing"
     SHORTLISTED = "shortlisted"
+    OFFERED = "offered"
     REJECTED = "rejected"
     ACCEPTED = "accepted"
 

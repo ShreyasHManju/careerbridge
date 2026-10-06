@@ -22,7 +22,7 @@ class ApplicationUpdate(BaseModel):
     student_id and job_posting_id are immutable and cannot be altered.
     """
     status: ApplicationStatus = Field(
-        ..., description="Updated application status (applied, reviewing, shortlisted, rejected, accepted)"
+        ..., description="Updated application status (applied, reviewing, shortlisted, offered, rejected, accepted)"
     )
 
 
@@ -37,7 +37,7 @@ class ApplicationBulkStatusUpdate(BaseModel):
         description="List of target application IDs to transition (1 to 100 items)",
     )
     status: ApplicationStatus = Field(
-        ..., description="Target application status (applied, reviewing, shortlisted, rejected, accepted)"
+        ..., description="Target application status (applied, reviewing, shortlisted, offered, rejected, accepted)"
     )
 
 
