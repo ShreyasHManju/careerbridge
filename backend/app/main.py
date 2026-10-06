@@ -25,6 +25,7 @@ from app.routers import (
     notifications_router,
     passport_router,
     project_evaluations_router,
+    candidate_evaluations_router,
     job_invitations_router,
     candidates_router,
     profile_image_router,
@@ -293,6 +294,7 @@ app.include_router(innovation_projects_router, prefix=settings.API_V1_STR)
 app.include_router(experience_records_router, prefix=settings.API_V1_STR)
 app.include_router(passport_router, prefix=settings.API_V1_STR)
 app.include_router(project_evaluations_router, prefix=settings.API_V1_STR)
+app.include_router(candidate_evaluations_router, prefix=settings.API_V1_STR)
 app.include_router(job_invitations_router, prefix=settings.API_V1_STR)
 app.include_router(candidates_router, prefix=settings.API_V1_STR)
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
