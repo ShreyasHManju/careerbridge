@@ -40,8 +40,10 @@ from app.core.database import SessionLocal, engine
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models.application import Application, ApplicationStatus
+from app.models.experience_record import ExperienceRecord, VerificationSource, VerificationStatus
 from app.models.job_offer import JobOffer, OfferStatus
 from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
+from app.models.notification import Notification, NotificationType
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.student_profile import StudentProfile
 from app.models.user import User, UserRole
@@ -58,6 +60,8 @@ TEST_PASSWORD = "OfferSecretPassword123!"
 def ensure_job_offers_table():
     """Ensure job_offers table exists in database."""
     JobOffer.__table__.create(bind=engine, checkfirst=True)
+    ExperienceRecord.__table__.create(bind=engine, checkfirst=True)
+    Notification.__table__.create(bind=engine, checkfirst=True)
 
 
 def cleanup_test_data():
@@ -73,6 +77,10 @@ def cleanup_test_data():
         users = db.scalars(select(User).where(User.email.in_(test_emails))).all()
         user_ids = [u.id for u in users]
         if user_ids:
+            # Delete notifications
+            db.execute(delete(Notification).where(Notification.user_id.in_(user_ids)))
+            # Delete experience records
+            db.execute(delete(ExperienceRecord).where(ExperienceRecord.student_id.in_(user_ids)))
             # Delete job offers
             db.execute(
                 delete(JobOffer).where(
@@ -573,13 +581,14 @@ def test_valid_and_invalid_lifecycle_transitions():
     )
     offer_id = create_res.json()["id"]
 
-    # Invalid: DRAFT -> ACCEPTED directly (must be OFFERED first)
+    # Invalid: Recruiter cannot directly PATCH to ACCEPTED
     res_inv1 = client.patch(
         f"/api/v1/offers/{offer_id}",
         headers=headers_a,
         json={"status": "accepted"},
     )
     assert res_inv1.status_code == 400, res_inv1.text
+    assert "Candidate acceptance or rejection must occur through candidate response endpoints" in res_inv1.json()["detail"]
 
     # Valid: DRAFT -> OFFERED
     res_v1 = client.patch(
@@ -590,16 +599,16 @@ def test_valid_and_invalid_lifecycle_transitions():
     assert res_v1.status_code == 200
     assert res_v1.json()["status"] == "offered"
 
-    # Valid: OFFERED -> ACCEPTED
+    # Valid: OFFERED -> WITHDRAWN
     res_v2 = client.patch(
         f"/api/v1/offers/{offer_id}",
         headers=headers_a,
-        json={"status": "accepted"},
+        json={"status": "withdrawn"},
     )
     assert res_v2.status_code == 200
-    assert res_v2.json()["status"] == "accepted"
+    assert res_v2.json()["status"] == "withdrawn"
 
-    # Invalid: ACCEPTED (terminal) -> DRAFT or OFFERED
+    # Invalid: WITHDRAWN (terminal) -> DRAFT or OFFERED
     res_inv2 = client.patch(
         f"/api/v1/offers/{offer_id}",
         headers=headers_a,
@@ -700,3 +709,325 @@ def test_offer_by_application_id_endpoint():
     # Student Other receives 403
     res_stu_o = client.get(f"/api/v1/applications/{env['app_a_id']}/offers", headers=headers_other)
     assert res_stu_o.status_code == 403
+
+
+# =========================================================================
+# PHASE 35B.3 — CANDIDATE DECISION, CREDENTIALING & NOTIFICATION TESTS
+# =========================================================================
+
+def test_student_accept_offered_job_offer_creates_experience_and_notification():
+    """Phase 35B.3: Student accepting an OFFERED job offer creates verified ExperienceRecord and recruiter notification."""
+    env = create_fixture_environment()
+    headers_a = env["headers_a"]
+    headers_s = env["headers_s"]
+
+    # Recruiter sends offer
+    create_res = client.post(
+        f"/api/v1/applications/{env['app_a_id']}/offers",
+        headers=headers_a,
+        json={"title": "Official Software Engineer Offer", "compensation": 130000.0, "is_sent": True},
+    )
+    assert create_res.status_code == 201
+    offer_id = create_res.json()["id"]
+
+    # Student accepts offer
+    accept_res = client.post(f"/api/v1/offers/{offer_id}/accept", headers=headers_s)
+    assert accept_res.status_code == 200, accept_res.text
+    data = accept_res.json()
+    assert data["status"] == "accepted"
+    assert data["id"] == offer_id
+
+    # Verify DB state: JobOffer and Application are both ACCEPTED
+    with SessionLocal() as db:
+        offer = db.scalar(select(JobOffer).where(JobOffer.id == offer_id))
+        assert offer.status == OfferStatus.ACCEPTED
+
+        app = db.scalar(select(Application).where(Application.id == env["app_a_id"]))
+        assert app.status == ApplicationStatus.ACCEPTED
+
+        # Verify ExperienceRecord is created and VERIFIED by recruiter
+        exp = db.scalar(
+            select(ExperienceRecord).where(ExperienceRecord.student_id == env["student_s_id"])
+        )
+        assert exp is not None
+        assert exp.status == VerificationStatus.VERIFIED
+        assert exp.verification_source == VerificationSource.RECRUITER_CONFIRMED
+        assert exp.verifier_id == env["recruiter_a_id"]
+        assert exp.organization_name == "Alpha Tech Solutions"
+        assert exp.title == "Full Stack Software Engineer"
+
+        # Verify Recruiter received OFFER_ACCEPTED notification
+        notif = db.scalar(
+            select(Notification).where(
+                Notification.user_id == env["recruiter_a_id"],
+                Notification.notification_type == NotificationType.OFFER_ACCEPTED,
+            )
+        )
+        assert notif is not None
+        assert "accepted your job offer" in notif.message
+
+
+def test_student_reject_offered_job_offer_updates_status_and_no_experience():
+    """Phase 35B.3: Student rejecting an OFFERED job offer updates status to REJECTED and creates no ExperienceRecord."""
+    env = create_fixture_environment()
+    headers_a = env["headers_a"]
+    headers_s = env["headers_s"]
+
+    # Recruiter sends offer
+    create_res = client.post(
+        f"/api/v1/applications/{env['app_a_id']}/offers",
+        headers=headers_a,
+        json={"title": "Official Software Engineer Offer", "compensation": 130000.0, "is_sent": True},
+    )
+    assert create_res.status_code == 201
+    offer_id = create_res.json()["id"]
+
+    # Student declines offer
+    reject_res = client.post(f"/api/v1/offers/{offer_id}/reject", headers=headers_s)
+    assert reject_res.status_code == 200, reject_res.text
+    data = reject_res.json()
+    assert data["status"] == "rejected"
+
+    # Verify DB state: JobOffer and Application are both REJECTED
+    with SessionLocal() as db:
+        offer = db.scalar(select(JobOffer).where(JobOffer.id == offer_id))
+        assert offer.status == OfferStatus.REJECTED
+
+        app = db.scalar(select(Application).where(Application.id == env["app_a_id"]))
+        assert app.status == ApplicationStatus.REJECTED
+
+        # Verify NO ExperienceRecord was created
+        exp = db.scalar(
+            select(ExperienceRecord).where(ExperienceRecord.student_id == env["student_s_id"])
+        )
+        assert exp is None
+
+        # Verify Recruiter received OFFER_REJECTED notification
+        notif = db.scalar(
+            select(Notification).where(
+                Notification.user_id == env["recruiter_a_id"],
+                Notification.notification_type == NotificationType.OFFER_REJECTED,
+            )
+        )
+        assert notif is not None
+        assert "declined your job offer" in notif.message
+
+
+def test_cross_student_cannot_accept_or_reject_offer():
+    """Phase 35B.3: Student Other cannot accept or reject Student S's offer (403 Forbidden)."""
+    env = create_fixture_environment()
+    headers_a = env["headers_a"]
+    headers_other = env["headers_other"]
+
+    # Recruiter sends offer for Student S
+    create_res = client.post(
+        f"/api/v1/applications/{env['app_a_id']}/offers",
+        headers=headers_a,
+        json={"title": "Private Offer", "compensation": 120000.0, "is_sent": True},
+    )
+    offer_id = create_res.json()["id"]
+
+    # Student Other attempts to accept -> 403
+    res_accept = client.post(f"/api/v1/offers/{offer_id}/accept", headers=headers_other)
+    assert res_accept.status_code == 403, res_accept.text
+
+    # Student Other attempts to reject -> 403
+    res_reject = client.post(f"/api/v1/offers/{offer_id}/reject", headers=headers_other)
+    assert res_reject.status_code == 403, res_reject.text
+
+
+def test_recruiter_cannot_accept_or_reject_offer():
+    """Phase 35B.3: Recruiters cannot call student decision endpoints (403 Forbidden)."""
+    env = create_fixture_environment()
+    headers_a = env["headers_a"]
+
+    create_res = client.post(
+        f"/api/v1/applications/{env['app_a_id']}/offers",
+        headers=headers_a,
+        json={"title": "Private Offer", "compensation": 120000.0, "is_sent": True},
+    )
+    offer_id = create_res.json()["id"]
+
+    # Recruiter attempts to accept -> 403
+    res_accept = client.post(f"/api/v1/offers/{offer_id}/accept", headers=headers_a)
+    assert res_accept.status_code == 403, res_accept.text
+
+    # Recruiter attempts to reject -> 403
+    res_reject = client.post(f"/api/v1/offers/{offer_id}/reject", headers=headers_a)
+    assert res_reject.status_code == 403, res_reject.text
+
+
+def test_invalid_offer_states_cannot_be_accepted_or_rejected():
+    """Phase 35B.3: Only OFFERED offers can be accepted/rejected (DRAFT, ACCEPTED, REJECTED, WITHDRAWN, EXPIRED return 400)."""
+    env = create_fixture_environment()
+    headers_a = env["headers_a"]
+    headers_s = env["headers_s"]
+
+    # 1. DRAFT offer cannot be accepted or rejected
+    res_draft = client.post(
+        f"/api/v1/applications/{env['app_a_id']}/offers",
+        headers=headers_a,
+        json={"title": "Draft Offer", "compensation": 100000.0, "is_sent": False},
+    )
+    draft_id = res_draft.json()["id"]
+
+    res_acc_draft = client.post(f"/api/v1/offers/{draft_id}/accept", headers=headers_s)
+    assert res_acc_draft.status_code == 400, res_acc_draft.text
+
+    res_rej_draft = client.post(f"/api/v1/offers/{draft_id}/reject", headers=headers_s)
+    assert res_rej_draft.status_code == 400, res_rej_draft.text
+
+    # 2. WITHDRAWN offer cannot be accepted
+    client.post(f"/api/v1/offers/{draft_id}/send", headers=headers_a)
+    client.post(f"/api/v1/offers/{draft_id}/withdraw", headers=headers_a)
+
+    res_acc_withdrawn = client.post(f"/api/v1/offers/{draft_id}/accept", headers=headers_s)
+    assert res_acc_withdrawn.status_code == 400, res_acc_withdrawn.text
+
+
+def test_accepted_and_rejected_offers_cannot_be_re_decided():
+    """Phase 35B.3: Once accepted or rejected, offers cannot be decided again."""
+    env = create_fixture_environment()
+    headers_a = env["headers_a"]
+    headers_s = env["headers_s"]
+
+    # Send offer
+    res_send = client.post(
+        f"/api/v1/applications/{env['app_a_id']}/offers",
+        headers=headers_a,
+        json={"title": "Decision Offer", "compensation": 100000.0, "is_sent": True},
+    )
+    offer_id = res_send.json()["id"]
+
+    # Accept
+    res_acc = client.post(f"/api/v1/offers/{offer_id}/accept", headers=headers_s)
+    assert res_acc.status_code == 200
+
+    # Try accepting again -> 400
+    res_acc_again = client.post(f"/api/v1/offers/{offer_id}/accept", headers=headers_s)
+    assert res_acc_again.status_code == 400, res_acc_again.text
+
+    # Try rejecting after accept -> 400
+    res_rej_after_acc = client.post(f"/api/v1/offers/{offer_id}/reject", headers=headers_s)
+    assert res_rej_after_acc.status_code == 400, res_rej_after_acc.text
+
+
+def test_notifications_on_offer_lifecycle_events():
+    """Phase 35B.3: Test in-app notifications generated on OFFER_RECEIVED and OFFER_WITHDRAWN."""
+    env = create_fixture_environment()
+    headers_a = env["headers_a"]
+
+    # Recruiter creates draft offer
+    res_draft = client.post(
+        f"/api/v1/applications/{env['app_a_id']}/offers",
+        headers=headers_a,
+        json={"title": "Lifecycle Notif Offer", "compensation": 110000.0, "is_sent": False},
+    )
+    offer_id = res_draft.json()["id"]
+
+    # Send offer -> Student receives OFFER_RECEIVED
+    client.post(f"/api/v1/offers/{offer_id}/send", headers=headers_a)
+    with SessionLocal() as db:
+        notif_recv = db.scalar(
+            select(Notification).where(
+                Notification.user_id == env["student_s_id"],
+                Notification.notification_type == NotificationType.OFFER_RECEIVED,
+            )
+        )
+        assert notif_recv is not None
+        assert "Full Stack Software Engineer" in notif_recv.message
+
+    # Withdraw offer -> Student receives OFFER_WITHDRAWN
+    client.post(f"/api/v1/offers/{offer_id}/withdraw", headers=headers_a)
+    with SessionLocal() as db:
+        notif_with = db.scalar(
+            select(Notification).where(
+                Notification.user_id == env["student_s_id"],
+                Notification.notification_type == NotificationType.OFFER_WITHDRAWN,
+            )
+        )
+        assert notif_with is not None
+        assert "withdrawn" in notif_with.message
+
+
+def test_passport_contains_verified_experience_after_acceptance():
+    """Phase 35B.3: Career Passport dynamically includes the verified experience record after offer acceptance."""
+    env = create_fixture_environment()
+    headers_a = env["headers_a"]
+    headers_s = env["headers_s"]
+
+    # Send and accept offer
+    res_offer = client.post(
+        f"/api/v1/applications/{env['app_a_id']}/offers",
+        headers=headers_a,
+        json={"title": "Passport Verified Role", "compensation": 125000.0, "is_sent": True},
+    )
+    offer_id = res_offer.json()["id"]
+
+    res_accept = client.post(f"/api/v1/offers/{offer_id}/accept", headers=headers_s)
+    assert res_accept.status_code == 200
+
+    # Retrieve passport for student
+    res_passport = client.get("/api/v1/passport/me", headers=headers_s)
+    assert res_passport.status_code == 200, res_passport.text
+    passport_data = res_passport.json()
+
+    exp_titles = [e["title"] for e in passport_data.get("verified_experiences", [])]
+    assert "Full Stack Software Engineer" in exp_titles
+
+    # Verify status is verified in passport output
+    accepted_exp = next(
+        e for e in passport_data["verified_experiences"] if e["title"] == "Full Stack Software Engineer"
+    )
+    assert accepted_exp["status"] == "verified"
+    assert accepted_exp["verification_source"] == "recruiter_confirmed"
+    assert accepted_exp["organization_name"] == "Alpha Tech Solutions"
+
+
+def test_acceptance_transaction_rollback_on_failure():
+    """Phase 35B.3: If experience credentialing fails, transaction rolls back atomically."""
+    from unittest.mock import patch
+    from app.services.experience_record_service import ExperienceRecordService
+
+    env = create_fixture_environment()
+    headers_a = env["headers_a"]
+    headers_s = env["headers_s"]
+
+    res_offer = client.post(
+        f"/api/v1/applications/{env['app_a_id']}/offers",
+        headers=headers_a,
+        json={"title": "Rollback Test Offer", "compensation": 100000.0, "is_sent": True},
+    )
+    offer_id = res_offer.json()["id"]
+
+    # Simulate catastrophic failure during ExperienceRecord creation
+    with patch.object(
+        ExperienceRecordService,
+        "create_experience_from_accepted_application",
+        side_effect=RuntimeError("Database transient credentialing error"),
+    ):
+        with pytest.raises(RuntimeError, match="Database transient credentialing error"):
+            client.post(f"/api/v1/offers/{offer_id}/accept", headers=headers_s)
+
+    # Verify that in database, all states remain uncommitted / rolled back
+    with SessionLocal() as db:
+        offer = db.scalar(select(JobOffer).where(JobOffer.id == offer_id))
+        assert offer.status == OfferStatus.OFFERED
+
+        app = db.scalar(select(Application).where(Application.id == env["app_a_id"]))
+        assert app.status == ApplicationStatus.OFFERED
+
+        # No partial experience record
+        exp = db.scalar(
+            select(ExperienceRecord).where(ExperienceRecord.student_id == env["student_s_id"])
+        )
+        assert exp is None
+
+        # No partial OFFER_ACCEPTED notification
+        notif = db.scalar(
+            select(Notification).where(
+                Notification.user_id == env["recruiter_a_id"],
+                Notification.notification_type == NotificationType.OFFER_ACCEPTED,
+            )
+        )
+        assert notif is None

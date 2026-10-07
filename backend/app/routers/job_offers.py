@@ -162,6 +162,48 @@ def withdraw_job_offer(
     )
 
 
+@router.post(
+    "/offers/{offer_id}/accept",
+    response_model=JobOfferResponse,
+    summary="Accept job offer",
+    description="Allows a student candidate to accept an extended job offer, transitioning both offer and application to ACCEPTED and creating a verified ExperienceRecord.",
+)
+def accept_job_offer(
+    offer_id: int = Path(..., ge=1, description="Primary key identifier of the job offer"),
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: Session = Depends(get_db),
+):
+    """
+    Accept an active job offer (Student-only).
+    """
+    return JobOfferService.accept_offer(
+        db=db,
+        offer_id=offer_id,
+        student_user=current_user,
+    )
+
+
+@router.post(
+    "/offers/{offer_id}/reject",
+    response_model=JobOfferResponse,
+    summary="Decline job offer",
+    description="Allows a student candidate to decline/reject an extended job offer, transitioning both offer and application to REJECTED.",
+)
+def reject_job_offer(
+    offer_id: int = Path(..., ge=1, description="Primary key identifier of the job offer"),
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: Session = Depends(get_db),
+):
+    """
+    Decline an active job offer (Student-only).
+    """
+    return JobOfferService.reject_offer(
+        db=db,
+        offer_id=offer_id,
+        student_user=current_user,
+    )
+
+
 # =========================================================================
 # Collection Endpoints
 # =========================================================================

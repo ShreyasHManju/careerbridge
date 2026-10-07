@@ -23,6 +23,10 @@ class NotificationType(str, enum.Enum):
     JOB_INVITATION_RECEIVED = "job_invitation_received"
     JOB_INVITATION_RESPONDED = "job_invitation_responded"
     EXPERIENCE_VERIFICATION_CHANGED = "experience_verification_changed"
+    OFFER_RECEIVED = "offer_received"
+    OFFER_ACCEPTED = "offer_accepted"
+    OFFER_REJECTED = "offer_rejected"
+    OFFER_WITHDRAWN = "offer_withdrawn"
 
 
 class Notification(Base):
