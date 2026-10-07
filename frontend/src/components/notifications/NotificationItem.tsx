@@ -25,6 +25,14 @@ export const getNotificationDestination = (type: string, role?: string): string 
       return '/app/experiences';
     case 'job_moderation_changed':
       return role === 'admin' ? '/app/admin/jobs' : '/app/recruiter/jobs';
+    case 'offer_received':
+      return role === 'recruiter' ? '/app/recruiter/applications?status=offered' : '/app/applications?status=offered';
+    case 'offer_accepted':
+      return role === 'recruiter' ? '/app/recruiter/applications?status=accepted' : '/app/applications?status=accepted';
+    case 'offer_rejected':
+      return role === 'recruiter' ? '/app/recruiter/applications?status=rejected' : '/app/applications?status=rejected';
+    case 'offer_withdrawn':
+      return role === 'recruiter' ? '/app/recruiter/applications' : '/app/applications';
     default:
       return null;
   }
@@ -34,6 +42,8 @@ export const isActionRequired = (type: string, role?: string): boolean => {
   switch (type) {
     case 'job_invitation_received':
       return true;
+    case 'offer_received':
+      return role !== 'recruiter';
     case 'application_submitted':
       return role === 'recruiter';
     case 'interview_scheduled':
@@ -55,6 +65,12 @@ export const getNotificationCTA = (type: string, role?: string): string | null =
   switch (type) {
     case 'job_invitation_received':
       return 'Accept / Decline';
+    case 'offer_received':
+      return role === 'recruiter' ? 'View Offer' : 'Review Offer';
+    case 'offer_accepted':
+    case 'offer_rejected':
+    case 'offer_withdrawn':
+      return 'View Application';
     case 'application_submitted':
       return role === 'recruiter' ? 'Review Application' : 'View Application';
     case 'application_status_changed':
@@ -118,6 +134,16 @@ export const NotificationIcon: React.FC<{ type: string }> = ({ type }) => {
           <line x1="16" y1="13" x2="8" y2="13" />
           <line x1="16" y1="17" x2="8" y2="17" />
           <polyline points="10 9 9 9 8 9" />
+        </svg>
+      );
+    case 'offer_received':
+    case 'offer_accepted':
+    case 'offer_rejected':
+    case 'offer_withdrawn':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="6" />
+          <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" />
         </svg>
       );
     case 'interview_scheduled':

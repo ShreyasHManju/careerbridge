@@ -15,7 +15,11 @@ export type NotificationType =
   | 'project_evaluation_submitted'
   | 'job_invitation_received'
   | 'job_invitation_responded'
-  | 'experience_verification_changed';
+  | 'experience_verification_changed'
+  | 'offer_received'
+  | 'offer_accepted'
+  | 'offer_rejected'
+  | 'offer_withdrawn';
 
 export interface Notification {
   id: number;

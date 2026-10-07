@@ -17,6 +17,7 @@ const STATUS_OPTIONS: { value: ApplicationFilterStatus; label: string }[] = [
   { value: 'applied', label: 'Applied' },
   { value: 'reviewing', label: 'Reviewing' },
   { value: 'shortlisted', label: 'Shortlisted' },
+  { value: 'offered', label: 'Offered' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'accepted', label: 'Accepted' },
 ];

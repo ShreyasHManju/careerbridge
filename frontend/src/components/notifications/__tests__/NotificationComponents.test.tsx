@@ -150,10 +150,17 @@ describe('NotificationDeepLink Logic & Action Classification', () => {
     expect(getNotificationDestination('recruiter_verification_changed', 'recruiter')).toBe('/app/recruiter/profile');
     expect(getNotificationDestination('job_moderation_changed', 'recruiter')).toBe('/app/recruiter/jobs');
     expect(getNotificationDestination('job_moderation_changed', 'admin')).toBe('/app/admin/jobs');
+    expect(getNotificationDestination('offer_received', 'student')).toBe('/app/applications?status=offered');
+    expect(getNotificationDestination('offer_accepted', 'recruiter')).toBe('/app/recruiter/applications?status=accepted');
+    expect(getNotificationDestination('offer_rejected', 'recruiter')).toBe('/app/recruiter/applications?status=rejected');
+    expect(getNotificationDestination('offer_withdrawn', 'student')).toBe('/app/applications');
   });
 
   it('correctly identifies action-required vs informational notification types', () => {
     expect(isActionRequired('job_invitation_received', 'student')).toBe(true);
+    expect(isActionRequired('offer_received', 'student')).toBe(true);
+    expect(isActionRequired('offer_received', 'recruiter')).toBe(false);
+    expect(isActionRequired('offer_accepted', 'recruiter')).toBe(false);
     expect(isActionRequired('application_submitted', 'recruiter')).toBe(true);
     expect(isActionRequired('application_submitted', 'student')).toBe(false);
     expect(isActionRequired('project_evaluation_submitted', 'student')).toBe(true);
@@ -164,6 +171,9 @@ describe('NotificationDeepLink Logic & Action Classification', () => {
 
   it('correctly supplies contextual CTAs', () => {
     expect(getNotificationCTA('job_invitation_received', 'student')).toBe('Accept / Decline');
+    expect(getNotificationCTA('offer_received', 'student')).toBe('Review Offer');
+    expect(getNotificationCTA('offer_received', 'recruiter')).toBe('View Offer');
+    expect(getNotificationCTA('offer_accepted', 'recruiter')).toBe('View Application');
     expect(getNotificationCTA('application_submitted', 'recruiter')).toBe('Review Application');
     expect(getNotificationCTA('project_evaluation_submitted', 'student')).toBe('Review Passport');
     expect(getNotificationCTA('experience_verification_changed', 'student')).toBe('View Experience');

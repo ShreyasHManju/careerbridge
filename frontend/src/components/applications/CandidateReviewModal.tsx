@@ -19,6 +19,7 @@ import { InterviewStatusBadge } from '@/components/interviews/InterviewStatusBad
 import { ProjectEvaluationModal } from '@/components/evaluations/ProjectEvaluationModal';
 import { ScheduleInterviewModal } from '@/components/interviews/ScheduleInterviewModal';
 import { RescheduleInterviewModal } from '@/components/interviews/RescheduleInterviewModal';
+import { JobOfferModal } from '@/components/offers/JobOfferModal';
 import { ApiErrorResponse } from '@/types/api';
 
 interface CandidateReviewModalProps {
@@ -38,6 +39,7 @@ const PIPELINE_STEPS: { key: string; label: string }[] = [
   { key: 'reviewing', label: 'Reviewing' },
   { key: 'shortlisted', label: 'Shortlisted' },
   { key: 'interview_scheduled', label: 'Interview Scheduled' },
+  { key: 'offered', label: 'Offered' },
   { key: 'accepted', label: 'Accepted' },
 ];
 
@@ -106,6 +108,9 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
   const [reschedulingInterview, setReschedulingInterview] = useState<Interview | null>(null);
   const [isInterviewMutating, setIsInterviewMutating] = useState<boolean>(false);
 
+  // Direct Job Offer modal state
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState<boolean>(false);
+
   // Load Passport & Interview history for candidate
   const loadCandidateData = useCallback(async (studentId: number, appId: number) => {
     setIsLoadingData(true);
@@ -151,6 +156,7 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
       setEditingEvaluation(null);
       setIsEvaluationModalOpen(false);
       setIsScheduleModalOpen(false);
+      setIsOfferModalOpen(false);
       setReschedulingInterview(null);
       loadCandidateData(application.student_id, application.id);
     } else {
@@ -163,7 +169,9 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        if (isEvaluationModalOpen) {
+        if (isOfferModalOpen) {
+          setIsOfferModalOpen(false);
+        } else if (isEvaluationModalOpen) {
           setIsEvaluationModalOpen(false);
           setEvaluatingProject(null);
           setEditingEvaluation(null);
@@ -180,7 +188,7 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isEvaluationModalOpen, isScheduleModalOpen, reschedulingInterview, showRejectConfirm, onClose]);
+  }, [isOpen, isOfferModalOpen, isEvaluationModalOpen, isScheduleModalOpen, reschedulingInterview, showRejectConfirm, onClose]);
 
   if (!isOpen || !application) return null;
 
@@ -344,7 +352,8 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
 
   // Determine active pipeline index
   const getPipelineIndex = (status: ApplicationStatus, hasInterview: boolean): number => {
-    if (status === 'accepted') return 4;
+    if (status === 'accepted') return 5;
+    if (status === 'offered') return 4;
     if (status === 'rejected') return -1; // special case
     if (hasInterview) return 3;
     if (status === 'shortlisted') return 2;
@@ -1170,6 +1179,18 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
               <button
                 type="button"
                 className="cb-btn cb-btn-success cb-btn-sm"
+                onClick={() => setIsOfferModalOpen(true)}
+                disabled={isMutatingStatus || isUpdating}
+                data-testid="action-offer-btn"
+              >
+                💼 {currentStatus === 'offered' ? 'Manage Job Offer' : 'Extend Job Offer'}
+              </button>
+            )}
+
+            {currentStatus !== 'accepted' && currentStatus !== 'rejected' && (
+              <button
+                type="button"
+                className="cb-btn cb-btn-outline-primary cb-btn-sm"
                 onClick={() => handleStatusTransition('accepted')}
                 disabled={isMutatingStatus || isUpdating}
                 data-testid="action-accept-btn"
@@ -1201,6 +1222,26 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
           </div>
         </footer>
       </div>
+
+      {/* Direct Job Offer Modal */}
+      {isOfferModalOpen && application && (
+        <JobOfferModal
+          isOpen={isOfferModalOpen}
+          applicationId={application.id}
+          candidateName={candidateName}
+          jobTitle={jobTitle}
+          companyName={companyName}
+          onClose={() => setIsOfferModalOpen(false)}
+          onSuccess={(newOffer) => {
+            if (newOffer.status === 'offered') {
+              setCurrentStatus('offered');
+            }
+            if (application) {
+              loadCandidateData(application.student_id, application.id);
+            }
+          }}
+        />
+      )}
 
       {/* Direct Project Evaluation Modal */}
       {isEvaluationModalOpen && evaluatingInnovationProject && (

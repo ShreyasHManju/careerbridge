@@ -26,6 +26,11 @@ const STATUS_CONFIG: Record<
     badgeClass: 'cb-app-badge-shortlisted',
     description: 'Candidate shortlisted for interview or advanced screening',
   },
+  offered: {
+    label: 'Offer Received',
+    badgeClass: 'cb-app-badge-offered',
+    description: 'Official job offer extended to candidate',
+  },
   rejected: {
     label: 'Rejected',
     badgeClass: 'cb-app-badge-rejected',
@@ -34,7 +39,7 @@ const STATUS_CONFIG: Record<
   accepted: {
     label: 'Accepted',
     badgeClass: 'cb-app-badge-accepted',
-    description: 'Candidate offered or accepted for the position',
+    description: 'Candidate accepted the position',
   },
 };
 

@@ -1,11 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Application } from '@/types/application';
 import { JobPosting } from '@/types/job';
 import { Interview, InterviewType } from '@/types/interview';
+import { JobOffer } from '@/types/jobOffer';
 import { ApplicationStatusBadge } from './ApplicationStatusBadge';
 import { InterviewStatusBadge } from '@/components/interviews/InterviewStatusBadge';
+import { StudentOfferDecisionModal } from '@/components/offers/StudentOfferDecisionModal';
 import { createExperienceFromAcceptedApplication } from '@/api/experiences';
+import { getApplicationJobOffer } from '@/api/jobOffers';
 
 export interface StudentApplicationCardProps {
   application: Application;
@@ -13,6 +16,8 @@ export interface StudentApplicationCardProps {
   isLoadingJob?: boolean;
   interview?: Interview | null;
   interviews?: Interview[];
+  offer?: JobOffer | null;
+  onOfferDecided?: () => void;
 }
 
 const TYPE_LABELS: Record<InterviewType, { label: string; icon: string }> = {
@@ -52,6 +57,8 @@ const getStatusMessage = (status: string): string => {
       return 'Application under review';
     case 'shortlisted':
       return "You've been shortlisted";
+    case 'offered':
+      return 'Official job offer extended';
     case 'accepted':
       return 'Application accepted';
     case 'rejected':
@@ -67,10 +74,35 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
   isLoadingJob = false,
   interview,
   interviews,
+  offer: initialOffer = null,
+  onOfferDecided,
 }) => {
   const [isCreatingExperience, setIsCreatingExperience] = useState(false);
   const [experienceCreated, setExperienceCreated] = useState(false);
   const [experienceError, setExperienceError] = useState<string | null>(null);
+
+  // Job Offer state
+  const [jobOffer, setJobOffer] = useState<JobOffer | null>(initialOffer);
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState<boolean>(false);
+
+  const fetchOffer = useCallback(async () => {
+    if (application.status === 'offered' || application.status === 'accepted') {
+      try {
+        const fetched = await getApplicationJobOffer(application.id);
+        setJobOffer(fetched);
+      } catch {
+        // Offer might not exist or failed
+      }
+    }
+  }, [application.id, application.status]);
+
+  useEffect(() => {
+    if (initialOffer) {
+      setJobOffer(initialOffer);
+    } else if (application.status === 'offered' || application.status === 'accepted') {
+      fetchOffer();
+    }
+  }, [application.status, initialOffer, fetchOffer]);
 
   const handleCreateExperience = async () => {
     if (
@@ -122,7 +154,10 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
     : job?.location || 'Location not specified';
 
   const statusMsg = getStatusMessage(application.status);
-  const isShortlistedOrAccepted = application.status === 'shortlisted' || application.status === 'accepted';
+  const isShortlistedOrBeyond =
+    application.status === 'shortlisted' ||
+    application.status === 'offered' ||
+    application.status === 'accepted';
 
   // Resolve upcoming active interview
   const resolvedInterview = useMemo(() => {
@@ -156,10 +191,23 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
 
   // Journey stage progression helpers
   const isAppliedStep = true;
-  const isReviewingStep = application.status === 'reviewing' || application.status === 'shortlisted' || application.status === 'accepted';
-  const isShortlistedStep = application.status === 'shortlisted' || application.status === 'accepted';
-  const isInterviewStep = application.status === 'shortlisted' || application.status === 'accepted';
-  const isDecisionStep = application.status === 'accepted' || application.status === 'rejected';
+  const isReviewingStep =
+    application.status === 'reviewing' ||
+    application.status === 'shortlisted' ||
+    application.status === 'offered' ||
+    application.status === 'accepted';
+  const isShortlistedStep =
+    application.status === 'shortlisted' ||
+    application.status === 'offered' ||
+    application.status === 'accepted';
+  const isInterviewStep =
+    application.status === 'shortlisted' ||
+    application.status === 'offered' ||
+    application.status === 'accepted';
+  const isDecisionStep =
+    application.status === 'offered' ||
+    application.status === 'accepted' ||
+    application.status === 'rejected';
 
   return (
     <article
@@ -230,10 +278,26 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
           </div>
           <div className={`cb-journey-connector ${isDecisionStep ? 'cb-conn-active' : ''}`} />
 
-          <div className={`cb-journey-step ${isDecisionStep ? (application.status === 'accepted' ? 'cb-step-success' : 'cb-step-closed') : ''}`}>
+          <div
+            className={`cb-journey-step ${
+              isDecisionStep
+                ? application.status === 'offered'
+                  ? 'cb-step-offered'
+                  : application.status === 'accepted'
+                  ? 'cb-step-success'
+                  : 'cb-step-closed'
+                : ''
+            }`}
+          >
             <div className="cb-step-indicator">5</div>
             <span className="cb-step-label">
-              {application.status === 'accepted' ? 'Offer' : application.status === 'rejected' ? 'Closed' : 'Outcome'}
+              {application.status === 'offered'
+                ? 'Offered'
+                : application.status === 'accepted'
+                ? 'Accepted'
+                : application.status === 'rejected'
+                ? 'Closed'
+                : 'Outcome'}
             </span>
           </div>
         </div>
@@ -245,6 +309,37 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
         </div>
       </div>
 
+      {/* Offer Received Alert Banner for OFFERED status */}
+      {application.status === 'offered' && (
+        <div
+          className="cb-offer-card-banner"
+          data-testid={`offer-card-banner-${application.id}`}
+          role="region"
+          aria-label="Job Offer Extended"
+        >
+          <div className="cb-offer-banner-content">
+            <div className="cb-offer-banner-icon-group">
+              <span className="cb-offer-banner-emoji" aria-hidden="true">🎉</span>
+              <div>
+                <strong className="cb-offer-banner-title">Official Job Offer Received!</strong>
+                <p className="cb-offer-banner-desc">
+                  {jobOffer?.title ? `${jobOffer.title} at ` : ''}{companyName} has extended a formal job offer.
+                  {jobOffer?.compensation ? ` Compensation: ${jobOffer.currency || 'USD'} ${jobOffer.compensation.toLocaleString()}` : ''}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="cb-btn cb-btn-success cb-btn-sm cb-offer-banner-cta"
+              onClick={() => setIsOfferModalOpen(true)}
+              data-testid={`review-offer-btn-${application.id}`}
+            >
+              Review Offer & Decide 📋
+            </button>
+          </div>
+        </div>
+      )}
+
       {application.cover_message && (
         <div className="cb-app-card-cover-message">
           <span className="cb-app-card-cover-label">Your Cover Note:</span>
@@ -252,7 +347,7 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
         </div>
       )}
 
-      {/* Upcoming Interview Preview Banner (Phase 4 Step 3) */}
+      {/* Upcoming Interview Preview Banner */}
       {hasActiveInterview && resolvedInterview && interviewTypeConfig && (
         <div
           className="cb-app-interview-preview"
@@ -326,13 +421,24 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
           </a>
         )}
 
-        {isShortlistedOrAccepted && (
+        {isShortlistedOrBeyond && (
           <Link
             to="/app/interviews"
             className="cb-btn cb-btn-primary cb-btn-sm cb-btn-interview-link"
           >
             📅 View Interviews
           </Link>
+        )}
+
+        {application.status === 'offered' && jobOffer && (
+          <button
+            type="button"
+            className="cb-btn cb-btn-success cb-btn-sm"
+            onClick={() => setIsOfferModalOpen(true)}
+            data-testid={`action-review-offer-btn-${application.id}`}
+          >
+            Review Offer ✍️
+          </button>
         )}
 
         {application.status === 'accepted' && (
@@ -367,6 +473,37 @@ export const StudentApplicationCard: React.FC<StudentApplicationCardProps> = ({
           </div>
         )}
       </div>
+
+      {/* Student Offer Decision Modal */}
+      {isOfferModalOpen && (
+        <StudentOfferDecisionModal
+          isOpen={isOfferModalOpen}
+          offer={
+            jobOffer || {
+              id: 0,
+              application_id: application.id,
+              recruiter_id: 0,
+              title: jobTitle,
+              compensation: null,
+              currency: 'USD',
+              start_date: null,
+              expiration_date: null,
+              terms: null,
+              status: 'offered',
+              created_at: application.created_at,
+              updated_at: application.updated_at,
+            }
+          }
+          job={job}
+          onClose={() => setIsOfferModalOpen(false)}
+          onDecisionComplete={(updatedOffer) => {
+            setJobOffer(updatedOffer);
+            if (onOfferDecided) {
+              onOfferDecided();
+            }
+          }}
+        />
+      )}
     </article>
   );
 };

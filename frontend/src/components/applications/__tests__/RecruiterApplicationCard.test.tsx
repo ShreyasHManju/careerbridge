@@ -56,7 +56,29 @@ describe('RecruiterApplicationCard Component', () => {
 
     const select = screen.getByLabelText(/Change status for Application #201/i) as HTMLSelectElement;
     expect(select.value).toBe('applied');
-    expect(select.options).toHaveLength(5);
+    expect(select.options).toHaveLength(6);
+  });
+
+  it('renders Extend Offer button and triggers onManageOffer callback', () => {
+    const onManageOfferMock = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <RecruiterApplicationCard
+          application={mockApplication}
+          job={mockJob}
+          onStatusChange={vi.fn()}
+          onManageOffer={onManageOfferMock}
+        />
+      </MemoryRouter>
+    );
+
+    const offerBtn = screen.getByTestId('manage-offer-btn-201');
+    expect(offerBtn).toBeInTheDocument();
+    expect(offerBtn).toHaveTextContent('Extend Offer');
+
+    fireEvent.click(offerBtn);
+    expect(onManageOfferMock).toHaveBeenCalledWith(mockApplication, mockJob);
   });
 
   it('invokes onStatusChange when recruiter selects a new status', async () => {

@@ -18,6 +18,7 @@ export const StudentApplicationsPage: React.FC = () => {
     'applied',
     'reviewing',
     'shortlisted',
+    'offered',
     'accepted',
     'rejected',
   ];
@@ -233,6 +234,7 @@ export const StudentApplicationsPage: React.FC = () => {
                   application={app}
                   job={jobsMap.get(app.job_posting_id) || null}
                   interview={interviewsMap.get(app.id) || null}
+                  onOfferDecided={fetchApplicationsAndJobs}
                 />
               ))}
             </div>

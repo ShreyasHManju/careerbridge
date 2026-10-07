@@ -8,6 +8,7 @@ export type ApplicationStatus =
   | 'applied'
   | 'reviewing'
   | 'shortlisted'
+  | 'offered'
   | 'rejected'
   | 'accepted';
 

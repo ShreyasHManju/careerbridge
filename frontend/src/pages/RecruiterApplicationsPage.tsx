@@ -13,12 +13,14 @@ import { RecruiterApplicationCard } from '@/components/applications/RecruiterApp
 import { ApplicationFilterBar } from '@/components/applications/ApplicationFilterBar';
 import { ScheduleInterviewModal } from '@/components/interviews/ScheduleInterviewModal';
 import { CandidateReviewModal } from '@/components/applications/CandidateReviewModal';
+import { JobOfferModal } from '@/components/offers/JobOfferModal';
 import { ApiErrorResponse } from '@/types/api';
 
 const ALL_STATUSES: { value: ApplicationStatus; label: string }[] = [
   { value: 'applied', label: 'Applied' },
   { value: 'reviewing', label: 'Reviewing' },
   { value: 'shortlisted', label: 'Shortlisted' },
+  { value: 'offered', label: 'Offered' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'accepted', label: 'Accepted' },
 ];
@@ -33,6 +35,7 @@ export const RecruiterApplicationsPage: React.FC = () => {
     'applied',
     'reviewing',
     'shortlisted',
+    'offered',
     'accepted',
     'rejected',
   ];
@@ -55,6 +58,12 @@ export const RecruiterApplicationsPage: React.FC = () => {
 
   // Scheduling modal state
   const [schedulingTarget, setSchedulingTarget] = useState<{
+    application: Application;
+    job: JobPosting | null;
+  } | null>(null);
+
+  // Offer modal state
+  const [offerTarget, setOfferTarget] = useState<{
     application: Application;
     job: JobPosting | null;
   } | null>(null);
@@ -503,6 +512,9 @@ export const RecruiterApplicationsPage: React.FC = () => {
                   onScheduleInterview={(targetApp, targetJob) =>
                     setSchedulingTarget({ application: targetApp, job: targetJob })
                   }
+                  onManageOffer={(targetApp, targetJob) =>
+                    setOfferTarget({ application: targetApp, job: targetJob })
+                  }
                   isUpdating={updatingAppId === app.id}
                   isSelected={selectedIds.has(app.id)}
                   onToggleSelect={handleToggleSelect}
@@ -528,6 +540,29 @@ export const RecruiterApplicationsPage: React.FC = () => {
             setSchedulingTarget({ application: targetApp, job: targetJob });
           }}
           isUpdating={updatingAppId === selectedCandidateForReview.id}
+        />
+      )}
+
+      {/* Job Offer Modal */}
+      {offerTarget && (
+        <JobOfferModal
+          isOpen={Boolean(offerTarget)}
+          applicationId={offerTarget.application.id}
+          candidateName={`Candidate #${offerTarget.application.student_id}`}
+          jobTitle={offerTarget.job?.title || `Job #${offerTarget.application.job_posting_id}`}
+          companyName={offerTarget.job?.company_name || 'Your Company'}
+          onClose={() => setOfferTarget(null)}
+          onSuccess={(offer) => {
+            setToastMessage({
+              type: 'success',
+              text:
+                offer.status === 'offered'
+                  ? `Job offer sent to Candidate #${offerTarget.application.student_id}!`
+                  : `Job offer saved as ${offer.status}.`,
+            });
+            setOfferTarget(null);
+            fetchApplicationsAndJobs();
+          }}
         />
       )}
 

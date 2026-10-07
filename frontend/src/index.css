@@ -8167,3 +8167,271 @@ a.cb-stat-card-link:focus-visible {
     justify-content: center;
   }
 }
+
+/* ==========================================================================
+   Phase 35B.4 — Job Offers Workflow & Badge Styles
+   ========================================================================== */
+
+/* Application Status Badge: Offered */
+.cb-app-badge-offered {
+  background-color: #f5f3ff;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
+}
+
+.cb-app-badge-offered .cb-app-status-indicator {
+  background-color: #8b5cf6;
+}
+
+/* Offer Status Badges */
+.cb-offer-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.cb-offer-status-indicator {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+}
+
+.cb-offer-badge-draft {
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+.cb-offer-badge-draft .cb-offer-status-indicator {
+  background-color: #94a3b8;
+}
+
+.cb-offer-badge-offered {
+  background-color: #f5f3ff;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
+}
+.cb-offer-badge-offered .cb-offer-status-indicator {
+  background-color: #8b5cf6;
+}
+
+.cb-offer-badge-accepted {
+  background-color: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.cb-offer-badge-accepted .cb-offer-status-indicator {
+  background-color: #10b981;
+}
+
+.cb-offer-badge-rejected {
+  background-color: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+.cb-offer-badge-rejected .cb-offer-status-indicator {
+  background-color: #ef4444;
+}
+
+.cb-offer-badge-withdrawn {
+  background-color: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+.cb-offer-badge-withdrawn .cb-offer-status-indicator {
+  background-color: #94a3b8;
+}
+
+.cb-offer-badge-expired {
+  background-color: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+.cb-offer-badge-expired .cb-offer-status-indicator {
+  background-color: #f59e0b;
+}
+
+/* Journey step offered */
+.cb-step-offered .cb-step-indicator {
+  background-color: #8b5cf6;
+  color: #ffffff;
+  border-color: #7c3aed;
+}
+
+/* Student Application Card: Job Offer Banner */
+.cb-offer-card-banner {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  border: 1px solid #c4b5fd;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin: 0.75rem 0;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.08);
+}
+
+.cb-offer-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.cb-offer-banner-icon-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 240px;
+}
+
+.cb-offer-banner-emoji {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.cb-offer-banner-title {
+  display: block;
+  font-size: 0.95rem;
+  color: #4c1d95;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.cb-offer-banner-desc {
+  font-size: 0.85rem;
+  color: #5b21b6;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.cb-offer-banner-cta {
+  white-space: nowrap;
+}
+
+/* Offer Modals */
+.cb-offer-modal,
+.cb-offer-decision-modal {
+  max-width: 640px;
+  width: 100%;
+}
+
+.cb-offer-modal-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cb-offer-tag {
+  display: inline-block;
+  align-self: flex-start;
+  background: #ede9fe;
+  color: #6d28d9;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
+.cb-offer-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cb-offer-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.cb-offer-detail-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cb-offer-detail-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+
+.cb-offer-detail-value {
+  font-size: 0.95rem;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.cb-offer-compensation {
+  color: #15803d;
+  font-size: 1.1rem;
+}
+
+.cb-offer-expiration {
+  color: #b45309;
+}
+
+.cb-offer-terms-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.cb-offer-terms-heading {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #334155;
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cb-offer-terms-content {
+  font-size: 0.875rem;
+  color: #475569;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.cb-decision-confirm-box {
+  margin-bottom: 1.25rem;
+  padding: 1.25rem;
+}
+
+.cb-decision-confirm-box h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.05rem;
+}
+
+.cb-decision-confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.cb-offer-withdraw-confirm {
+  margin-bottom: 1rem;
+}
+
+.cb-offer-withdraw-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}

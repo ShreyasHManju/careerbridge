@@ -10,6 +10,7 @@ interface RecruiterApplicationCardProps {
   onStatusChange: (applicationId: number, newStatus: ApplicationStatus) => Promise<void>;
   onReviewCandidate?: (application: Application, job: JobPosting | null) => void;
   onScheduleInterview?: (application: Application, job: JobPosting | null) => void;
+  onManageOffer?: (application: Application, job: JobPosting | null) => void;
   isUpdating?: boolean;
   isSelected?: boolean;
   onToggleSelect?: (applicationId: number) => void;
@@ -20,6 +21,7 @@ const ALL_STATUSES: { value: ApplicationStatus; label: string }[] = [
   { value: 'applied', label: 'Applied' },
   { value: 'reviewing', label: 'Reviewing' },
   { value: 'shortlisted', label: 'Shortlisted' },
+  { value: 'offered', label: 'Offered' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'accepted', label: 'Accepted' },
 ];
@@ -30,6 +32,7 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
   onStatusChange,
   onReviewCandidate,
   onScheduleInterview,
+  onManageOffer,
   isUpdating = false,
   isSelected = false,
   onToggleSelect,
@@ -199,6 +202,17 @@ export const RecruiterApplicationCard: React.FC<RecruiterApplicationCardProps> =
             data-testid={`review-candidate-btn-${application.id}`}
           >
             📋 Review Candidate
+          </button>
+        )}
+        {onManageOffer && application.status !== 'rejected' && (
+          <button
+            type="button"
+            className="cb-btn cb-btn-outline-primary cb-btn-sm"
+            onClick={() => onManageOffer(application, job || null)}
+            aria-label={`Manage Job Offer for Candidate #${application.student_id || application.id}`}
+            data-testid={`manage-offer-btn-${application.id}`}
+          >
+            💼 {application.status === 'offered' ? 'View Offer' : 'Extend Offer'}
           </button>
         )}
         {application.student_id ? (
