@@ -13,6 +13,10 @@ export const RecruitmentFunnel: React.FC<RecruitmentFunnelProps> = ({ dashboard 
   const reviewRate = totalApps > 0 ? Math.round((reviewedApps / totalApps) * 100) : 0;
   const shortlistRate = totalApps > 0 ? Math.round((dashboard.shortlisted_candidates / totalApps) * 100) : 0;
   const interviewRate = totalApps > 0 ? Math.round((dashboard.scheduled_interviews / totalApps) * 100) : 0;
+  const offersExtended = dashboard.offers_extended ?? 0;
+  const offersAccepted = dashboard.offers_accepted ?? 0;
+  const offerRate = totalApps > 0 ? Math.round((offersExtended / totalApps) * 100) : 0;
+  const hireRate = totalApps > 0 ? Math.round((offersAccepted / totalApps) * 100) : 0;
 
   return (
     <section
@@ -113,6 +117,28 @@ export const RecruitmentFunnel: React.FC<RecruitmentFunnelProps> = ({ dashboard 
               </div>
               <div className="cb-funnel-track" role="progressbar" aria-valuenow={interviewRate} aria-valuemin={0} aria-valuemax={100}>
                 <div className="cb-funnel-fill cb-funnel-fill-interview" style={{ width: `${interviewRate}%` }} />
+              </div>
+            </div>
+
+            {/* Stage 5: Offers Extended */}
+            <div className="cb-funnel-bar-item">
+              <div className="cb-funnel-bar-meta">
+                <span className="cb-funnel-stage-name">5. Offers Extended</span>
+                <strong className="cb-funnel-stage-metric">{offersExtended} ({offerRate}%)</strong>
+              </div>
+              <div className="cb-funnel-track" role="progressbar" aria-valuenow={offerRate} aria-valuemin={0} aria-valuemax={100}>
+                <div className="cb-funnel-fill cb-funnel-fill-shortlisted" style={{ width: `${offerRate}%` }} />
+              </div>
+            </div>
+
+            {/* Stage 6: Accepted Hires */}
+            <div className="cb-funnel-bar-item">
+              <div className="cb-funnel-bar-meta">
+                <span className="cb-funnel-stage-name">6. Accepted Hires</span>
+                <strong className="cb-funnel-stage-metric">{offersAccepted} ({hireRate}%)</strong>
+              </div>
+              <div className="cb-funnel-track" role="progressbar" aria-valuenow={hireRate} aria-valuemin={0} aria-valuemax={100}>
+                <div className="cb-funnel-fill cb-funnel-fill-success" style={{ width: `${hireRate}%` }} />
               </div>
             </div>
           </div>

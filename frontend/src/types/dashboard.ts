@@ -12,6 +12,8 @@ export interface StudentDashboard {
   accepted_applications: number;
   saved_internships: number;
   upcoming_interviews: number;
+  pending_offers: number;
+  offers_accepted: number;
 }
 
 export interface RecruiterDashboard {
@@ -20,6 +22,11 @@ export interface RecruiterDashboard {
   applications_awaiting_review: number;
   shortlisted_candidates: number;
   scheduled_interviews: number;
+  offers_extended: number;
+  offers_accepted: number;
+  pending_offer_decisions: number;
+  evaluations_completed: number;
+  hire_conversion_rate: number;
 }
 
 export interface MonthlyRegistrationMetric {
@@ -34,5 +41,8 @@ export interface AdminDashboard {
   published_internships: number;
   total_applications: number;
   application_success_rate: number; // 0.0 to 100.0
+  total_offers_extended: number;
+  total_offers_accepted: number;
+  offer_acceptance_rate: number;
   monthly_registrations: MonthlyRegistrationMetric[];
 }

@@ -16,6 +16,9 @@ const mockDashboard: AdminDashboard = {
   published_internships: 42,
   total_applications: 320,
   application_success_rate: 22.4,
+  total_offers_extended: 40,
+  total_offers_accepted: 32,
+  offer_acceptance_rate: 80.0,
   monthly_registrations: [
     { month: '2026-07', count: 30 },
     { month: '2026-08', count: 60 },
@@ -26,6 +29,9 @@ const mockAllVerifiedDashboard: AdminDashboard = {
   ...mockDashboard,
   total_companies: 25,
   verified_companies: 25, // 0 unverified
+  total_offers_extended: 30,
+  total_offers_accepted: 24,
+  offer_acceptance_rate: 80.0,
 };
 
 const mockZeroDashboard: AdminDashboard = {
@@ -35,6 +41,9 @@ const mockZeroDashboard: AdminDashboard = {
   published_internships: 0,
   total_applications: 0,
   application_success_rate: 0.0,
+  total_offers_extended: 0,
+  total_offers_accepted: 0,
+  offer_acceptance_rate: 0.0,
   monthly_registrations: [],
 };
 
@@ -116,7 +125,7 @@ describe('Admin Career OS Components', () => {
   });
 
   describe('PlatformHealthSnapshot', () => {
-    it('renders all 6 metric cards and formatted success rate', () => {
+    it('renders all 9 metric cards and formatted success and acceptance rates', () => {
       render(
         <MemoryRouter>
           <PlatformHealthSnapshot dashboard={mockDashboard} />
@@ -129,12 +138,17 @@ describe('Admin Career OS Components', () => {
       expect(screen.getByTestId('metric-published-internships')).toHaveTextContent('42');
       expect(screen.getByTestId('metric-total-applications')).toHaveTextContent('320');
       expect(screen.getByTestId('metric-application-success-rate')).toHaveTextContent('22.4%');
+      expect(screen.getByTestId('metric-total-offers-extended')).toHaveTextContent('40');
+      expect(screen.getByTestId('metric-total-offers-accepted')).toHaveTextContent('32');
+      expect(screen.getByTestId('metric-offer-acceptance-rate')).toHaveTextContent('80.0%');
 
       expect(screen.getByTestId('metric-total-students')).toHaveAttribute('href', '/app/admin/users?role=student');
       expect(screen.getByTestId('metric-total-companies')).toHaveAttribute('href', '/app/admin/users?role=recruiter');
       expect(screen.getByTestId('metric-verified-companies')).toHaveAttribute('href', '/app/admin/recruiters?is_verified=true');
       expect(screen.getByTestId('metric-published-internships')).toHaveAttribute('href', '/app/admin/jobs?is_active=true');
       expect(screen.getByTestId('metric-total-applications')).toHaveAttribute('href', '/app/admin/jobs');
+      expect(screen.getByTestId('metric-total-offers-extended')).toHaveAttribute('href', '/app/admin/jobs');
+      expect(screen.getByTestId('metric-total-offers-accepted')).toHaveAttribute('href', '/app/admin/jobs');
     });
   });
 

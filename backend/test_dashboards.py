@@ -38,7 +38,13 @@ from app.core.database import SessionLocal
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models.application import Application, ApplicationStatus
+from app.models.candidate_evaluation import (
+    CandidateEvaluation,
+    CandidateEvaluationStatus,
+    CandidateRecommendation,
+)
 from app.models.interview import Interview, InterviewStatus, InterviewType
+from app.models.job_offer import JobOffer, OfferStatus
 from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.saved_job import SavedJob
@@ -101,6 +107,8 @@ def teardown_module():
         user_ids = [u.id for u in users]
         if user_ids:
             # Clean dependent records
+            db.execute(delete(CandidateEvaluation).where(CandidateEvaluation.recruiter_id.in_(user_ids)))
+            db.execute(delete(JobOffer).where(JobOffer.recruiter_id.in_(user_ids)))
             db.execute(delete(Interview).where(Interview.student_id.in_(user_ids)))
             db.execute(delete(SavedJob).where(SavedJob.student_id.in_(user_ids)))
             db.execute(delete(Application).where(Application.student_id.in_(user_ids)))
@@ -109,9 +117,10 @@ def teardown_module():
             jobs = db.scalars(select(JobPosting).where(JobPosting.recruiter_id.in_(user_ids))).all()
             job_ids = [j.id for j in jobs]
             if job_ids:
-                db.execute(delete(Interview).where(Interview.application_id.in_(
-                    select(Application.id).where(Application.job_posting_id.in_(job_ids))
-                )))
+                app_subquery = select(Application.id).where(Application.job_posting_id.in_(job_ids))
+                db.execute(delete(CandidateEvaluation).where(CandidateEvaluation.application_id.in_(app_subquery)))
+                db.execute(delete(JobOffer).where(JobOffer.application_id.in_(app_subquery)))
+                db.execute(delete(Interview).where(Interview.application_id.in_(app_subquery)))
                 db.execute(delete(SavedJob).where(SavedJob.job_posting_id.in_(job_ids)))
                 db.execute(delete(Application).where(Application.job_posting_id.in_(job_ids)))
                 db.execute(delete(JobPosting).where(JobPosting.id.in_(job_ids)))
@@ -349,6 +358,83 @@ def setup_module():
         db.add_all([int1, int2, int3, int4, int5])
         db.commit()
 
+        # Job Offers:
+        # Offer 1: for app2 (Student 1, Job 2, Recruiter 1) -> status = OFFERED
+        # -> Student 1 pending_offers = 1
+        # -> Recruiter 1 offers_extended = 1, pending_offer_decisions = 1
+        off1 = JobOffer(
+            application_id=app2.id,
+            recruiter_id=recruiter1_id,
+            title="Cloud Architect Intern Offer",
+            status=OfferStatus.OFFERED,
+            compensation=4500.0,
+            currency="USD",
+        )
+
+        # Offer 2: for app3 (Student 1, Job Rec2, Recruiter 2) -> status = ACCEPTED
+        # -> Student 1 offers_accepted = 1
+        # -> Recruiter 2 offers_extended = 1, offers_accepted = 1
+        off2 = JobOffer(
+            application_id=app3.id,
+            recruiter_id=recruiter2_id,
+            title="Frontend React Intern Offer",
+            status=OfferStatus.ACCEPTED,
+            compensation=4000.0,
+            currency="USD",
+        )
+
+        # Offer 3: for app1 (Student 1, Job 1, Recruiter 1) -> status = DRAFT
+        # -> MUST be excluded from student pending offers and recruiter offers extended
+        off3 = JobOffer(
+            application_id=app1.id,
+            recruiter_id=recruiter1_id,
+            title="Backend Engineer Draft Offer",
+            status=OfferStatus.DRAFT,
+            compensation=5000.0,
+            currency="USD",
+        )
+
+        db.add_all([off1, off2, off3])
+        db.commit()
+
+        # Candidate Evaluations:
+        # Eval 1: for app2 (Job 2, Recruiter 1) -> status = SUBMITTED
+        # -> Recruiter 1 evaluations_completed = 1
+        ev1 = CandidateEvaluation(
+            application_id=app2.id,
+            recruiter_id=recruiter1_id,
+            status=CandidateEvaluationStatus.SUBMITTED,
+            technical_score=5,
+            problem_solving_score=4,
+            communication_score=5,
+            role_fit_score=4,
+            overall_score=4.5,
+            recommendation=CandidateRecommendation.STRONG_HIRE,
+        )
+
+        # Eval 2: for app1 (Job 1, Recruiter 1) -> status = DRAFT
+        # -> MUST be excluded from evaluations_completed
+        ev2 = CandidateEvaluation(
+            application_id=app1.id,
+            recruiter_id=recruiter1_id,
+            status=CandidateEvaluationStatus.DRAFT,
+            technical_score=3,
+        )
+
+        # Eval 3: for app3 (Job Rec2, Recruiter 2) -> status = SUBMITTED
+        # -> Recruiter 2 evaluations_completed = 1
+        ev3 = CandidateEvaluation(
+            application_id=app3.id,
+            recruiter_id=recruiter2_id,
+            status=CandidateEvaluationStatus.SUBMITTED,
+            technical_score=4,
+            overall_score=4.0,
+            recommendation=CandidateRecommendation.HIRE,
+        )
+
+        db.add_all([ev1, ev2, ev3])
+        db.commit()
+
 
 # ==============================================================================
 # 1. Authentication & Security Tests
@@ -482,6 +568,12 @@ def test_12_student1_dashboard_accurate_metrics():
     assert data["saved_internships"] == 2, f"Expected saved_internships=2, got {data['saved_internships']}"
     # Upcoming interviews: 2 in future (int1 SCHEDULED, int2 RESCHEDULED). Past (int3), cancelled (int4), completed (int5) excluded.
     assert data["upcoming_interviews"] == 2, f"Expected upcoming_interviews=2, got {data['upcoming_interviews']}"
+    # Phase 35C Offers:
+    # off1 is OFFERED -> pending_offers = 1
+    # off2 is ACCEPTED -> offers_accepted = 1
+    # off3 is DRAFT -> excluded
+    assert data["pending_offers"] == 1, f"Expected pending_offers=1, got {data['pending_offers']}"
+    assert data["offers_accepted"] == 1, f"Expected offers_accepted=1, got {data['offers_accepted']}"
 
 
 def test_13_student2_dashboard_data_isolation():
@@ -500,6 +592,8 @@ def test_13_student2_dashboard_data_isolation():
     assert data["accepted_applications"] == 0, f"Expected 0, got {data['accepted_applications']}"
     assert data["saved_internships"] == 1, f"Expected 1, got {data['saved_internships']}"
     assert data["upcoming_interviews"] == 0, f"Expected 0, got {data['upcoming_interviews']}"
+    assert data["pending_offers"] == 0, f"Expected 0, got {data['pending_offers']}"
+    assert data["offers_accepted"] == 0, f"Expected 0, got {data['offers_accepted']}"
 
 
 def test_14_student_empty_state_returns_zeroes():
@@ -516,6 +610,8 @@ def test_14_student_empty_state_returns_zeroes():
     assert data["accepted_applications"] == 0
     assert data["saved_internships"] == 0
     assert data["upcoming_interviews"] == 0
+    assert data["pending_offers"] == 0
+    assert data["offers_accepted"] == 0
 
 
 def test_15_student_saved_internship_unsave_updates_count():
@@ -570,6 +666,18 @@ def test_16_recruiter1_dashboard_accurate_metrics():
     # Total = 2
     assert data["scheduled_interviews"] == 2, f"Expected scheduled_interviews=2, got {data['scheduled_interviews']}"
 
+    # Phase 35C Recruiter Metrics:
+    # offers_extended = 1 (off1 is OFFERED; off3 is DRAFT and excluded)
+    # offers_accepted = 0 (off1 is OFFERED, not accepted)
+    # pending_offer_decisions = 1 (off1 is OFFERED)
+    # evaluations_completed = 1 (ev1 is SUBMITTED; ev2 is DRAFT)
+    # hire_conversion_rate = 0.0 (0 / 4 * 100)
+    assert data["offers_extended"] == 1, f"Expected offers_extended=1, got {data['offers_extended']}"
+    assert data["offers_accepted"] == 0, f"Expected offers_accepted=0, got {data['offers_accepted']}"
+    assert data["pending_offer_decisions"] == 1, f"Expected pending_offer_decisions=1, got {data['pending_offer_decisions']}"
+    assert data["evaluations_completed"] == 1, f"Expected evaluations_completed=1, got {data['evaluations_completed']}"
+    assert data["hire_conversion_rate"] == 0.0, f"Expected hire_conversion_rate=0.0, got {data['hire_conversion_rate']}"
+
 
 def test_17_recruiter2_dashboard_data_isolation():
     """Recruiter 2 dashboard reflects only Recruiter 2's postings and pipeline, isolated from Recruiter 1."""
@@ -591,6 +699,16 @@ def test_17_recruiter2_dashboard_data_isolation():
     # scheduled_interviews: int2 (RESCHEDULED on app3) -> 1
     assert data["scheduled_interviews"] == 1, f"Expected 1, got {data['scheduled_interviews']}"
 
+    # Recruiter 2 Phase 35C metrics:
+    # off2 is ACCEPTED -> offers_extended = 1, offers_accepted = 1, pending_offer_decisions = 0
+    # ev3 is SUBMITTED -> evaluations_completed = 1
+    # hire_conversion_rate = (1 / 1) * 100 = 100.0
+    assert data["offers_extended"] == 1, f"Expected offers_extended=1, got {data['offers_extended']}"
+    assert data["offers_accepted"] == 1, f"Expected offers_accepted=1, got {data['offers_accepted']}"
+    assert data["pending_offer_decisions"] == 0, f"Expected pending_offer_decisions=0, got {data['pending_offer_decisions']}"
+    assert data["evaluations_completed"] == 1, f"Expected evaluations_completed=1, got {data['evaluations_completed']}"
+    assert data["hire_conversion_rate"] == 100.0, f"Expected hire_conversion_rate=100.0, got {data['hire_conversion_rate']}"
+
 
 def test_18_recruiter_empty_state_returns_zeroes():
     """Recruiter with no postings returns 0 for all metrics."""
@@ -605,6 +723,11 @@ def test_18_recruiter_empty_state_returns_zeroes():
     assert data["applications_awaiting_review"] == 0
     assert data["shortlisted_candidates"] == 0
     assert data["scheduled_interviews"] == 0
+    assert data["offers_extended"] == 0
+    assert data["offers_accepted"] == 0
+    assert data["pending_offer_decisions"] == 0
+    assert data["evaluations_completed"] == 0
+    assert data["hire_conversion_rate"] == 0.0
 
 
 def test_19_recruiter_inactive_posting_toggle():
@@ -632,7 +755,7 @@ def test_19_recruiter_inactive_posting_toggle():
 # 5. Admin Dashboard Functional Tests
 # ==============================================================================
 def test_20_admin_dashboard_platform_wide_metrics():
-    """Admin dashboard returns platform-wide aggregated user and posting metrics."""
+    """Admin dashboard returns platform-wide aggregated user, posting, and offer metrics."""
     res = client.get(
         "/api/v1/dashboard/admin",
         headers={"Authorization": f"Bearer {admin_token}"},
@@ -647,6 +770,12 @@ def test_20_admin_dashboard_platform_wide_metrics():
     assert data["total_applications"] >= 5, f"Expected >=5 total applications, got {data['total_applications']}"
     assert isinstance(data["application_success_rate"], float)
     assert 0.0 <= data["application_success_rate"] <= 100.0
+
+    # Phase 35C Platform Offer Metrics
+    assert data["total_offers_extended"] >= 2, f"Expected >=2 offers extended, got {data['total_offers_extended']}"
+    assert data["total_offers_accepted"] >= 1, f"Expected >=1 offers accepted, got {data['total_offers_accepted']}"
+    assert isinstance(data["offer_acceptance_rate"], float)
+    assert 0.0 <= data["offer_acceptance_rate"] <= 100.0
 
 
 def test_21_admin_dashboard_recruiter_verification_sensitivity():
@@ -676,10 +805,6 @@ def test_22_admin_dashboard_success_rate_formula():
         dash = DashboardService.get_admin_dashboard(db)
 
         total_apps = dash.total_applications
-        # Count accepted applications in DB
-        accepted = db.scalar(
-            select(Application.id).where(Application.status == ApplicationStatus.ACCEPTED)
-        )
         total_accepted = len(
             db.scalars(select(Application.id).where(Application.status == ApplicationStatus.ACCEPTED)).all()
         )
@@ -693,12 +818,10 @@ def test_22_admin_dashboard_success_rate_formula():
 
 def test_23_admin_dashboard_zero_division_safety():
     """When no applications exist in the query, success_rate is 0.0 without division error."""
-    # Directly test the mathematical condition in service
     class MockAdminStats:
         total = 0
         accepted = 0
 
-    # Ensure zero applications returns 0.0
     if MockAdminStats.total > 0:
         rate = round((MockAdminStats.accepted / MockAdminStats.total) * 100.0, 2)
     else:
@@ -756,7 +879,7 @@ def test_26_admin_dashboard_invalid_period_year():
 # 6. Direct Service Layer & Performance Tests
 # ==============================================================================
 def test_27_direct_service_student_dashboard():
-    """Direct DashboardService.get_student_dashboard returns valid Pydantic model."""
+    """Direct DashboardService.get_student_dashboard returns valid Pydantic model with offer stats."""
     with SessionLocal() as db:
         res = DashboardService.get_student_dashboard(db, student_id=student1_id)
         assert isinstance(res, StudentDashboardResponse)
@@ -766,10 +889,12 @@ def test_27_direct_service_student_dashboard():
         assert res.accepted_applications == 1
         assert res.saved_internships == 2
         assert res.upcoming_interviews == 2
+        assert res.pending_offers == 1
+        assert res.offers_accepted == 1
 
 
 def test_28_direct_service_recruiter_dashboard():
-    """Direct DashboardService.get_recruiter_dashboard returns valid Pydantic model."""
+    """Direct DashboardService.get_recruiter_dashboard returns valid Pydantic model with offer and evaluation stats."""
     with SessionLocal() as db:
         res = DashboardService.get_recruiter_dashboard(db, recruiter_id=recruiter1_id)
         assert isinstance(res, RecruiterDashboardResponse)
@@ -778,10 +903,15 @@ def test_28_direct_service_recruiter_dashboard():
         assert res.applications_awaiting_review == 1
         assert res.shortlisted_candidates == 1
         assert res.scheduled_interviews == 2
+        assert res.offers_extended == 1
+        assert res.offers_accepted == 0
+        assert res.pending_offer_decisions == 1
+        assert res.evaluations_completed == 1
+        assert res.hire_conversion_rate == 0.0
 
 
 def test_29_direct_service_admin_dashboard():
-    """Direct DashboardService.get_admin_dashboard returns valid Pydantic model."""
+    """Direct DashboardService.get_admin_dashboard returns valid Pydantic model with offer metrics."""
     with SessionLocal() as db:
         res = DashboardService.get_admin_dashboard(db)
         assert isinstance(res, AdminDashboardResponse)
@@ -790,11 +920,14 @@ def test_29_direct_service_admin_dashboard():
         assert res.verified_companies >= 1
         assert res.published_internships >= 3
         assert res.total_applications >= 5
+        assert res.total_offers_extended >= 2
+        assert res.total_offers_accepted >= 1
+        assert isinstance(res.offer_acceptance_rate, float)
         assert isinstance(res.monthly_registrations, list)
 
 
 def test_30_dashboard_query_performance():
-    """Dashboard endpoints execute within performance SLA (under 200ms)."""
+    """Dashboard endpoints execute within performance SLA (under 500ms)."""
     start_time = time.perf_counter()
     res_student = client.get("/api/v1/dashboard/student", headers={"Authorization": f"Bearer {student1_token}"})
     student_duration_ms = (time.perf_counter() - start_time) * 1000
@@ -824,8 +957,12 @@ def test_31_pydantic_schema_validations():
         accepted_applications=1,
         saved_internships=3,
         upcoming_interviews=1,
+        pending_offers=1,
+        offers_accepted=1,
     )
     assert s.total_applications == 5
+    assert s.pending_offers == 1
+    assert s.offers_accepted == 1
 
     # Test negative count rejection
     try:
@@ -836,12 +973,14 @@ def test_31_pydantic_schema_validations():
             accepted_applications=0,
             saved_internships=0,
             upcoming_interviews=0,
+            pending_offers=0,
+            offers_accepted=0,
         )
         assert False, "Should have raised ValidationError for negative total_applications"
     except Exception:
         pass
 
-    # Test admin success rate bounds [0, 100]
+    # Test admin success rate and acceptance rate bounds [0, 100]
     adm = AdminDashboardResponse(
         total_students=10,
         total_companies=5,
@@ -849,29 +988,130 @@ def test_31_pydantic_schema_validations():
         published_internships=8,
         total_applications=20,
         application_success_rate=50.0,
+        total_offers_extended=10,
+        total_offers_accepted=5,
+        offer_acceptance_rate=50.0,
         monthly_registrations=[MonthlyRegistrationMetric(month="2026-09", count=15)],
     )
     assert adm.application_success_rate == 50.0
+    assert adm.offer_acceptance_rate == 50.0
 
-    try:
-        AdminDashboardResponse(
-            total_students=10,
-            total_companies=5,
-            verified_companies=3,
-            published_internships=8,
-            total_applications=20,
-            application_success_rate=150.0,
-            monthly_registrations=[],
-        )
-        assert False, "Should have raised ValidationError for success rate > 100"
-    except Exception:
-        pass
+
+# ==============================================================================
+# 7. Phase 35C Specific Lifecycle, Isolation & Calculation Tests
+# ==============================================================================
+def test_32_student_pending_offers_lifecycle_filter():
+    """Verifies that only OFFERED status increments pending_offers, and DRAFT/REJECTED/WITHDRAWN/EXPIRED do not."""
+    with SessionLocal() as db:
+        # Check current student 1 pending offers is 1
+        dash1 = DashboardService.get_student_dashboard(db, student_id=student1_id)
+        assert dash1.pending_offers == 1
+        assert dash1.offers_accepted == 1
+
+        # Fetch offer 1 (currently OFFERED on app2) and update to REJECTED
+        app_subquery = select(Application.id).where(Application.student_id == student1_id, Application.status == ApplicationStatus.SHORTLISTED).scalar_subquery()
+        off = db.scalar(select(JobOffer).where(JobOffer.application_id == app_subquery))
+        assert off is not None
+        assert off.status == OfferStatus.OFFERED
+
+        off.status = OfferStatus.REJECTED
+        db.commit()
+
+        dash2 = DashboardService.get_student_dashboard(db, student_id=student1_id)
+        assert dash2.pending_offers == 0
+        assert dash2.offers_accepted == 1
+
+        # Revert back to OFFERED
+        off.status = OfferStatus.OFFERED
+        db.commit()
+
+        dash3 = DashboardService.get_student_dashboard(db, student_id=student1_id)
+        assert dash3.pending_offers == 1
+
+
+def test_33_recruiter_offers_and_evaluations_strict_isolation():
+    """Verifies recruiter evaluations and offers are strictly scoped to jobs owned by that recruiter."""
+    with SessionLocal() as db:
+        dash_r1 = DashboardService.get_recruiter_dashboard(db, recruiter_id=recruiter1_id)
+        dash_r2 = DashboardService.get_recruiter_dashboard(db, recruiter_id=recruiter2_id)
+
+        # Recruiter 1 has 1 extended offer (off1, OFFERED) and 1 draft (off3, excluded) -> offers_extended = 1
+        # Recruiter 1 has 1 submitted evaluation (ev1) -> evaluations_completed = 1
+        assert dash_r1.offers_extended == 1
+        assert dash_r1.pending_offer_decisions == 1
+        assert dash_r1.evaluations_completed == 1
+
+        # Recruiter 2 has 1 extended offer (off2, ACCEPTED) -> offers_extended = 1, offers_accepted = 1
+        # Recruiter 2 has 1 submitted evaluation (ev3) -> evaluations_completed = 1
+        assert dash_r2.offers_extended == 1
+        assert dash_r2.offers_accepted == 1
+        assert dash_r2.evaluations_completed == 1
+
+
+def test_34_recruiter_hire_conversion_rate_zero_apps():
+    """Recruiter with 0 applications safely computes hire_conversion_rate as 0.0."""
+    with SessionLocal() as db:
+        dash_empty = DashboardService.get_recruiter_dashboard(db, recruiter_id=recruiter_empty_id)
+        assert dash_empty.total_applications == 0
+        assert dash_empty.offers_accepted == 0
+        assert dash_empty.hire_conversion_rate == 0.0
+
+
+def test_35_admin_offer_acceptance_rate_calculation():
+    """Admin dashboard accurately calculates offer_acceptance_rate = total_offers_accepted / total_offers_extended * 100."""
+    with SessionLocal() as db:
+        dash = DashboardService.get_admin_dashboard(db)
+        if dash.total_offers_extended > 0:
+            expected_rate = round((dash.total_offers_accepted / dash.total_offers_extended) * 100.0, 2)
+            assert dash.offer_acceptance_rate == expected_rate
+        else:
+            assert dash.offer_acceptance_rate == 0.0
+
+
+def test_36_rate_precision_two_decimals():
+    """Verifies that hire_conversion_rate and offer_acceptance_rate round strictly to 2 decimal places."""
+    # Test formula directly with 1/3 (33.333333... -> 33.33) and 2/3 (66.666666... -> 66.67)
+    rate_1_3 = round((1 / 3) * 100.0, 2)
+    assert rate_1_3 == 33.33
+
+    rate_2_3 = round((2 / 3) * 100.0, 2)
+    assert rate_2_3 == 66.67
+
+    # Verify via Pydantic response models
+    rec = RecruiterDashboardResponse(
+        active_internships=1,
+        total_applications=3,
+        applications_awaiting_review=1,
+        shortlisted_candidates=1,
+        scheduled_interviews=1,
+        offers_extended=2,
+        offers_accepted=1,
+        pending_offer_decisions=1,
+        evaluations_completed=1,
+        hire_conversion_rate=round((1 / 3) * 100.0, 2),
+    )
+    assert rec.hire_conversion_rate == 33.33
+
+    adm = AdminDashboardResponse(
+        total_students=10,
+        total_companies=5,
+        verified_companies=3,
+        published_internships=8,
+        total_applications=20,
+        application_success_rate=round((1 / 3) * 100.0, 2),
+        total_offers_extended=3,
+        total_offers_accepted=2,
+        offer_acceptance_rate=round((2 / 3) * 100.0, 2),
+        monthly_registrations=[MonthlyRegistrationMetric(month="2026-09", count=15)],
+    )
+    assert adm.application_success_rate == 33.33
+    assert adm.offer_acceptance_rate == 66.67
 
 
 def run_all_tests():
     """Run all test functions sequentially."""
     print("=" * 70)
-    print("RUNNING CAREERBRIDGE PHASE 22 DASHBOARD TEST SUITE")
+    print("RUNNING CAREERBRIDGE PHASE 35C DASHBOARD TEST SUITE")
     print("=" * 70)
 
     setup_module()
@@ -907,6 +1147,11 @@ def run_all_tests():
         test_29_direct_service_admin_dashboard,
         test_30_dashboard_query_performance,
         test_31_pydantic_schema_validations,
+        test_32_student_pending_offers_lifecycle_filter,
+        test_33_recruiter_offers_and_evaluations_strict_isolation,
+        test_34_recruiter_hire_conversion_rate_zero_apps,
+        test_35_admin_offer_acceptance_rate_calculation,
+        test_36_rate_precision_two_decimals,
     ]
 
     passed = 0

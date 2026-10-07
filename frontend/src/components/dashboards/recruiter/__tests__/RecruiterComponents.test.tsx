@@ -15,6 +15,11 @@ const mockDashboard: RecruiterDashboard = {
   applications_awaiting_review: 8,
   shortlisted_candidates: 5,
   scheduled_interviews: 2,
+  offers_extended: 3,
+  offers_accepted: 2,
+  pending_offer_decisions: 1,
+  evaluations_completed: 4,
+  hire_conversion_rate: 8.3,
 };
 
 const mockZeroDashboard: RecruiterDashboard = {
@@ -23,6 +28,11 @@ const mockZeroDashboard: RecruiterDashboard = {
   applications_awaiting_review: 0,
   shortlisted_candidates: 0,
   scheduled_interviews: 0,
+  offers_extended: 0,
+  offers_accepted: 0,
+  pending_offer_decisions: 0,
+  evaluations_completed: 0,
+  hire_conversion_rate: 0.0,
 };
 
 describe('Recruiter Career OS Components', () => {
@@ -115,7 +125,7 @@ describe('Recruiter Career OS Components', () => {
   });
 
   describe('HiringActionCenter', () => {
-    it('renders all 5 metric cards and triage alert when reviews are pending', () => {
+    it('renders all 10 metric cards and triage alert when reviews are pending', () => {
       render(
         <MemoryRouter>
           <HiringActionCenter dashboard={mockDashboard} />
@@ -128,6 +138,11 @@ describe('Recruiter Career OS Components', () => {
       expect(screen.getByTestId('metric-applications-awaiting-review')).toHaveTextContent('8');
       expect(screen.getByTestId('metric-shortlisted-candidates')).toHaveTextContent('5');
       expect(screen.getByTestId('metric-scheduled-interviews')).toHaveTextContent('2');
+      expect(screen.getByTestId('metric-offers-extended')).toHaveTextContent('3');
+      expect(screen.getByTestId('metric-offers-accepted')).toHaveTextContent('2');
+      expect(screen.getByTestId('metric-pending-offer-decisions')).toHaveTextContent('1');
+      expect(screen.getByTestId('metric-evaluations-completed')).toHaveTextContent('4');
+      expect(screen.getByTestId('metric-hire-conversion-rate')).toHaveTextContent('8.3%');
 
       // Recommended hiring actions
       expect(screen.getByText(/Candidate Evaluation Queue/i)).toBeInTheDocument();

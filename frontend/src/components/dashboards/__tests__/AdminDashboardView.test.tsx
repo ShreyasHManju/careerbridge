@@ -12,6 +12,9 @@ const mockAdminDashboard: AdminDashboard = {
   published_internships: 35,
   total_applications: 310,
   application_success_rate: 18.5,
+  total_offers_extended: 25,
+  total_offers_accepted: 20,
+  offer_acceptance_rate: 80.0,
   monthly_registrations: [
     { month: '2026-08', count: 45 },
     { month: '2026-09', count: 68 },
@@ -25,6 +28,9 @@ const mockZeroAdminDashboard: AdminDashboard = {
   published_internships: 0,
   total_applications: 0,
   application_success_rate: 0.0,
+  total_offers_extended: 0,
+  total_offers_accepted: 0,
+  offer_acceptance_rate: 0.0,
   monthly_registrations: [],
 };
 
@@ -53,7 +59,7 @@ describe('AdminDashboardView Component (Phase 22)', () => {
     expect(screen.getByText(/Loading platform-wide administrative metrics/i)).toBeInTheDocument();
   });
 
-  it('renders all platform KPIs and formatted success rate', async () => {
+  it('renders all platform KPIs and formatted success and acceptance rates', async () => {
     vi.spyOn(dashboardsApi, 'getAdminDashboard').mockResolvedValue(mockAdminDashboard);
 
     render(
@@ -74,6 +80,9 @@ describe('AdminDashboardView Component (Phase 22)', () => {
     expect(screen.getByTestId('metric-published-internships')).toHaveTextContent('35');
     expect(screen.getByTestId('metric-total-applications')).toHaveTextContent('310');
     expect(screen.getByTestId('metric-application-success-rate')).toHaveTextContent('18.5%');
+    expect(screen.getByTestId('metric-total-offers-extended')).toHaveTextContent('25');
+    expect(screen.getByTestId('metric-total-offers-accepted')).toHaveTextContent('20');
+    expect(screen.getByTestId('metric-offer-acceptance-rate')).toHaveTextContent('80.0%');
   });
 
   it('renders monthly registration proportional bars correctly', async () => {
@@ -223,5 +232,7 @@ describe('AdminDashboardView Component (Phase 22)', () => {
     expect(screen.getByTestId('metric-verified-companies')).toHaveAttribute('href', '/app/admin/recruiters?is_verified=true');
     expect(screen.getByTestId('metric-published-internships')).toHaveAttribute('href', '/app/admin/jobs?is_active=true');
     expect(screen.getByTestId('metric-total-applications')).toHaveAttribute('href', '/app/admin/jobs');
+    expect(screen.getByTestId('metric-total-offers-extended')).toHaveAttribute('href', '/app/admin/jobs');
+    expect(screen.getByTestId('metric-total-offers-accepted')).toHaveAttribute('href', '/app/admin/jobs');
   });
 });

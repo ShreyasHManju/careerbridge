@@ -30,6 +30,8 @@ const mockDashboard: StudentDashboard = {
   accepted_applications: 1,
   saved_internships: 3,
   upcoming_interviews: 1,
+  pending_offers: 1,
+  offers_accepted: 1,
 };
 
 const mockPassport: PassportResponse = {
@@ -118,13 +120,16 @@ describe('Student Dashboard Modular Subcomponents', () => {
   });
 
   describe('CareerActionList', () => {
-    it('generates high-priority actions for accepted placement credentialing and scheduled interviews', () => {
+    it('generates high-priority actions for pending offer review, accepted placement credentialing and scheduled interviews', () => {
       render(
         <MemoryRouter>
           <CareerActionList dashboard={mockDashboard} passport={mockPassport} />
         </MemoryRouter>
       );
 
+      expect(screen.getByText(/Review your pending job offer/i)).toBeInTheDocument();
+      expect(screen.getByText(/Decision Required/i)).toBeInTheDocument();
+      expect(screen.getByText(/Review Offer/i)).toBeInTheDocument();
       expect(screen.getByText(/Credentialize your accepted placement/i)).toBeInTheDocument();
       expect(screen.getByText(/Placement Credential/i)).toBeInTheDocument();
       expect(screen.getByText(/Add to Passport/i)).toBeInTheDocument();
@@ -135,6 +140,7 @@ describe('Student Dashboard Modular Subcomponents', () => {
       const dashboardNoOffers: StudentDashboard = {
         ...mockDashboard,
         accepted_applications: 0,
+        pending_offers: 0,
       };
 
       render(
@@ -143,6 +149,7 @@ describe('Student Dashboard Modular Subcomponents', () => {
         </MemoryRouter>
       );
 
+      expect(screen.queryByText(/Review your pending job offer/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/Credentialize your accepted placement/i)).not.toBeInTheDocument();
       expect(screen.getByText(/Prepare for your upcoming interview/i)).toBeInTheDocument();
     });
@@ -159,9 +166,10 @@ describe('Student Dashboard Modular Subcomponents', () => {
       expect(screen.getByTestId('metric-total-applications')).toHaveAttribute('href', '/app/applications');
       expect(screen.getByTestId('metric-applications-under-review')).toHaveAttribute('href', '/app/applications?status=reviewing');
       expect(screen.getByTestId('metric-shortlisted-applications')).toHaveAttribute('href', '/app/applications?status=shortlisted');
+      expect(screen.getByTestId('metric-upcoming-interviews')).toHaveAttribute('href', '/app/interviews');
+      expect(screen.getByTestId('metric-pending-offers')).toHaveAttribute('href', '/app/applications?status=offered');
       expect(screen.getByTestId('metric-accepted-applications')).toHaveAttribute('href', '/app/applications?status=accepted');
       expect(screen.getByTestId('metric-saved-internships')).toHaveAttribute('href', '/app/saved-jobs');
-      expect(screen.getByTestId('metric-upcoming-interviews')).toHaveAttribute('href', '/app/interviews');
     });
   });
 

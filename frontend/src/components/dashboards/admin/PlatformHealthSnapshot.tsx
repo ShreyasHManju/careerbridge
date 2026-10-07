@@ -119,6 +119,54 @@ export const PlatformHealthSnapshot: React.FC<PlatformHealthSnapshotProps> = ({ 
           </span>
           <span className="cb-stat-desc">Accepted vs total submissions</span>
         </div>
+
+        {/* 7. Total Offers Extended */}
+        <Link
+          to="/app/admin/jobs"
+          className="cb-stat-card cb-stat-card-link"
+          data-testid="metric-total-offers-extended"
+          aria-label="View platform offers extended"
+        >
+          <div className="cb-stat-card-top">
+            <span className="cb-stat-label">Offers Extended</span>
+            <span className="cb-stat-icon-badge cb-stat-icon-default" aria-hidden="true">
+              <BriefcaseIcon size={16} />
+            </span>
+          </div>
+          <span className="cb-stat-value">{dashboard.total_offers_extended ?? 0}</span>
+          <span className="cb-stat-desc">Platform-wide extended offers</span>
+        </Link>
+
+        {/* 8. Total Offers Accepted */}
+        <Link
+          to="/app/admin/jobs"
+          className="cb-stat-card cb-stat-success cb-stat-card-link"
+          data-testid="metric-total-offers-accepted"
+          aria-label="View platform offers accepted"
+        >
+          <div className="cb-stat-card-top">
+            <span className="cb-stat-label">Offers Accepted</span>
+            <span className="cb-stat-icon-badge cb-stat-icon-success" aria-hidden="true">
+              <ShieldCheckIcon size={16} />
+            </span>
+          </div>
+          <span className="cb-stat-value">{dashboard.total_offers_accepted ?? 0}</span>
+          <span className="cb-stat-desc">Platform-wide accepted hires</span>
+        </Link>
+
+        {/* 9. Offer Acceptance Rate */}
+        <div className="cb-stat-card cb-stat-success" data-testid="metric-offer-acceptance-rate">
+          <div className="cb-stat-card-top">
+            <span className="cb-stat-label">Offer Acceptance Rate</span>
+            <span className="cb-stat-icon-badge cb-stat-icon-success" aria-hidden="true">
+              <AwardIcon size={16} />
+            </span>
+          </div>
+          <span className="cb-stat-value">
+            {(dashboard.offer_acceptance_rate ?? 0).toFixed(1)}%
+          </span>
+          <span className="cb-stat-desc">Accepted vs extended offers</span>
+        </div>
       </div>
     </section>
   );

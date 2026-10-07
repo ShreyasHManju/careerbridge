@@ -147,6 +147,86 @@ export const HiringActionCenter: React.FC<HiringActionCenterProps> = ({ dashboar
             <span className="cb-stat-value">{scheduled_interviews}</span>
             <span className="cb-stat-desc">Active upcoming rounds</span>
           </Link>
+
+          {/* 6. Offers Extended */}
+          <Link
+            to="/app/recruiter/applications?status=offered"
+            className="cb-stat-card cb-stat-card-link"
+            data-testid="metric-offers-extended"
+            aria-label="View extended candidate offers"
+          >
+            <div className="cb-stat-card-top">
+              <span className="cb-stat-label">Offers Extended</span>
+              <span className="cb-stat-icon-badge cb-stat-icon-default" aria-hidden="true">
+                <BriefcaseIcon size={16} />
+              </span>
+            </div>
+            <span className="cb-stat-value">{dashboard.offers_extended ?? 0}</span>
+            <span className="cb-stat-desc">Official candidate offers</span>
+          </Link>
+
+          {/* 7. Offers Accepted (Hires) */}
+          <Link
+            to="/app/recruiter/applications?status=accepted"
+            className="cb-stat-card cb-stat-success cb-stat-card-link"
+            data-testid="metric-offers-accepted"
+            aria-label="View accepted offers and hires"
+          >
+            <div className="cb-stat-card-top">
+              <span className="cb-stat-label">Offers Accepted</span>
+              <span className="cb-stat-icon-badge cb-stat-icon-success" aria-hidden="true">
+                <UserCheckIcon size={16} />
+              </span>
+            </div>
+            <span className="cb-stat-value">{dashboard.offers_accepted ?? 0}</span>
+            <span className="cb-stat-desc">Successful candidate hires</span>
+          </Link>
+
+          {/* 8. Pending Offer Decisions */}
+          <Link
+            to="/app/recruiter/applications?status=offered"
+            className="cb-stat-card cb-stat-warning cb-stat-card-link"
+            data-testid="metric-pending-offer-decisions"
+            aria-label="View offers awaiting candidate decision"
+          >
+            <div className="cb-stat-card-top">
+              <span className="cb-stat-label">Pending Decisions</span>
+              <span className="cb-stat-icon-badge cb-stat-icon-warning" aria-hidden="true">
+                <ClockIcon size={16} />
+              </span>
+            </div>
+            <span className="cb-stat-value">{dashboard.pending_offer_decisions ?? 0}</span>
+            <span className="cb-stat-desc">Awaiting student decision</span>
+          </Link>
+
+          {/* 9. Evaluations Completed */}
+          <Link
+            to="/app/recruiter/applications"
+            className="cb-stat-card cb-stat-info cb-stat-card-link"
+            data-testid="metric-evaluations-completed"
+            aria-label="View completed candidate evaluations"
+          >
+            <div className="cb-stat-card-top">
+              <span className="cb-stat-label">Evaluations Done</span>
+              <span className="cb-stat-icon-badge cb-stat-icon-info" aria-hidden="true">
+                <UsersIcon size={16} />
+              </span>
+            </div>
+            <span className="cb-stat-value">{dashboard.evaluations_completed ?? 0}</span>
+            <span className="cb-stat-desc">Scorecards submitted</span>
+          </Link>
+
+          {/* 10. Hire Conversion Rate */}
+          <div className="cb-stat-card cb-stat-primary" data-testid="metric-hire-conversion-rate">
+            <div className="cb-stat-card-top">
+              <span className="cb-stat-label">Hire Conversion</span>
+              <span className="cb-stat-icon-badge cb-stat-icon-primary" aria-hidden="true">
+                <SparklesIcon size={16} />
+              </span>
+            </div>
+            <span className="cb-stat-value">{(dashboard.hire_conversion_rate ?? 0).toFixed(1)}%</span>
+            <span className="cb-stat-desc">Applications to hires</span>
+          </div>
         </div>
       </section>
 

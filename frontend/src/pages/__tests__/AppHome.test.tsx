@@ -82,6 +82,8 @@ describe('AppHome Role-Based Dashboard Landing (Phase 22)', () => {
       accepted_applications: 0,
       saved_internships: 3,
       upcoming_interviews: 1,
+      pending_offers: 0,
+      offers_accepted: 0,
     });
 
     render(
@@ -106,6 +108,11 @@ describe('AppHome Role-Based Dashboard Landing (Phase 22)', () => {
       applications_awaiting_review: 8,
       shortlisted_candidates: 4,
       scheduled_interviews: 2,
+      offers_extended: 2,
+      offers_accepted: 1,
+      pending_offer_decisions: 1,
+      evaluations_completed: 3,
+      hire_conversion_rate: 5.0,
     });
 
     render(
@@ -132,6 +139,9 @@ describe('AppHome Role-Based Dashboard Landing (Phase 22)', () => {
       published_internships: 25,
       total_applications: 250,
       application_success_rate: 15.0,
+      total_offers_extended: 20,
+      total_offers_accepted: 15,
+      offer_acceptance_rate: 75.0,
       monthly_registrations: [{ month: '2026-09', count: 50 }],
     });
 

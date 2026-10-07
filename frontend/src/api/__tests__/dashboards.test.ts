@@ -19,6 +19,8 @@ const mockStudentDashboard: StudentDashboard = {
   accepted_applications: 1,
   saved_internships: 5,
   upcoming_interviews: 2,
+  pending_offers: 1,
+  offers_accepted: 1,
 };
 
 const mockRecruiterDashboard: RecruiterDashboard = {
@@ -27,6 +29,11 @@ const mockRecruiterDashboard: RecruiterDashboard = {
   applications_awaiting_review: 14,
   shortlisted_candidates: 6,
   scheduled_interviews: 5,
+  offers_extended: 4,
+  offers_accepted: 3,
+  pending_offer_decisions: 1,
+  evaluations_completed: 6,
+  hire_conversion_rate: 9.4,
 };
 
 const mockAdminDashboard: AdminDashboard = {
@@ -36,6 +43,9 @@ const mockAdminDashboard: AdminDashboard = {
   published_internships: 35,
   total_applications: 310,
   application_success_rate: 18.5,
+  total_offers_extended: 25,
+  total_offers_accepted: 20,
+  offer_acceptance_rate: 80.0,
   monthly_registrations: [
     { month: '2026-08', count: 45 },
     { month: '2026-09', count: 68 },

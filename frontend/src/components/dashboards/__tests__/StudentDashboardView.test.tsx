@@ -14,6 +14,8 @@ const mockPopulatedDashboard: StudentDashboard = {
   accepted_applications: 1,
   saved_internships: 5,
   upcoming_interviews: 2,
+  pending_offers: 1,
+  offers_accepted: 1,
 };
 
 const mockZeroDashboard: StudentDashboard = {
@@ -23,6 +25,8 @@ const mockZeroDashboard: StudentDashboard = {
   accepted_applications: 0,
   saved_internships: 0,
   upcoming_interviews: 0,
+  pending_offers: 0,
+  offers_accepted: 0,
 };
 
 const mockPassportData: PassportResponse = {
@@ -114,7 +118,7 @@ describe('StudentDashboardView Component (Career OS)', () => {
     // 4. Accepted
     const acceptedCard = screen.getByTestId('metric-accepted-applications');
     expect(acceptedCard).toHaveTextContent('1');
-    expect(acceptedCard).toHaveTextContent(/Accepted Offers/i);
+    expect(acceptedCard).toHaveTextContent(/Accepted & Credentialed/i);
 
     // 5. Saved Internships
     const savedCard = screen.getByTestId('metric-saved-internships');
@@ -125,6 +129,11 @@ describe('StudentDashboardView Component (Career OS)', () => {
     const interviewsCard = screen.getByTestId('metric-upcoming-interviews');
     expect(interviewsCard).toHaveTextContent('2');
     expect(interviewsCard).toHaveTextContent(/Upcoming Interviews/i);
+
+    // 7. Pending Offers
+    const pendingOfferCard = screen.getByTestId('metric-pending-offers');
+    expect(pendingOfferCard).toHaveTextContent('1');
+    expect(pendingOfferCard).toHaveTextContent(/Offers Received/i);
   });
 
   it('renders zero numeric values correctly without treating them as empty/missing', async () => {
@@ -146,6 +155,7 @@ describe('StudentDashboardView Component (Career OS)', () => {
     expect(screen.getByTestId('metric-accepted-applications')).toHaveTextContent('0');
     expect(screen.getByTestId('metric-saved-internships')).toHaveTextContent('0');
     expect(screen.getByTestId('metric-upcoming-interviews')).toHaveTextContent('0');
+    expect(screen.getByTestId('metric-pending-offers')).toHaveTextContent('0');
   });
 
   it('renders all quick action navigation links with valid routes', async () => {
@@ -239,9 +249,10 @@ describe('StudentDashboardView Component (Career OS)', () => {
     expect(screen.getByTestId('metric-total-applications')).toHaveAttribute('href', '/app/applications');
     expect(screen.getByTestId('metric-applications-under-review')).toHaveAttribute('href', '/app/applications?status=reviewing');
     expect(screen.getByTestId('metric-shortlisted-applications')).toHaveAttribute('href', '/app/applications?status=shortlisted');
+    expect(screen.getByTestId('metric-upcoming-interviews')).toHaveAttribute('href', '/app/interviews');
+    expect(screen.getByTestId('metric-pending-offers')).toHaveAttribute('href', '/app/applications?status=offered');
     expect(screen.getByTestId('metric-accepted-applications')).toHaveAttribute('href', '/app/applications?status=accepted');
     expect(screen.getByTestId('metric-saved-internships')).toHaveAttribute('href', '/app/saved-jobs');
-    expect(screen.getByTestId('metric-upcoming-interviews')).toHaveAttribute('href', '/app/interviews');
   });
 
   it('renders Student Career OS sections including Career Journey, Actions, Evidence, and Passport', async () => {

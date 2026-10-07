@@ -5,7 +5,9 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.models.application import Application, ApplicationStatus
+from app.models.candidate_evaluation import CandidateEvaluation, CandidateEvaluationStatus
 from app.models.interview import Interview, InterviewStatus
+from app.models.job_offer import JobOffer, OfferStatus
 from app.models.job_posting import JobPosting
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.saved_job import SavedJob
@@ -87,6 +89,33 @@ class DashboardService:
             )
         ) or 0
 
+        # 4. Job Offer aggregates for this student
+        offer_stats = db.execute(
+            select(
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (JobOffer.status == OfferStatus.OFFERED, 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("pending_offers"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (JobOffer.status == OfferStatus.ACCEPTED, 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("offers_accepted"),
+            )
+            .select_from(JobOffer)
+            .join(Application, JobOffer.application_id == Application.id)
+            .where(Application.student_id == student_id)
+        ).one()
+
         return StudentDashboardResponse(
             total_applications=app_stats.total_applications or 0,
             applications_under_review=int(app_stats.applications_under_review or 0),
@@ -94,6 +123,8 @@ class DashboardService:
             accepted_applications=int(app_stats.accepted_applications or 0),
             saved_internships=saved_internships,
             upcoming_interviews=upcoming_interviews,
+            pending_offers=int(offer_stats.pending_offers or 0),
+            offers_accepted=int(offer_stats.offers_accepted or 0),
         )
 
     @classmethod
@@ -155,12 +186,83 @@ class DashboardService:
             )
         ) or 0
 
+        # 4. Job Offers extended, accepted, and pending decision for recruiter's jobs
+        rec_offer_stats = db.execute(
+            select(
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (JobOffer.status.in_([
+                                OfferStatus.OFFERED,
+                                OfferStatus.ACCEPTED,
+                                OfferStatus.REJECTED,
+                                OfferStatus.WITHDRAWN,
+                                OfferStatus.EXPIRED,
+                            ]), 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("offers_extended"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (JobOffer.status == OfferStatus.ACCEPTED, 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("offers_accepted"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (JobOffer.status == OfferStatus.OFFERED, 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("pending_offer_decisions"),
+            )
+            .select_from(JobOffer)
+            .join(Application, JobOffer.application_id == Application.id)
+            .join(JobPosting, Application.job_posting_id == JobPosting.id)
+            .where(JobPosting.recruiter_id == recruiter_id)
+        ).one()
+
+        offers_extended = int(rec_offer_stats.offers_extended or 0)
+        offers_accepted = int(rec_offer_stats.offers_accepted or 0)
+        pending_offer_decisions = int(rec_offer_stats.pending_offer_decisions or 0)
+
+        # 5. Submitted evaluations for applications on recruiter's jobs (strict recruiter ownership)
+        evaluations_completed = db.scalar(
+            select(func.count(CandidateEvaluation.id))
+            .select_from(CandidateEvaluation)
+            .join(Application, CandidateEvaluation.application_id == Application.id)
+            .join(JobPosting, Application.job_posting_id == JobPosting.id)
+            .where(
+                JobPosting.recruiter_id == recruiter_id,
+                CandidateEvaluation.status == CandidateEvaluationStatus.SUBMITTED,
+            )
+        ) or 0
+
+        # 6. Hiring conversion rate: offers_accepted / total_applications * 100
+        total_applications = rec_app_stats.total_applications or 0
+        if total_applications > 0:
+            hire_conversion_rate = round((offers_accepted / total_applications) * 100.0, 2)
+        else:
+            hire_conversion_rate = 0.0
+
         return RecruiterDashboardResponse(
             active_internships=active_internships,
-            total_applications=rec_app_stats.total_applications or 0,
+            total_applications=total_applications,
             applications_awaiting_review=int(rec_app_stats.applications_awaiting_review or 0),
             shortlisted_candidates=int(rec_app_stats.shortlisted_candidates or 0),
             scheduled_interviews=scheduled_interviews,
+            offers_extended=offers_extended,
+            offers_accepted=offers_accepted,
+            pending_offer_decisions=pending_offer_decisions,
+            evaluations_completed=evaluations_completed,
+            hire_conversion_rate=hire_conversion_rate,
         )
 
     @classmethod
@@ -218,7 +320,46 @@ class DashboardService:
         else:
             success_rate = 0.0
 
-        # 6. Monthly registrations for the current calendar year
+        # 6. Platform-wide job offer stats (non-draft extended and accepted)
+        admin_offer_stats = db.execute(
+            select(
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (JobOffer.status.in_([
+                                OfferStatus.OFFERED,
+                                OfferStatus.ACCEPTED,
+                                OfferStatus.REJECTED,
+                                OfferStatus.WITHDRAWN,
+                                OfferStatus.EXPIRED,
+                            ]), 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("total_offers_extended"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (JobOffer.status == OfferStatus.ACCEPTED, 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("total_offers_accepted"),
+            )
+        ).one()
+
+        total_offers_extended = int(admin_offer_stats.total_offers_extended or 0)
+        total_offers_accepted = int(admin_offer_stats.total_offers_accepted or 0)
+
+        # 7. Offer acceptance rate: accepted / extended * 100 (safe zero division)
+        if total_offers_extended > 0:
+            offer_acceptance_rate = round((total_offers_accepted / total_offers_extended) * 100.0, 2)
+        else:
+            offer_acceptance_rate = 0.0
+
+        # 8. Monthly registrations for the current calendar year
         target_year = period_year or datetime.now(timezone.utc).year
         year_start = datetime(target_year, 1, 1, tzinfo=timezone.utc)
         month_label = func.to_char(User.created_at, "YYYY-MM")
@@ -245,5 +386,8 @@ class DashboardService:
             published_internships=published_internships,
             total_applications=total_applications,
             application_success_rate=success_rate,
+            total_offers_extended=total_offers_extended,
+            total_offers_accepted=total_offers_accepted,
+            offer_acceptance_rate=offer_acceptance_rate,
             monthly_registrations=monthly_registrations,
         )

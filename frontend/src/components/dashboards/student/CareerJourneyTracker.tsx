@@ -32,6 +32,8 @@ export const CareerJourneyTracker: React.FC<CareerJourneyTrackerProps> = ({
   const interviewsCount = dashboard.upcoming_interviews;
   const offersCount = dashboard.accepted_applications;
 
+  const pendingOffersCount = dashboard.pending_offers ?? 0;
+
   // Determine stage statuses deterministically
   const stages: Stage[] = [
     {
@@ -79,11 +81,13 @@ export const CareerJourneyTracker: React.FC<CareerJourneyTrackerProps> = ({
     {
       id: 'offers',
       name: 'Offers',
-      link: '/app/applications?status=accepted',
-      status: offersCount > 0 ? 'completed' : 'upcoming',
+      link: offersCount > 0 ? '/app/applications?status=accepted' : '/app/applications?status=offered',
+      status: offersCount > 0 ? 'completed' : pendingOffersCount > 0 ? 'active' : 'upcoming',
       detail:
         offersCount > 0
           ? `${offersCount} accepted offer(s) • Credentialize to Passport`
+          : pendingOffersCount > 0
+          ? `${pendingOffersCount} pending offer(s) • Decision required`
           : 'Placement milestones',
     },
   ];

@@ -30,7 +30,25 @@ export const CareerActionList: React.FC<CareerActionListProps> = ({
   const projectsCount = passport?.summary?.public_projects_count ?? passport?.projects?.length ?? 0;
   const experiencesCount = passport?.summary?.verified_experiences_count ?? passport?.verified_experiences?.length ?? 0;
 
-  // 1. Highest priority: accepted placement credentialing
+  // 1. Critical priority: pending job offers awaiting review / decision
+  if ((dashboard.pending_offers ?? 0) > 0) {
+    actions.push({
+      id: 'review-pending-offer',
+      title: 'Review your pending job offer',
+      description: `You have ${dashboard.pending_offers} official job offer(s) waiting for your review and decision. Review compensation, terms, and accept before the deadline.`,
+      destination: '/app/applications?status=offered',
+      ctaLabel: 'Review Offer',
+      badgeText: 'Decision Required',
+      priority: 'high',
+      category: 'application',
+      sourceDomain: 'student',
+      notificationType: 'offer_received',
+      count: dashboard.pending_offers,
+      icon: <ShieldCheckIcon size={20} className="cb-action-item-icon" />,
+    });
+  }
+
+  // 2. Highest priority: accepted placement credentialing
   if (dashboard.accepted_applications > 0) {
     actions.push({
       id: 'credentialize-offer',

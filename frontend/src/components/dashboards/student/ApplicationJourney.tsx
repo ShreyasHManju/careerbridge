@@ -79,22 +79,41 @@ export const ApplicationJourney: React.FC<ApplicationJourneyProps> = ({ dashboar
           <span className="cb-stat-desc">Scheduled future interviews</span>
         </Link>
 
-        {/* 5. Accepted Offers */}
+        {/* 5. Offers Received */}
+        <Link
+          to="/app/applications?status=offered"
+          className={`cb-stat-card cb-stat-card-link cb-funnel-stage ${
+            (dashboard.pending_offers ?? 0) > 0 ? 'cb-stat-highlight cb-stat-card-active-offer' : 'cb-stat-info'
+          }`}
+          data-testid="metric-pending-offers"
+          aria-label="View active job offers awaiting decision"
+        >
+          <div className="cb-funnel-stage-header">
+            <span className="cb-funnel-step-tag">Step 5</span>
+            <span className="cb-stat-label">Offers Received</span>
+          </div>
+          <span className="cb-stat-value">{dashboard.pending_offers ?? 0}</span>
+          <span className="cb-stat-desc">
+            {(dashboard.pending_offers ?? 0) > 0 ? 'Decision required' : 'Awaiting employer offers'}
+          </span>
+        </Link>
+
+        {/* 6. Accepted & Credentialed */}
         <Link
           to="/app/applications?status=accepted"
           className="cb-stat-card cb-stat-success cb-stat-card-link cb-funnel-stage"
           data-testid="metric-accepted-applications"
-          aria-label="View accepted application offers"
+          aria-label="View accepted application offers and credentials"
         >
           <div className="cb-funnel-stage-header">
-            <span className="cb-funnel-step-tag">Step 5</span>
-            <span className="cb-stat-label">Accepted Offers</span>
+            <span className="cb-funnel-step-tag">Step 6</span>
+            <span className="cb-stat-label">Accepted & Credentialed</span>
           </div>
           <span className="cb-stat-value">{dashboard.accepted_applications}</span>
-          <span className="cb-stat-desc">Accepted by employers</span>
+          <span className="cb-stat-desc">Accepted placement milestones</span>
         </Link>
 
-        {/* 6. Saved Opportunities */}
+        {/* 7. Saved Opportunities */}
         <Link
           to="/app/saved-jobs"
           className="cb-stat-card cb-stat-card-link cb-funnel-stage"

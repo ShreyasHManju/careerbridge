@@ -11,6 +11,11 @@ const mockPopulatedDashboard: RecruiterDashboard = {
   applications_awaiting_review: 14,
   shortlisted_candidates: 6,
   scheduled_interviews: 5,
+  offers_extended: 4,
+  offers_accepted: 3,
+  pending_offer_decisions: 1,
+  evaluations_completed: 6,
+  hire_conversion_rate: 9.4,
 };
 
 const mockZeroDashboard: RecruiterDashboard = {
@@ -19,6 +24,11 @@ const mockZeroDashboard: RecruiterDashboard = {
   applications_awaiting_review: 0,
   shortlisted_candidates: 0,
   scheduled_interviews: 0,
+  offers_extended: 0,
+  offers_accepted: 0,
+  pending_offer_decisions: 0,
+  evaluations_completed: 0,
+  hire_conversion_rate: 0.0,
 };
 
 describe('RecruiterDashboardView Component (Phase 22)', () => {
@@ -41,7 +51,7 @@ describe('RecruiterDashboardView Component (Phase 22)', () => {
     expect(screen.getByText(/Loading your recruiter dashboard metrics.../i)).toBeInTheDocument();
   });
 
-  it('renders all five populated metrics correctly', async () => {
+  it('renders all populated metrics correctly', async () => {
     vi.spyOn(dashboardsApi, 'getRecruiterDashboard').mockResolvedValue(mockPopulatedDashboard);
 
     render(
@@ -80,6 +90,30 @@ describe('RecruiterDashboardView Component (Phase 22)', () => {
     const interviewsCard = screen.getByTestId('metric-scheduled-interviews');
     expect(interviewsCard).toHaveTextContent('5');
     expect(interviewsCard).toHaveTextContent(/Scheduled Interviews/i);
+
+    // 6. Offers Extended
+    const offersExtendedCard = screen.getByTestId('metric-offers-extended');
+    expect(offersExtendedCard).toHaveTextContent('4');
+    expect(offersExtendedCard).toHaveTextContent(/Offers Extended/i);
+
+    // 7. Offers Accepted
+    const offersAcceptedCard = screen.getByTestId('metric-offers-accepted');
+    expect(offersAcceptedCard).toHaveTextContent('3');
+    expect(offersAcceptedCard).toHaveTextContent(/Offers Accepted/i);
+
+    // 8. Pending Offer Decisions
+    const pendingDecisionsCard = screen.getByTestId('metric-pending-offer-decisions');
+    expect(pendingDecisionsCard).toHaveTextContent('1');
+    expect(pendingDecisionsCard).toHaveTextContent(/Pending Decisions/i);
+
+    // 9. Evaluations Completed
+    const evaluationsCard = screen.getByTestId('metric-evaluations-completed');
+    expect(evaluationsCard).toHaveTextContent('6');
+    expect(evaluationsCard).toHaveTextContent(/Evaluations Done/i);
+
+    // 10. Hire Conversion Rate
+    const conversionCard = screen.getByTestId('metric-hire-conversion-rate');
+    expect(conversionCard).toHaveTextContent('9.4%');
   });
 
   it('displays candidate review queue action spotlight when applications_awaiting_review > 0', async () => {
@@ -136,6 +170,11 @@ describe('RecruiterDashboardView Component (Phase 22)', () => {
     expect(screen.getByTestId('metric-applications-awaiting-review')).toHaveTextContent('0');
     expect(screen.getByTestId('metric-shortlisted-candidates')).toHaveTextContent('0');
     expect(screen.getByTestId('metric-scheduled-interviews')).toHaveTextContent('0');
+    expect(screen.getByTestId('metric-offers-extended')).toHaveTextContent('0');
+    expect(screen.getByTestId('metric-offers-accepted')).toHaveTextContent('0');
+    expect(screen.getByTestId('metric-pending-offer-decisions')).toHaveTextContent('0');
+    expect(screen.getByTestId('metric-evaluations-completed')).toHaveTextContent('0');
+    expect(screen.getByTestId('metric-hire-conversion-rate')).toHaveTextContent('0.0%');
   });
 
   it('renders quick action navigation links with valid routes', async () => {
@@ -206,5 +245,9 @@ describe('RecruiterDashboardView Component (Phase 22)', () => {
     expect(screen.getByTestId('metric-applications-awaiting-review')).toHaveAttribute('href', '/app/recruiter/applications?status=applied');
     expect(screen.getByTestId('metric-shortlisted-candidates')).toHaveAttribute('href', '/app/recruiter/applications?status=shortlisted');
     expect(screen.getByTestId('metric-scheduled-interviews')).toHaveAttribute('href', '/app/recruiter/interviews');
+    expect(screen.getByTestId('metric-offers-extended')).toHaveAttribute('href', '/app/recruiter/applications?status=offered');
+    expect(screen.getByTestId('metric-offers-accepted')).toHaveAttribute('href', '/app/recruiter/applications?status=accepted');
+    expect(screen.getByTestId('metric-pending-offer-decisions')).toHaveAttribute('href', '/app/recruiter/applications?status=offered');
+    expect(screen.getByTestId('metric-evaluations-completed')).toHaveAttribute('href', '/app/recruiter/applications');
   });
 });

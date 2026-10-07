@@ -39,6 +39,16 @@ class StudentDashboardResponse(BaseModel):
         ge=0,
         description="Number of scheduled interviews in the future for this student",
     )
+    pending_offers: int = Field(
+        default=0,
+        ge=0,
+        description="Active job offers extended to this student awaiting decision",
+    )
+    offers_accepted: int = Field(
+        default=0,
+        ge=0,
+        description="Total job offers accepted by this student",
+    )
 
 
 class RecruiterDashboardResponse(BaseModel):
@@ -72,6 +82,32 @@ class RecruiterDashboardResponse(BaseModel):
         ...,
         ge=0,
         description="Total scheduled or rescheduled interviews associated with this recruiter's opportunities",
+    )
+    offers_extended: int = Field(
+        default=0,
+        ge=0,
+        description="Total non-draft job offers extended for recruiter opportunities",
+    )
+    offers_accepted: int = Field(
+        default=0,
+        ge=0,
+        description="Total offers accepted by candidates resulting in hires",
+    )
+    pending_offer_decisions: int = Field(
+        default=0,
+        ge=0,
+        description="Active job offers awaiting candidate decision",
+    )
+    evaluations_completed: int = Field(
+        default=0,
+        ge=0,
+        description="Total submitted candidate evaluations for recruiter opportunities",
+    )
+    hire_conversion_rate: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=100.0,
+        description="Percentage of applications converted to accepted hires",
     )
 
 
@@ -128,6 +164,22 @@ class AdminDashboardResponse(BaseModel):
         ge=0.0,
         le=100.0,
         description="Percentage of applications resulting in acceptance (accepted / total * 100)",
+    )
+    total_offers_extended: int = Field(
+        default=0,
+        ge=0,
+        description="Platform-wide total non-draft job offers extended",
+    )
+    total_offers_accepted: int = Field(
+        default=0,
+        ge=0,
+        description="Platform-wide total accepted job offers",
+    )
+    offer_acceptance_rate: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=100.0,
+        description="Percentage of extended offers resulting in acceptance (accepted / extended * 100)",
     )
     monthly_registrations: List[MonthlyRegistrationMetric] = Field(
         default_factory=list,
