@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.interview import Interview
     from app.models.innovation_project import InnovationProject
     from app.models.experience_record import ExperienceRecord
+    from app.models.job_offer import JobOffer
     from app.models.job_posting import JobPosting
     from app.models.message import Message
     from app.models.notification import Notification
@@ -200,6 +201,14 @@ class User(Base):
     candidate_evaluations_as_recruiter: Mapped[list["CandidateEvaluation"]] = relationship(
         "CandidateEvaluation",
         foreign_keys="[CandidateEvaluation.recruiter_id]",
+        back_populates="recruiter",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-many relationship with JobOffer (as recruiter)
+    job_offers_as_recruiter: Mapped[list["JobOffer"]] = relationship(
+        "JobOffer",
+        foreign_keys="[JobOffer.recruiter_id]",
         back_populates="recruiter",
         cascade="all, delete-orphan",
     )

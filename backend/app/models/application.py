@@ -9,6 +9,7 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from app.models.candidate_evaluation import CandidateEvaluation
     from app.models.interview import Interview
+    from app.models.job_offer import JobOffer
     from app.models.job_posting import JobPosting
     from app.models.user import User
 
@@ -84,6 +85,9 @@ class Application(Base):
     )
     candidate_evaluations: Mapped[list["CandidateEvaluation"]] = relationship(
         "CandidateEvaluation", back_populates="application", cascade="all, delete-orphan"
+    )
+    job_offer: Mapped[Optional["JobOffer"]] = relationship(
+        "JobOffer", back_populates="application", uselist=False, cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

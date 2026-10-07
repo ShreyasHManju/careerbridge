@@ -27,6 +27,7 @@ from app.routers import (
     project_evaluations_router,
     candidate_evaluations_router,
     job_invitations_router,
+    job_offers_router,
     candidates_router,
     profile_image_router,
     rbac_router,
@@ -184,6 +185,14 @@ TAGS_METADATA = [
         "description": "Student profile image avatar uploads, metadata inspection, and downloads.",
     },
     {
+        "name": "Candidate Evaluations",
+        "description": "Recruiter candidate evaluation scorecards and dimensional assessments.",
+    },
+    {
+        "name": "Job Offers",
+        "description": "Official job and internship offers extended by recruiters to candidate applications.",
+    },
+    {
         "name": "Dashboards",
         "description": "Role-specific aggregate metrics and KPI analytics for students, recruiters, and admins.",
     },
@@ -296,6 +305,7 @@ app.include_router(passport_router, prefix=settings.API_V1_STR)
 app.include_router(project_evaluations_router, prefix=settings.API_V1_STR)
 app.include_router(candidate_evaluations_router, prefix=settings.API_V1_STR)
 app.include_router(job_invitations_router, prefix=settings.API_V1_STR)
+app.include_router(job_offers_router, prefix=settings.API_V1_STR)
 app.include_router(candidates_router, prefix=settings.API_V1_STR)
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)

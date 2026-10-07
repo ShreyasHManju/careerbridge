@@ -31,6 +31,7 @@ from app.models.candidate_evaluation import (
     CandidateRecommendation,
 )
 from app.models.job_invitation import JobInvitation, InvitationStatus
+from app.models.job_offer import JobOffer, OfferStatus
 
 __all__ = [
     "Base",
@@ -85,4 +86,6 @@ __all__ = [
     "CandidateRecommendation",
     "JobInvitation",
     "InvitationStatus",
+    "JobOffer",
+    "OfferStatus",
 ]

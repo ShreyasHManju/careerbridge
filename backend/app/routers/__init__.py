@@ -9,6 +9,7 @@ from app.routers.project_evaluations import router as project_evaluations_router
 from app.routers.job_invitations import router as job_invitations_router
 from app.routers.candidate_evaluations import router as candidate_evaluations_router
 from app.routers.candidates import router as candidates_router
+from app.routers.job_offers import router as job_offers_router
 from app.routers.interviews import router as interviews_router
 from app.routers.job_posting import router as job_posting_router
 from app.routers.messaging import router as messaging_router
@@ -48,4 +49,5 @@ __all__ = [
     "candidate_evaluations_router",
     "job_invitations_router",
     "candidates_router",
+    "job_offers_router",
 ]
