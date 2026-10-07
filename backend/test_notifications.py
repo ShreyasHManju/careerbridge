@@ -465,7 +465,13 @@ def test_event_recruiter_verification_changed_notifies_recruiter():
 
 def test_event_job_moderation_changed_notifies_recruiter():
     with SessionLocal() as db:
-        job = db.scalar(select(JobPosting).where(JobPosting.title == "Senior Backend Engineer"))
+        recruiter = db.scalar(select(User).where(User.email == RECRUITER_EMAIL))
+        job = db.scalar(
+            select(JobPosting).where(
+                JobPosting.title == "Senior Backend Engineer",
+                JobPosting.recruiter_id == recruiter.id,
+            )
+        )
         job_id = job.id
 
     admin_headers = get_auth_headers(ADMIN_EMAIL)
