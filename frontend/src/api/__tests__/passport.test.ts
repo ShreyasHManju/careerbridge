@@ -1,7 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { apiClient } from '../client';
-import { getMyPassport, getStudentPassport } from '../passport';
+import {
+  getMyPassport,
+  getStudentPassport,
+  createPassportShare,
+  listPassportShares,
+  updatePassportShare,
+  revokePassportShare,
+  getPublicPassport,
+} from '../passport';
 import { PassportResponse } from '@/types/passport';
+
 
 const mockPassportResponse: PassportResponse = {
   identity: {
@@ -190,6 +199,187 @@ describe('Passport API Service Module', () => {
           status: 404,
         })
       );
+    });
+  });
+
+  describe('createPassportShare', () => {
+    it('dispatches POST to /passport/shares and returns creation response with raw token', async () => {
+      const mockCreated = {
+        id: 1,
+        share_token: 'raw_token_xyz_123',
+        share_url: '/p/raw_token_xyz_123',
+        label: 'Google Recruiter',
+        is_active: true,
+        allow_contact_info: true,
+        allow_unverified_projects: false,
+        view_count: 0,
+        expires_at: '2026-11-01T00:00:00Z',
+        created_at: '2026-10-08T00:00:00Z',
+      };
+
+      const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
+        data: mockCreated,
+      });
+
+      const payload = {
+        label: 'Google Recruiter',
+        expires_in_days: 30,
+        allow_contact_info: true,
+        allow_unverified_projects: false,
+      };
+
+      const result = await createPassportShare(payload);
+
+      expect(postSpy).toHaveBeenCalledTimes(1);
+      expect(postSpy).toHaveBeenCalledWith('/passport/shares', payload);
+      expect(result).toEqual(mockCreated);
+      expect(result.share_token).toBe('raw_token_xyz_123');
+    });
+  });
+
+  describe('listPassportShares', () => {
+    it('dispatches GET to /passport/shares and returns summary list', async () => {
+      const mockShares = [
+        {
+          id: 1,
+          token_preview: 'cb_share_abc...',
+          share_url: null,
+          label: 'Default Link',
+          is_active: true,
+          allow_contact_info: false,
+          allow_unverified_projects: false,
+          view_count: 5,
+          last_accessed_at: '2026-10-07T12:00:00Z',
+          expires_at: null,
+          created_at: '2026-10-01T00:00:00Z',
+          revoked_at: null,
+        },
+      ];
+
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
+        data: mockShares,
+      });
+
+      const result = await listPassportShares();
+
+      expect(getSpy).toHaveBeenCalledTimes(1);
+      expect(getSpy).toHaveBeenCalledWith('/passport/shares');
+      expect(result).toEqual(mockShares);
+    });
+  });
+
+  describe('updatePassportShare', () => {
+    it('dispatches PATCH to /passport/shares/{id} and returns updated share', async () => {
+      const mockUpdated = {
+        id: 1,
+        token_preview: 'cb_share_abc...',
+        share_url: null,
+        label: 'Updated Label',
+        is_active: true,
+        allow_contact_info: true,
+        allow_unverified_projects: true,
+        view_count: 5,
+        last_accessed_at: null,
+        expires_at: '2026-11-01T00:00:00Z',
+        created_at: '2026-10-01T00:00:00Z',
+        revoked_at: null,
+      };
+
+      const patchSpy = vi.spyOn(apiClient, 'patch').mockResolvedValueOnce({
+        data: mockUpdated,
+      });
+
+      const payload = {
+        label: 'Updated Label',
+        allow_contact_info: true,
+        allow_unverified_projects: true,
+      };
+
+      const result = await updatePassportShare(1, payload);
+
+      expect(patchSpy).toHaveBeenCalledTimes(1);
+      expect(patchSpy).toHaveBeenCalledWith('/passport/shares/1', payload);
+      expect(result).toEqual(mockUpdated);
+    });
+  });
+
+  describe('revokePassportShare', () => {
+    it('dispatches DELETE to /passport/shares/{id}', async () => {
+      const deleteSpy = vi.spyOn(apiClient, 'delete').mockResolvedValueOnce({
+        data: null,
+      });
+
+      await revokePassportShare(1);
+
+      expect(deleteSpy).toHaveBeenCalledTimes(1);
+      expect(deleteSpy).toHaveBeenCalledWith('/passport/shares/1');
+    });
+  });
+
+  describe('getPublicPassport', () => {
+    it('dispatches GET to /public/passport/{share_token} and returns public projection', async () => {
+      const mockPublicResponse = {
+        full_name: 'Alex Morgan',
+        institution: 'MIT',
+        major: 'Computer Science',
+        degree: 'B.S.',
+        graduation_year: 2026,
+        bio: 'Builder',
+        avatar_url: null,
+        contact_info: null,
+        verification_summary: {
+          issuer: 'CareerBridge',
+          verification_status: 'VERIFIED',
+          verified_at: '2026-09-01T00:00:00Z',
+          verified_placements_count: 1,
+          verified_projects_count: 1,
+          total_verified_skills: 2,
+        },
+        verified_skills: [
+          {
+            skill_name: 'Python',
+            category: 'Backend',
+            projects_count: 1,
+            verified_placements_count: 1,
+          },
+        ],
+        experience_timeline: [
+          {
+            company_name: 'Apex Systems',
+            role_title: 'Software Intern',
+            employment_type: 'Internship',
+            start_date: '2025-06-01',
+            end_date: '2025-08-31',
+            is_current: false,
+            is_verified: true,
+            verified_at: '2025-09-01T00:00:00Z',
+          },
+        ],
+        featured_projects: [
+          {
+            title: 'Task Orchestrator',
+            tagline: 'Workflow engine',
+            description: 'Scalable system',
+            milestones_completed: 2,
+            total_milestones: 2,
+            repository_url: 'https://github.com/alexmorgan/orchestrator',
+            live_demo_url: null,
+            is_verified: true,
+            verified_evidence_count: 1,
+          },
+        ],
+      };
+
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
+        data: mockPublicResponse,
+      });
+
+      const result = await getPublicPassport('test_token_abc_123');
+
+      expect(getSpy).toHaveBeenCalledTimes(1);
+      expect(getSpy).toHaveBeenCalledWith('/public/passport/test_token_abc_123');
+      expect(result).toEqual(mockPublicResponse);
+      expect(result.verification_summary.verification_status).toBe('VERIFIED');
     });
   });
 });

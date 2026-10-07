@@ -7,6 +7,7 @@ import {
   PassportHeader,
   PassportProjects,
   PassportResume,
+  PassportShareManager,
   PassportSkills,
   PassportSummary,
 } from '@/components/passport';
@@ -110,6 +111,11 @@ export const PassportPage: React.FC = () => {
               <PassportResume resume={passport.resume} />
             </div>
           </div>
+
+          {/* Share Management Panel — Strictly restricted to passport owner */}
+          {passport.is_owner && (
+            <PassportShareManager onShareCreated={fetchPassport} />
+          )}
         </div>
       )}
     </div>

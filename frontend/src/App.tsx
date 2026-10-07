@@ -25,6 +25,7 @@ import { StudentExperiencesPage } from '@/pages/StudentExperiencesPage';
 import { RecruiterExperienceVerificationPage } from '@/pages/RecruiterExperienceVerificationPage';
 import { AdminExperienceVerificationPage } from '@/pages/AdminExperienceVerificationPage';
 import { PassportPage } from '@/pages/PassportPage';
+import { PublicPassportPage } from '@/pages/PublicPassportPage';
 import { MessagesPage } from '@/pages/MessagesPage';
 import { NotificationsPage } from '@/pages/NotificationsPage';
 import { AdminUsersPage } from '@/pages/AdminUsersPage';
@@ -44,6 +45,10 @@ export const App: React.FC = () => {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Route>
+
+      {/* Public Career Passport Sharing Route (Unauthenticated) */}
+      <Route path="/p/:shareToken" element={<PublicPassportPage />} />
+
 
       {/* Protected Authenticated Routes */}
       <Route element={<ProtectedRoute />}>

@@ -278,5 +278,47 @@ describe('PassportPage Component Foundation', () => {
     expect(getStudentSpy).toHaveBeenCalledWith(42);
     expect(getMySpy).not.toHaveBeenCalled();
     expect(screen.queryByTestId('passport-owner-badge')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('passport-share-manager')).not.toBeInTheDocument();
+  });
+
+  it('renders PassportShareManager when passport.is_owner is true', async () => {
+    vi.spyOn(passportApi, 'getMyPassport').mockResolvedValueOnce({
+      ...mockPopulatedPassport,
+      is_owner: true,
+    });
+    vi.spyOn(passportApi, 'listPassportShares').mockResolvedValueOnce([]);
+
+    render(
+      <MemoryRouter>
+        <PassportPage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('passport-content')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('passport-share-manager')).toBeInTheDocument();
+  });
+
+  it('does NOT render PassportShareManager when passport.is_owner is false', async () => {
+    vi.spyOn(passportApi, 'getStudentPassport').mockResolvedValueOnce({
+      ...mockPopulatedPassport,
+      is_owner: false,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/app/passport/99']}>
+        <Routes>
+          <Route path="/app/passport/:studentId" element={<PassportPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('passport-content')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('passport-share-manager')).not.toBeInTheDocument();
   });
 });

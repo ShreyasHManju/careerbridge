@@ -233,4 +233,42 @@ describe('Experience Passport Routing and Role Protection', () => {
       expect(getStudentSpy).toHaveBeenCalledWith(999);
     });
   });
+
+  describe('/p/:shareToken (Public Unauthenticated Route)', () => {
+    it('allows public unauthenticated visitor to resolve /p/:shareToken without redirecting to login', async () => {
+      setupAuthMock(null); // Unauthenticated visitor
+      const getPublicSpy = vi.spyOn(passportApi, 'getPublicPassport').mockResolvedValueOnce({
+        full_name: 'Jane Doe',
+        institution: 'UC Berkeley',
+        major: 'EECS',
+        degree: 'B.S.',
+        graduation_year: 2026,
+        bio: 'Open source contributor',
+        avatar_url: null,
+        contact_info: null,
+        verification_summary: {
+          issuer: 'CareerBridge',
+          verification_status: 'VERIFIED',
+          verified_at: '2026-09-01T00:00:00Z',
+          verified_placements_count: 1,
+          verified_projects_count: 1,
+          total_verified_skills: 2,
+        },
+        verified_skills: [],
+        experience_timeline: [],
+        featured_projects: [],
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/p/public_share_token_123']}>
+          <App />
+        </MemoryRouter>
+      );
+
+      expect(await screen.findByTestId('public-passport-page')).toBeInTheDocument();
+      expect(getPublicSpy).toHaveBeenCalledWith('public_share_token_123');
+      expect(screen.getByTestId('public-passport-name')).toHaveTextContent('Jane Doe');
+      expect(screen.queryByRole('button', { name: /sign in/i })).not.toBeInTheDocument();
+    });
+  });
 });
