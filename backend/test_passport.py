@@ -24,7 +24,7 @@ if str(backend_dir) not in sys.path:
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, engine
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models.experience_record import (
@@ -36,6 +36,7 @@ from app.models.experience_record import (
 )
 from app.models.innovation_project import (
     InnovationProject,
+    ProjectSkill,
     ProjectStatus,
     ProjectType,
     ProjectVisibility,
@@ -52,6 +53,8 @@ from app.models.project_evaluation import (
 from app.models.project_milestone import MilestoneStatus, ProjectMilestone
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.resume import Resume
+from app.core.rate_limit import rate_limiter
+from app.models.passport_share import PassportShare
 from app.models.skill import Skill, StudentSkill
 from app.models.student_profile import StudentProfile
 from app.models.user import User, UserRole
@@ -87,6 +90,7 @@ def cleanup_test_data():
 
 def setup_users():
     """Create test users and return their IDs and JWT tokens."""
+    PassportShare.__table__.create(bind=engine, checkfirst=True)
     cleanup_test_data()
     with SessionLocal() as db:
         # Student 1
@@ -814,6 +818,498 @@ def test_8_passport_recruiter_evaluations_aggregation_and_privacy():
     print("  [PASS] Withdrawn evaluations are strictly omitted from Passport.")
 
 
+def test_9_passport_share_lifecycle_and_crud():
+    """
+    Test 9: Verify authenticated student Passport Share lifecycle:
+    - Authenticated student can create a new share link (POST /api/v1/passport/shares)
+    - Unauthenticated requests receive 401
+    - Non-student roles receive 403
+    - Raw token is returned only on creation with usable /p/ share URL
+    - List shares returns masked token preview and share_url=None
+    - Update share modifies label, activation, and expiration
+    - Delete share revokes the link (204 No Content)
+    """
+    print("\n--- Test 9: Passport Share CRUD & Lifecycle ---")
+    data = setup_users()
+    s1_id = data["s1_id"]
+    headers_s1 = {"Authorization": f"Bearer {data['token_s1']}"}
+    headers_r1 = {"Authorization": f"Bearer {data['token_r1']}"}
+
+    # 1. Unauthenticated creation rejected
+    res_unauth = client.post(
+        "/api/v1/passport/shares",
+        json={"label": "Unauth Test"},
+    )
+    assert res_unauth.status_code == 401
+    print("  [PASS] Unauthenticated share creation rejected with 401.")
+
+    # 2. Non-student role rejected
+    res_rec = client.post(
+        "/api/v1/passport/shares",
+        json={"label": "Recruiter Test"},
+        headers=headers_r1,
+    )
+    assert res_rec.status_code == 403
+    print("  [PASS] Non-student role share creation rejected with 403.")
+
+    # 3. Authenticated student creates share link
+    create_payload = {
+        "label": "Engineering Recruiter Share",
+        "expires_in_days": 30,
+        "allow_contact_info": True,
+        "allow_unverified_projects": False,
+    }
+    res_create = client.post(
+        "/api/v1/passport/shares",
+        json=create_payload,
+        headers=headers_s1,
+    )
+    assert res_create.status_code == 201
+    created_body = res_create.json()
+    assert "share_token" in created_body
+    raw_token = created_body["share_token"]
+    assert raw_token.startswith("cb_share_")
+    assert created_body["share_url"] == f"/p/{raw_token}"
+    assert created_body["label"] == "Engineering Recruiter Share"
+    assert created_body["is_active"] is True
+    assert created_body["allow_contact_info"] is True
+    assert created_body["allow_unverified_projects"] is False
+    assert created_body["view_count"] == 0
+    assert created_body["expires_at"] is not None
+    share_id = created_body["id"]
+    print("  [PASS] Student successfully creates share link with raw token and share URL.")
+
+    # 4. List shares returns safe historical summary
+    res_list = client.get("/api/v1/passport/shares", headers=headers_s1)
+    assert res_list.status_code == 200
+    shares_list = res_list.json()
+    assert len(shares_list) == 1
+    item = shares_list[0]
+    assert item["id"] == share_id
+    assert item["label"] == "Engineering Recruiter Share"
+    assert item["token_preview"].startswith("cb_share_")
+    assert "..." in item["token_preview"]
+    assert item["share_url"] is None
+    assert "share_token" not in item
+    print("  [PASS] List shares returns masked token preview and share_url=None.")
+
+    # 5. Update share: label and expiration
+    res_upd = client.patch(
+        f"/api/v1/passport/shares/{share_id}",
+        json={"label": "Updated Label", "clear_expiration": True},
+        headers=headers_s1,
+    )
+    assert res_upd.status_code == 200
+    upd_body = res_upd.json()
+    assert upd_body["label"] == "Updated Label"
+    assert upd_body["expires_at"] is None
+    assert upd_body["is_active"] is True
+    print("  [PASS] Update share successfully updates label and clears expiration.")
+
+    # 6. Deactivate / Revoke via update
+    res_deact = client.patch(
+        f"/api/v1/passport/shares/{share_id}",
+        json={"is_active": False},
+        headers=headers_s1,
+    )
+    assert res_deact.status_code == 200
+    assert res_deact.json()["is_active"] is False
+    assert res_deact.json()["revoked_at"] is not None
+    print("  [PASS] Deactivating share link records revoked_at timestamp.")
+
+    # 7. Reactivate via update
+    res_react = client.patch(
+        f"/api/v1/passport/shares/{share_id}",
+        json={"is_active": True},
+        headers=headers_s1,
+    )
+    assert res_react.status_code == 200
+    assert res_react.json()["is_active"] is True
+    assert res_react.json()["revoked_at"] is None
+    print("  [PASS] Reactivating share link clears revoked_at timestamp.")
+
+    # 8. Delete / Revoke via DELETE endpoint
+    res_del = client.delete(f"/api/v1/passport/shares/{share_id}", headers=headers_s1)
+    assert res_del.status_code == 204
+    # Verify share is now inactive in DB
+    res_list_after = client.get("/api/v1/passport/shares", headers=headers_s1)
+    assert res_list_after.json()[0]["is_active"] is False
+    print("  [PASS] DELETE /passport/shares/{id} successfully revokes share link (204).")
+
+
+def test_10_passport_share_idor_prevention():
+    """
+    Test 10: Strict IDOR prevention between students:
+    - Student A cannot access or list Student B's share links
+    - Student A cannot modify Student B's share links
+    - Student A cannot revoke Student B's share links
+    """
+    print("\n--- Test 10: Passport Share IDOR Protection ---")
+    data = setup_users()
+    headers_s1 = {"Authorization": f"Bearer {data['token_s1']}"}
+    headers_s2 = {"Authorization": f"Bearer {data['token_s2']}"}
+
+    # Student 1 creates a share
+    res_create = client.post(
+        "/api/v1/passport/shares",
+        json={"label": "Student 1 Share"},
+        headers=headers_s1,
+    )
+    assert res_create.status_code == 201
+    s1_share_id = res_create.json()["id"]
+
+    # Student 2 lists shares: must see 0 shares (isolated)
+    res_s2_list = client.get("/api/v1/passport/shares", headers=headers_s2)
+    assert res_s2_list.status_code == 200
+    assert len(res_s2_list.json()) == 0
+    print("  [PASS] Student 2 cannot view Student 1's share links.")
+
+    # Student 2 attempts to update Student 1's share: rejected with 404
+    res_s2_upd = client.patch(
+        f"/api/v1/passport/shares/{s1_share_id}",
+        json={"label": "Hacked Label"},
+        headers=headers_s2,
+    )
+    assert res_s2_upd.status_code == 404
+    print("  [PASS] Student 2 cannot update Student 1's share link (404 Not Found).")
+
+    # Student 2 attempts to delete Student 1's share: rejected with 404
+    res_s2_del = client.delete(
+        f"/api/v1/passport/shares/{s1_share_id}",
+        headers=headers_s2,
+    )
+    assert res_s2_del.status_code == 404
+    print("  [PASS] Student 2 cannot revoke Student 1's share link (404 Not Found).")
+
+
+def test_11_public_passport_verification_and_privacy():
+    """
+    Test 11: Public Passport Resolution, Verification Summary, and Privacy Shielding:
+    - Public endpoint /api/v1/public/passport/{share_token} resolves without auth
+    - Cache-Control header is set to no-store, no-cache, must-revalidate
+    - No internal student ID, recruiter ID, or evaluation IDs leaked
+    - Avatar URL is None (no ID leaked)
+    - Verification timestamp derived from authoritative artifact timestamps
+    - Contact info respects allow_contact_info flag
+    - Unverified projects respect allow_unverified_projects flag
+    """
+    print("\n--- Test 11: Public Passport Verification & Privacy ---")
+    data = setup_users()
+    s1_id = data["s1_id"]
+    headers_s1 = {"Authorization": f"Bearer {data['token_s1']}"}
+
+    # Setup student profile, verified experience, verified project, and unverified project
+    with SessionLocal() as db:
+        # Profile
+        p1 = db.scalar(select(StudentProfile).where(StudentProfile.user_id == s1_id))
+        if p1:
+            p1.full_name = "Alex Vance"
+            p1.phone = "+1-555-0199"
+            p1.college = "MIT"
+            p1.degree = "B.S."
+            p1.branch = "Computer Science"
+            p1.graduation_year = 2026
+            p1.bio = "Systems programmer & distributed systems builder."
+            p1.portfolio_url = "https://alexvance.dev"
+            p1.linkedin_url = "https://linkedin.com/in/alexvance"
+            p1.github_url = "https://github.com/alexvance"
+        else:
+            db.add(
+                StudentProfile(
+                    user_id=s1_id,
+                    full_name="Alex Vance",
+                    phone="+1-555-0199",
+                    college="MIT",
+                    degree="B.S.",
+                    branch="Computer Science",
+                    graduation_year=2026,
+                    bio="Systems programmer & distributed systems builder.",
+                    portfolio_url="https://alexvance.dev",
+                    linkedin_url="https://linkedin.com/in/alexvance",
+                    github_url="https://github.com/alexvance",
+                )
+            )
+        # Verified Experience
+        exp_verified_at = datetime(2026, 5, 15, 10, 0, 0, tzinfo=timezone.utc)
+        exp = ExperienceRecord(
+            student_id=s1_id,
+            title="Systems Engineering Intern",
+            organization_name="Apex Systems",
+            experience_type=ExperienceType.INTERNSHIP,
+            start_date=date(2025, 6, 1),
+            end_date=date(2025, 8, 31),
+            is_current=False,
+            description="Built high-throughput message pipelines.",
+            status=VerificationStatus.VERIFIED,
+            verification_source=VerificationSource.RECRUITER_CONFIRMED,
+            verified_at=exp_verified_at,
+        )
+        db.add(exp)
+        db.flush()
+
+        skill_go = get_or_create_skill(db, "Go", "Languages", is_verified=True)
+        db.add(ExperienceSkill(experience_record_id=exp.id, skill_id=skill_go.id))
+
+        # Verified Project
+        proj_verified_at = datetime(2026, 6, 20, 14, 30, 0, tzinfo=timezone.utc)
+        proj_v = InnovationProject(
+            student_id=s1_id,
+            title="Distributed Raft Cluster",
+            slug="distributed-raft-cluster",
+            short_description="Consensus engine in Go",
+            description="Production Raft implementation.",
+            project_type=ProjectType.SOFTWARE,
+            status=ProjectStatus.ACTIVE,
+            visibility=ProjectVisibility.PUBLIC,
+            repository_url="https://github.com/alexvance/raft",
+        )
+        db.add(proj_v)
+        db.flush()
+
+        ev = ProjectEvidence(
+            innovation_project_id=proj_v.id,
+            title="Repository Proof",
+            url="https://github.com/alexvance/raft",
+            evidence_type=EvidenceType.REPOSITORY,
+        )
+        db.add(ev)
+        db.flush()
+
+        ev_ver = EvidenceVerification(
+            evidence_id=ev.id,
+            status=EvidenceVerificationStatus.VERIFIED,
+            verified_at=proj_verified_at,
+        )
+        db.add(ev_ver)
+
+        skill_dist = get_or_create_skill(db, "Distributed Systems", "Architecture", is_verified=True)
+        db.add(ProjectSkill(innovation_project_id=proj_v.id, skill_id=skill_dist.id))
+
+        # Unverified Project
+        proj_unv = InnovationProject(
+            student_id=s1_id,
+            title="Unverified Toy Project",
+            slug="unverified-toy-project",
+            short_description="Toy parser in Python",
+            description="Unverified experiments.",
+            project_type=ProjectType.SOFTWARE,
+            status=ProjectStatus.ACTIVE,
+            visibility=ProjectVisibility.PUBLIC,
+        )
+        db.add(proj_unv)
+        db.flush()
+        skill_py = get_or_create_skill(db, "Python", "Languages", is_verified=False)
+        db.add(ProjectSkill(innovation_project_id=proj_unv.id, skill_id=skill_py.id))
+
+        db.commit()
+
+    # Create share link with allow_contact_info=True, allow_unverified_projects=False
+    res_c1 = client.post(
+        "/api/v1/passport/shares",
+        json={"label": "Verified Only", "allow_contact_info": True, "allow_unverified_projects": False},
+        headers=headers_s1,
+    )
+    raw_token1 = res_c1.json()["share_token"]
+
+    # Public request without credentials
+    res_pub = client.get(f"/api/v1/public/passport/{raw_token1}")
+    assert res_pub.status_code == 200
+    assert res_pub.headers.get("Cache-Control") == "no-store, no-cache, must-revalidate"
+    pub_data = res_pub.json()
+
+    # Verify Profile header
+    assert pub_data["full_name"] == "Alex Vance"
+    assert pub_data["institution"] == "MIT"
+    assert pub_data["major"] == "Computer Science"
+    assert pub_data["degree"] == "B.S."
+    assert pub_data["graduation_year"] == 2026
+    assert pub_data["avatar_url"] is None  # Student ID shielded
+
+    # Verify Contact info (included when True)
+    assert pub_data["contact_info"] is not None
+    assert pub_data["contact_info"]["email"] == STUDENT1_EMAIL
+    assert pub_data["contact_info"]["phone"] == "+1-555-0199"
+    assert pub_data["contact_info"]["portfolio_url"] == "https://alexvance.dev"
+
+    # Verify Verification summary
+    v_summary = pub_data["verification_summary"]
+    assert v_summary["issuer"] == "CareerBridge"
+    assert v_summary["verification_status"] == "VERIFIED"
+    assert v_summary["verified_placements_count"] == 1
+    assert v_summary["verified_projects_count"] == 1
+    # Latest verified timestamp is max(exp_verified_at, proj_verified_at) = proj_verified_at
+    assert v_summary["verified_at"] is not None
+    assert "2026-06-20" in v_summary["verified_at"]
+
+    # Verify Experience timeline (no internal IDs)
+    assert len(pub_data["experience_timeline"]) == 1
+    exp_item = pub_data["experience_timeline"][0]
+    assert exp_item["company_name"] == "Apex Systems"
+    assert exp_item["role_title"] == "Systems Engineering Intern"
+    assert exp_item["is_verified"] is True
+    assert "id" not in exp_item
+    assert "student_id" not in exp_item
+
+    # Verify Featured projects (unverified excluded when allow_unverified_projects=False)
+    assert len(pub_data["featured_projects"]) == 1
+    assert pub_data["featured_projects"][0]["title"] == "Distributed Raft Cluster"
+    assert pub_data["featured_projects"][0]["is_verified"] is True
+    assert "id" not in pub_data["featured_projects"][0]
+
+    # Verify Verified skills: Go and Distributed Systems present, Python strictly excluded
+    skill_names = [s["skill_name"] for s in pub_data["verified_skills"]]
+    assert "Go" in skill_names
+    assert "Distributed Systems" in skill_names
+    assert "Python" not in skill_names
+    print("  [PASS] Public passport verified projections and privacy shields verified.")
+
+    # Create share link with allow_contact_info=False, allow_unverified_projects=True
+    res_c2 = client.post(
+        "/api/v1/passport/shares",
+        json={"label": "Unverified Included", "allow_contact_info": False, "allow_unverified_projects": True},
+        headers=headers_s1,
+    )
+    raw_token2 = res_c2.json()["share_token"]
+    res_pub2 = client.get(f"/api/v1/public/passport/{raw_token2}")
+    assert res_pub2.status_code == 200
+    pub_data2 = res_pub2.json()
+
+    # Contact info omitted when allow_contact_info=False
+    assert pub_data2["contact_info"] is None
+
+    # Featured projects includes unverified project marked with is_verified=False
+    proj_titles = [p["title"] for p in pub_data2["featured_projects"]]
+    assert "Distributed Raft Cluster" in proj_titles
+    assert "Unverified Toy Project" in proj_titles
+    toy_proj = next(p for p in pub_data2["featured_projects"] if p["title"] == "Unverified Toy Project")
+    assert toy_proj["is_verified"] is False
+
+    # Unverified project skills STILL excluded from verified_skills
+    skill_names2 = [s["skill_name"] for s in pub_data2["verified_skills"]]
+    assert "Python" not in skill_names2
+    print("  [PASS] Contact info omitted and unverified project skills excluded from verified_skills.")
+
+
+def test_12_public_passport_status_guards_and_view_count_isolation():
+    """
+    Test 12: Public Endpoint Status Guards & Atomic View Counting:
+    - Valid token increments view_count atomically
+    - Invalid token returns 404 (no view count increment)
+    - Revoked token returns 410 (no view count increment)
+    - Expired token returns 410 (no view count increment)
+    - Inactive student returns 404 (no view count increment)
+    """
+    print("\n--- Test 12: Public Status Guards & Atomic View Count ---")
+    data = setup_users()
+    s1_id = data["s1_id"]
+    headers_s1 = {"Authorization": f"Bearer {data['token_s1']}"}
+
+    res_c = client.post(
+        "/api/v1/passport/shares",
+        json={"label": "View Count Guard Test"},
+        headers=headers_s1,
+    )
+    share_id = res_c.json()["id"]
+    raw_token = res_c.json()["share_token"]
+
+    # 1. First valid request increments view count to 1
+    res1 = client.get(f"/api/v1/public/passport/{raw_token}")
+    assert res1.status_code == 200
+
+    with SessionLocal() as db:
+        share_db = db.scalar(select(PassportShare).where(PassportShare.id == share_id))
+        assert share_db.view_count == 1
+        assert share_db.last_accessed_at is not None
+
+    # 2. Second valid request increments view count to 2
+    res2 = client.get(f"/api/v1/public/passport/{raw_token}")
+    assert res2.status_code == 200
+
+    with SessionLocal() as db:
+        share_db = db.scalar(select(PassportShare).where(PassportShare.id == share_id))
+        assert share_db.view_count == 2
+    print("  [PASS] Atomic view count increments on valid requests.")
+
+    # 3. Invalid token returns 404 and does not increment
+    res_invalid = client.get("/api/v1/public/passport/cb_share_completely_invalid_token_12345")
+    assert res_invalid.status_code == 404
+
+    # 4. Revoked token returns 410 and does not increment
+    client.patch(f"/api/v1/passport/shares/{share_id}", json={"is_active": False}, headers=headers_s1)
+    res_revoked = client.get(f"/api/v1/public/passport/{raw_token}")
+    assert res_revoked.status_code == 410
+
+    with SessionLocal() as db:
+        share_db = db.scalar(select(PassportShare).where(PassportShare.id == share_id))
+        assert share_db.view_count == 2
+    print("  [PASS] Revoked token returns 410 with no view count increment.")
+
+    # 5. Expired token returns 410 and does not increment
+    client.patch(f"/api/v1/passport/shares/{share_id}", json={"is_active": True}, headers=headers_s1)
+    with SessionLocal() as db:
+        share_db = db.scalar(select(PassportShare).where(PassportShare.id == share_id))
+        share_db.expires_at = datetime.now(timezone.utc) - timedelta(days=1)
+        db.commit()
+
+    res_expired = client.get(f"/api/v1/public/passport/{raw_token}")
+    assert res_expired.status_code == 410
+
+    with SessionLocal() as db:
+        share_db = db.scalar(select(PassportShare).where(PassportShare.id == share_id))
+        assert share_db.view_count == 2
+    print("  [PASS] Expired token returns 410 with no view count increment.")
+
+    # 6. Inactive student returns 404 and does not increment
+    client.patch(f"/api/v1/passport/shares/{share_id}", json={"clear_expiration": True}, headers=headers_s1)
+    with SessionLocal() as db:
+        s1 = db.scalar(select(User).where(User.id == s1_id))
+        s1.is_active = False
+        db.commit()
+
+    res_inactive = client.get(f"/api/v1/public/passport/{raw_token}")
+    assert res_inactive.status_code == 404
+
+    with SessionLocal() as db:
+        share_db = db.scalar(select(PassportShare).where(PassportShare.id == share_id))
+        assert share_db.view_count == 2
+        # Restore student active state
+        s1 = db.scalar(select(User).where(User.id == s1_id))
+        s1.is_active = True
+        db.commit()
+    print("  [PASS] Inactive student returns 404 with no view count increment.")
+
+
+def test_13_public_passport_rate_limiting():
+    """
+    Test 13: Public Passport Sliding-Window Rate Limiting:
+    - Enforces max 60 requests/minute per IP
+    - Exceeding limit triggers HTTP 429 Too Many Requests with Retry-After header
+    """
+    print("\n--- Test 13: Public Passport Rate Limiting ---")
+    rate_limiter.reset()
+    data = setup_users()
+    headers_s1 = {"Authorization": f"Bearer {data['token_s1']}"}
+
+    res_c = client.post(
+        "/api/v1/passport/shares",
+        json={"label": "Rate Limit Test"},
+        headers=headers_s1,
+    )
+    raw_token = res_c.json()["share_token"]
+
+    # Send 60 requests -> all should succeed (200)
+    for i in range(60):
+        res = client.get(f"/api/v1/public/passport/{raw_token}")
+        assert res.status_code == 200
+
+    # 61st request -> should trigger 429 RateLimitExceeded
+    res_limited = client.get(f"/api/v1/public/passport/{raw_token}")
+    assert res_limited.status_code == 429
+    assert "Retry-After" in res_limited.headers
+    print("  [PASS] 61st request triggers HTTP 429 with Retry-After header.")
+    rate_limiter.reset()
+
+
 def run_all():
     print("=" * 70)
     print("CAREERBRIDGE 2.0-E — EXPERIENCE PASSPORT TEST SUITE")
@@ -826,11 +1322,15 @@ def run_all():
     test_6_security_and_nonexistent_students()
     test_7_passport_verified_evidence_aggregation_and_privacy()
     test_8_passport_recruiter_evaluations_aggregation_and_privacy()
+    test_9_passport_share_lifecycle_and_crud()
+    test_10_passport_share_idor_prevention()
+    test_11_public_passport_verification_and_privacy()
+    test_12_public_passport_status_guards_and_view_count_isolation()
+    test_13_public_passport_rate_limiting()
     cleanup_test_data()
     print("\n" + "=" * 70)
     print("ALL 2.0-E EXPERIENCE PASSPORT TESTS PASSED!")
     print("=" * 70)
-
 
 if __name__ == "__main__":
     run_all()

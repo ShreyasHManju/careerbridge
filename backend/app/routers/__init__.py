@@ -4,7 +4,7 @@ from app.routers.auth import router as auth_router
 from app.routers.dashboards import router as dashboards_router
 from app.routers.innovation_projects import router as innovation_projects_router
 from app.routers.experience_records import router as experience_records_router
-from app.routers.passport import router as passport_router
+from app.routers.passport import public_router as public_passport_router, router as passport_router
 from app.routers.project_evaluations import router as project_evaluations_router
 from app.routers.job_invitations import router as job_invitations_router
 from app.routers.candidate_evaluations import router as candidate_evaluations_router
@@ -45,6 +45,7 @@ __all__ = [
     "innovation_projects_router",
     "experience_records_router",
     "passport_router",
+    "public_passport_router",
     "project_evaluations_router",
     "candidate_evaluations_router",
     "job_invitations_router",

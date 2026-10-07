@@ -32,6 +32,7 @@ from app.models.candidate_evaluation import (
 )
 from app.models.job_invitation import JobInvitation, InvitationStatus
 from app.models.job_offer import JobOffer, OfferStatus
+from app.models.passport_share import PassportShare
 
 __all__ = [
     "Base",
@@ -88,4 +89,5 @@ __all__ = [
     "InvitationStatus",
     "JobOffer",
     "OfferStatus",
+    "PassportShare",
 ]

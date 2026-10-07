@@ -169,3 +169,136 @@ class PassportResponse(BaseModel):
     resume: Optional[PassportResumeInfo] = None
     is_owner: bool = False
     model_config = ConfigDict(from_attributes=True)
+
+
+# ==============================================================================
+# Phase 36: Passport Sharing & Public Sanitized Projections
+# ==============================================================================
+
+class PassportShareCreateRequest(BaseModel):
+    """Payload for creating a new public Passport share link."""
+    label: Optional[str] = Field(None, max_length=128, description="Optional memorable label for the link")
+    expires_in_days: Optional[int] = Field(None, ge=1, le=365, description="Optional link lifetime in days")
+    allow_contact_info: bool = Field(False, description="Whether direct contact info (email/phone) is visible")
+    allow_unverified_projects: bool = Field(False, description="Whether unverified in-progress projects are visible")
+
+
+class PassportShareUpdateRequest(BaseModel):
+    """Payload for modifying an existing Passport share link."""
+    label: Optional[str] = Field(None, max_length=128)
+    allow_contact_info: Optional[bool] = None
+    allow_unverified_projects: Optional[bool] = None
+    is_active: Optional[bool] = None
+    expires_in_days: Optional[int] = Field(None, ge=1, le=365, description="Set new expiration in N days from now")
+    clear_expiration: Optional[bool] = Field(False, description="Explicitly remove expiration and make link indefinite")
+
+
+class PassportShareCreateResponse(BaseModel):
+    """Response returned upon creating a Passport share link. Contains the raw token exactly once."""
+    id: int
+    share_token: str
+    share_url: str
+    label: Optional[str] = None
+    is_active: bool = True
+    allow_contact_info: bool = False
+    allow_unverified_projects: bool = False
+    view_count: int = 0
+    expires_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PassportShareSummaryResponse(BaseModel):
+    """Summary of a Passport share link for student link management. Raw token is never returned."""
+    id: int
+    token_preview: str
+    share_url: Optional[str] = None
+    label: Optional[str] = None
+    is_active: bool = True
+    allow_contact_info: bool = False
+    allow_unverified_projects: bool = False
+    view_count: int = 0
+    last_accessed_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    created_at: datetime
+    revoked_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PublicVerificationSummary(BaseModel):
+    """Authoritative platform verification summary without internal identifiers."""
+    issuer: str = "CareerBridge"
+    verification_status: str = "VERIFIED"
+    verified_at: Optional[datetime] = None
+    verified_placements_count: int = 0
+    verified_projects_count: int = 0
+    total_verified_skills: int = 0
+
+
+class PublicSkillProvenance(BaseModel):
+    """Sanitized skill competency backed by project and placement evidence."""
+    skill_name: str
+    category: Optional[str] = None
+    projects_count: int = 0
+    verified_placements_count: int = 0
+
+
+class PublicExperienceItem(BaseModel):
+    """Sanitized verified employer experience item. Internal IDs and notes strictly omitted."""
+    company_name: str
+    role_title: str
+    employment_type: str
+    start_date: str
+    end_date: Optional[str] = None
+    is_current: bool = False
+    is_verified: bool = True
+    verified_at: Optional[datetime] = None
+
+
+class PublicProjectItem(BaseModel):
+    """Sanitized public innovation project. Internal IDs and raw storage paths strictly omitted."""
+    title: str
+    tagline: Optional[str] = None
+    description: str
+    milestones_completed: int = 0
+    total_milestones: int = 0
+    repository_url: Optional[str] = None
+    live_demo_url: Optional[str] = None
+    is_verified: bool = False
+    verified_evidence_count: int = 0
+
+
+class PublicContactInfo(BaseModel):
+    """Sanitized public contact info included ONLY when allow_contact_info is True."""
+    email: str
+    phone: Optional[str] = None
+    portfolio_url: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    github_url: Optional[str] = None
+
+
+class PublicPassportResponse(BaseModel):
+    """
+    Explicit, sanitized public projection of a student's Career Passport.
+    Never exposes internal database IDs, candidate evaluations, recruiter notes,
+    application history, or offer terms.
+    """
+    # Student Header
+    full_name: Optional[str] = None
+    institution: Optional[str] = None
+    major: Optional[str] = None
+    degree: Optional[str] = None
+    graduation_year: Optional[int] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+    # Optional Contact Info (Present ONLY when allow_contact_info == True)
+    contact_info: Optional[PublicContactInfo] = None
+
+    # Verification & Public Artifacts
+    verification_summary: PublicVerificationSummary
+    verified_skills: List[PublicSkillProvenance] = Field(default_factory=list)
+    experience_timeline: List[PublicExperienceItem] = Field(default_factory=list)
+    featured_projects: List[PublicProjectItem] = Field(default_factory=list)
