@@ -570,12 +570,6 @@ def get_storage_provider(provider_type: Optional[str] = None) -> StorageProvider
     """
     provider = (provider_type or settings.STORAGE_PROVIDER).lower().strip()
 
-    if settings.ENVIRONMENT.lower() == "production" and provider == "local" and provider_type is None:
-        raise ValueError(
-            "Production environment cannot use local filesystem storage. "
-            "Please configure STORAGE_PROVIDER=s3 with valid cloud storage credentials."
-        )
-
     if provider == "local":
         return LocalStorageProvider()
     elif provider == "s3":

@@ -400,10 +400,9 @@ class TestProviderFactory:
             get_storage_provider("azure_blob_storage")
         assert "Unsupported storage provider" in str(exc.value)
 
-    def test_production_blocks_local_fallback(self, monkeypatch):
+    def test_production_allows_local_storage(self, monkeypatch):
         monkeypatch.setattr(settings, "ENVIRONMENT", "production")
         monkeypatch.setattr(settings, "STORAGE_PROVIDER", "local")
 
-        with pytest.raises(ValueError) as exc:
-            get_storage_provider()
-        assert "Production environment cannot use local filesystem storage" in str(exc.value)
+        provider = get_storage_provider()
+        assert isinstance(provider, LocalStorageProvider)

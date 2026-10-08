@@ -169,11 +169,26 @@ def test_production_rejects_non_http_cors_origin():
 # 5. STORAGE PROVIDER VALIDATION IN PRODUCTION
 # ==============================================================================
 
-def test_production_rejects_local_storage_provider():
-    """Production startup must fail if STORAGE_PROVIDER is 'local'."""
-    settings = create_valid_production_settings(STORAGE_PROVIDER="local")
+def test_production_allows_valid_local_storage_provider():
+    """Production startup succeeds with STORAGE_PROVIDER='local' and valid UPLOAD_DIR."""
+    settings = create_valid_production_settings(STORAGE_PROVIDER="local", UPLOAD_DIR="uploads")
     errors = validate_production_configuration(settings)
-    assert any("STORAGE_PROVIDER must be 's3' in production" in err for err in errors)
+    assert errors == []
+    assert_production_configuration_or_fail(settings)
+
+
+def test_production_rejects_empty_upload_dir_with_local_storage():
+    """Production startup must fail if STORAGE_PROVIDER is 'local' but UPLOAD_DIR is empty."""
+    settings = create_valid_production_settings(STORAGE_PROVIDER="local", UPLOAD_DIR="   ")
+    errors = validate_production_configuration(settings)
+    assert any("UPLOAD_DIR must be configured" in err for err in errors)
+
+
+def test_production_rejects_unsupported_storage_provider():
+    """Production startup must fail if STORAGE_PROVIDER is unsupported (neither 's3' nor 'local')."""
+    settings = create_valid_production_settings(STORAGE_PROVIDER="azure_blob")
+    errors = validate_production_configuration(settings)
+    assert any("STORAGE_PROVIDER must be 's3' or 'local' in production" in err for err in errors)
 
 
 def test_production_rejects_s3_storage_without_bucket():

@@ -137,15 +137,20 @@ def _validate_cors_origins(settings: Settings, errors: List[str]) -> None:
 
 def _validate_storage_provider(settings: Settings, errors: List[str]) -> None:
     provider = (settings.STORAGE_PROVIDER or "").strip().lower()
-    if provider != "s3":
+    if provider == "s3":
+        bucket = (settings.STORAGE_BUCKET or "").strip()
+        if not bucket:
+            errors.append("STORAGE_BUCKET must be configured and non-empty when STORAGE_PROVIDER is 's3' in production.")
+    elif provider == "local":
+        upload_dir = (settings.UPLOAD_DIR or "").strip()
+        if not upload_dir:
+            errors.append("UPLOAD_DIR must be configured and non-empty when STORAGE_PROVIDER is 'local' in production.")
+        elif "\x00" in upload_dir:
+            errors.append("UPLOAD_DIR contains invalid characters in production.")
+    else:
         errors.append(
-            f"STORAGE_PROVIDER must be 's3' in production (configured provider: '{provider or 'none'}')."
+            f"STORAGE_PROVIDER must be 's3' or 'local' in production (configured provider: '{provider or 'none'}')."
         )
-        return
-
-    bucket = (settings.STORAGE_BUCKET or "").strip()
-    if not bucket:
-        errors.append("STORAGE_BUCKET must be configured and non-empty when STORAGE_PROVIDER is 's3' in production.")
 
 
 def _validate_database_credentials(settings: Settings, errors: List[str]) -> None:
