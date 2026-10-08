@@ -714,8 +714,15 @@ def test_e2e_application_status_update_dispatches_status_email():
         assert app_rec is not None
         application_id = app_rec.id
 
-    _default_local_provider.clear()
     headers = {"Authorization": f"Bearer {recruiter_token}"}
+    # Step applied -> reviewing first to adhere to approved lifecycle
+    client.patch(
+        f"/api/v1/recruiter/applications/{application_id}",
+        json={"status": "reviewing"},
+        headers=headers,
+    )
+
+    _default_local_provider.clear()
     response = client.patch(
         f"/api/v1/recruiter/applications/{application_id}",
         json={"status": "shortlisted"},

@@ -413,6 +413,14 @@ def test_event_application_status_changed_notifies_student():
     assert len(apps) > 0
     app_id = apps[0]["id"]
 
+    # Recruiter transitions application status to 'reviewing' first
+    rev_resp = client.patch(
+        f"/api/v1/recruiter/applications/{app_id}",
+        headers=recruiter_headers,
+        json={"status": "reviewing"},
+    )
+    assert rev_resp.status_code == 200
+
     student2_headers = get_auth_headers(STUDENT2_EMAIL)
     before_count = client.get("/api/v1/notifications/unread-count", headers=student2_headers).json()["unread_count"]
 

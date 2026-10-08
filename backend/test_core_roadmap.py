@@ -24,7 +24,7 @@ if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.database import SessionLocal
 from app.core.security import hash_password, verify_password
@@ -40,6 +40,8 @@ from app.core.test_fixtures import (
 )
 from app.main import app
 from app.models.application import Application, ApplicationStatus
+from app.models.experience_record import ExperienceRecord
+from app.models.job_offer import JobOffer
 from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
 from app.models.user import User, UserRole
 
@@ -52,6 +54,8 @@ def cleanup():
     global created_user_ids
     with get_test_db() as db:
         if created_user_ids:
+            db.execute(delete(ExperienceRecord).where(ExperienceRecord.student_id.in_(created_user_ids)))
+            db.execute(delete(JobOffer).where(JobOffer.recruiter_id.in_(created_user_ids)))
             clean_test_records(db, user_ids=created_user_ids)
             created_user_ids = []
         # Safety guard: clean any orphaned records matching test patterns
@@ -59,13 +63,15 @@ def cleanup():
             "reg_%@careerbridge.io", "login_%@careerbridge.io", "perm_%@careerbridge.io",
             "job_create_%@careerbridge.io", "filter_%@careerbridge.io", "app_%@careerbridge.io",
             "dup_%@careerbridge.io", "stat_%@careerbridge.io", "adm_%@careerbridge.io",
-            "err_%@careerbridge.io", "short_pass_%@careerbridge.io"
+            "err_%@careerbridge.io", "short_pass_%@careerbridge.io", "e2e_%@careerbridge.io"
         ]
         clause = User.email.like(patterns[0])
         for p in patterns[1:]:
             clause = clause | User.email.like(p)
         orphans = db.scalars(select(User.id).where(clause)).all()
         if orphans:
+            db.execute(delete(ExperienceRecord).where(ExperienceRecord.student_id.in_(orphans)))
+            db.execute(delete(JobOffer).where(JobOffer.recruiter_id.in_(orphans)))
             clean_test_records(db, user_ids=list(orphans))
 
 
@@ -523,17 +529,17 @@ def test_14_application_status_transitions_and_isolation():
     assert res_short.status_code == 200
     assert res_short.json()["status"] == "shortlisted"
 
-    # 5. Owning recruiter transitions status: shortlisted -> accepted
-    res_acc = client.patch(f"/api/v1/recruiter/applications/{application.id}", headers=rec1_hdr, json={
-        "status": "accepted"
+    # 5. Owning recruiter transitions status: shortlisted -> rejected
+    res_rej = client.patch(f"/api/v1/recruiter/applications/{application.id}", headers=rec1_hdr, json={
+        "status": "rejected"
     })
-    assert res_acc.status_code == 200
-    assert res_acc.json()["status"] == "accepted"
+    assert res_rej.status_code == 200
+    assert res_rej.json()["status"] == "rejected"
 
     # 6. Student views their updated application status
     res_stu_view = client.get(f"/api/v1/applications/{application.id}", headers=stu_hdr)
     assert res_stu_view.status_code == 200
-    assert res_stu_view.json()["status"] == "accepted"
+    assert res_stu_view.json()["status"] == "rejected"
 
 
 # ==============================================================================
@@ -737,19 +743,38 @@ def test_17_end_to_end_student_recruiter_lifecycle_flow():
     assert matching_app["student_id"] == stu_id
     assert matching_app["status"] == "applied"
 
-    # 10. Recruiter changes application status to 'shortlisted'
+    # 10. Recruiter changes application status: applied -> reviewing -> shortlisted
+    res_patch_rev = client.patch(f"/api/v1/recruiter/applications/{application_id}", headers=rec_headers, json={
+        "status": "reviewing"
+    })
+    assert res_patch_rev.status_code == 200
+    assert res_patch_rev.json()["status"] == "reviewing"
+
     res_patch_short = client.patch(f"/api/v1/recruiter/applications/{application_id}", headers=rec_headers, json={
         "status": "shortlisted"
     })
     assert res_patch_short.status_code == 200
     assert res_patch_short.json()["status"] == "shortlisted"
 
-    # 11. Recruiter updates status to 'accepted'
-    res_patch_acc = client.patch(f"/api/v1/recruiter/applications/{application_id}", headers=rec_headers, json={
-        "status": "accepted"
-    })
-    assert res_patch_acc.status_code == 200
-    assert res_patch_acc.json()["status"] == "accepted"
+    # 11. Recruiter issues Job Offer and Candidate accepts offer (transitioning application to 'accepted')
+    res_create_offer = client.post(
+        f"/api/v1/applications/{application_id}/offers",
+        headers=rec_headers,
+        json={
+            "title": "Full Stack AI Engineer Intern",
+            "compensation": 8000.0,
+            "is_sent": True,
+        },
+    )
+    assert res_create_offer.status_code == 201
+    offer_id = res_create_offer.json()["id"]
+
+    res_accept_offer = client.post(
+        f"/api/v1/offers/{offer_id}/accept",
+        headers=stu_headers,
+    )
+    assert res_accept_offer.status_code == 200
+    assert res_accept_offer.json()["status"] == "accepted"
 
     # 12. FLOW C: Student logs in / views applications and observes updated status
     res_stu_apps = client.get("/api/v1/applications/me", headers=stu_headers)
