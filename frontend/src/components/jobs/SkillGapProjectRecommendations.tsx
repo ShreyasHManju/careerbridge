@@ -161,7 +161,7 @@ export const SkillGapProjectRecommendations: React.FC<SkillGapProjectRecommendat
               No pre-configured platform blueprints currently target these specific skills. You can build a custom project and document deliverables to demonstrate your expertise.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-              <Link to="/app/student/projects" className="cb-btn cb-btn-outline cb-btn-sm">
+              <Link to="/app/projects" className="cb-btn cb-btn-outline cb-btn-sm">
                 + Create Custom Project
               </Link>
               <Link to="/app/explore-projects" className="cb-link cb-link-sm">

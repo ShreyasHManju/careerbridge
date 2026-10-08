@@ -28,7 +28,7 @@ export const SkillGapDiagnostics: React.FC<SkillGapDiagnosticsProps> = ({
   } = matchSummary;
 
   const handleBridgeGap = () => {
-    navigate('/app/student/projects', {
+    navigate('/app/projects', {
       state: {
         openCreateModal: true,
         prefilledSkills: missing_skills.map((skill) => skill.name).join(', '),

@@ -139,7 +139,7 @@ describe('SkillGapDiagnostics Component', () => {
     expect(bridgeBtn).toHaveTextContent('Bridge This Gap');
   });
 
-  it('navigates to /app/student/projects with correct state when Bridge This Gap is clicked', () => {
+  it('navigates to /app/projects with correct state when Bridge This Gap is clicked', () => {
     const mockSummary: JobMatchSummary = {
       match_percentage: 50,
       total_required: 2,
@@ -167,7 +167,7 @@ describe('SkillGapDiagnostics Component', () => {
     fireEvent.click(bridgeBtn);
 
     expect(mockNavigate).toHaveBeenCalledTimes(1);
-    expect(mockNavigate).toHaveBeenCalledWith('/app/student/projects', {
+    expect(mockNavigate).toHaveBeenCalledWith('/app/projects', {
       state: {
         openCreateModal: true,
         prefilledSkills: 'GraphQL, TypeScript',

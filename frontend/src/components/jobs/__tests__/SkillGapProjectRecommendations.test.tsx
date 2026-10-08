@@ -140,7 +140,7 @@ describe('SkillGapProjectRecommendations Component', () => {
     expect(screen.getByText('Custom Innovation Project Option')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /\+ Create Custom Project/i })).toHaveAttribute(
       'href',
-      '/app/student/projects'
+      '/app/projects'
     );
   });
 

@@ -536,7 +536,7 @@ export const ProjectDetailPage: React.FC = () => {
                   </p>
                 </div>
                 <Link
-                  to="/app/student/passport"
+                  to="/app/passport"
                   className="cb-btn cb-btn-secondary cb-btn-sm"
                   data-testid="view-passport-link"
                 >
