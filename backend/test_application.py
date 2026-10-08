@@ -336,7 +336,7 @@ def run_application_tests():
         print("  -> Passed: Cross-recruiter isolation enforced on list and detail (403).")
 
         # TEST 16: Recruiter can update status of own job's application
-        print("[Test 16/22] Recruiter can update status of own job's application...")
+        print("[Test 16/26] Recruiter can update status of own job's application...")
         r16_patch1 = client.patch(
             f"/api/v1/recruiter/applications/{app1_id}",
             json={"status": "reviewing"},
@@ -354,8 +354,120 @@ def run_application_tests():
         assert r16_patch2.json()["status"] == "shortlisted"
         print("  -> Passed: Recruiter transitioned status to 'reviewing' and 'shortlisted'.")
 
+        # TEST 16A: Shortlisted application cannot transition directly to accepted (409)
+        print("[Test 16A] Shortlisted application cannot transition directly to accepted (409)...")
+        r16a_res = client.patch(
+            f"/api/v1/recruiter/applications/{app1_id}",
+            json={"status": "accepted"},
+            headers=headers_r1,
+        )
+        assert r16a_res.status_code == 409, f"Expected 409, got {r16a_res.status_code}: {r16a_res.text}"
+        assert "Invalid application status transition: shortlisted -> accepted" in r16a_res.json()["detail"]
+        print("  -> Passed: Invalid transition SHORTLISTED -> ACCEPTED rejected with 409 Conflict.")
+
+        # TEST 16B: Terminal rejected application cannot be updated to reviewing (409)
+        print("[Test 16B] Terminal rejected application cannot transition to reviewing (409)...")
+        s2_app_res = client.post(
+            f"/api/v1/jobs/{job1_id}/applications",
+            json={"cover_message": "Student 2 applying to job 1 for rejection test."},
+            headers=headers_s2,
+        )
+        assert s2_app_res.status_code == 201
+        app2_id = s2_app_res.json()["id"]
+
+        r16b_reject = client.patch(
+            f"/api/v1/recruiter/applications/{app2_id}",
+            json={"status": "rejected"},
+            headers=headers_r1,
+        )
+        assert r16b_reject.status_code == 200
+        assert r16b_reject.json()["status"] == "rejected"
+
+        r16b_rev = client.patch(
+            f"/api/v1/recruiter/applications/{app2_id}",
+            json={"status": "reviewing"},
+            headers=headers_r1,
+        )
+        assert r16b_rev.status_code == 409, f"Expected 409, got {r16b_rev.status_code}: {r16b_rev.text}"
+        assert "Invalid application status transition: rejected -> reviewing" in r16b_rev.json()["detail"]
+        print("  -> Passed: Invalid transition REJECTED -> REVIEWING rejected with 409 Conflict.")
+
+        # TEST 16C: Generic recruiter application-status endpoint rejects SHORTLISTED -> OFFERED (409)
+        print("[Test 16C] Recruiter application-status endpoint rejects SHORTLISTED -> OFFERED (409)...")
+        r16c_res = client.patch(
+            f"/api/v1/recruiter/applications/{app1_id}",
+            json={"status": "offered"},
+            headers=headers_r1,
+        )
+        assert r16c_res.status_code == 409, f"Expected 409, got {r16c_res.status_code}: {r16c_res.text}"
+        assert "Invalid application status transition: shortlisted -> offered" in r16c_res.json()["detail"]
+        print("  -> Passed: Generic recruiter endpoint rejects SHORTLISTED -> OFFERED with 409 Conflict.")
+
+        # TEST 16D: Bulk status update is atomic (rejects batch if any transition is invalid)
+        print("[Test 16D] Bulk status update atomicity verification (409)...")
+        with SessionLocal() as db:
+            job_bulk = JobPosting(
+                recruiter_id=recruiter1_id,
+                title="Bulk Atomicity Test Job",
+                description="Testing bulk update validation atomicity.",
+                opportunity_type=OpportunityType.INTERNSHIP,
+                company_name="BridgeTech",
+                is_active=True,
+                employment_type=EmploymentType.FULL_TIME,
+            )
+            db.add(job_bulk)
+            db.commit()
+            db.refresh(job_bulk)
+            job_bulk_id = job_bulk.id
+
+        bulk_app_a_res = client.post(
+            f"/api/v1/jobs/{job_bulk_id}/applications",
+            json={"cover_message": "Candidate A for bulk atomicity"},
+            headers=headers_s1,
+        )
+        assert bulk_app_a_res.status_code == 201
+        bulk_app_a_id = bulk_app_a_res.json()["id"]
+
+        bulk_app_b_res = client.post(
+            f"/api/v1/jobs/{job_bulk_id}/applications",
+            json={"cover_message": "Candidate B for bulk atomicity"},
+            headers=headers_s2,
+        )
+        assert bulk_app_b_res.status_code == 201
+        bulk_app_b_id = bulk_app_b_res.json()["id"]
+
+        # Move bulk_app_b to REJECTED (valid: applied -> rejected)
+        r_b_rej = client.patch(
+            f"/api/v1/recruiter/applications/{bulk_app_b_id}",
+            json={"status": "rejected"},
+            headers=headers_r1,
+        )
+        assert r_b_rej.status_code == 200
+
+        # Now bulk_app_a is APPLIED (valid for 'reviewing'), bulk_app_b is REJECTED (invalid for 'reviewing')
+        # Submit bulk request requesting 'reviewing' for both
+        bulk_update_res = client.post(
+            "/api/v1/applications/bulk-status",
+            json={
+                "application_ids": [bulk_app_a_id, bulk_app_b_id],
+                "status": "reviewing",
+            },
+            headers=headers_r1,
+        )
+        assert bulk_update_res.status_code == 409, f"Expected 409, got {bulk_update_res.status_code}: {bulk_update_res.text}"
+
+        # Verify BOTH applications retain their original statuses (app_a remains APPLIED, app_b remains REJECTED)
+        check_a = client.get(f"/api/v1/recruiter/applications/{bulk_app_a_id}", headers=headers_r1)
+        assert check_a.status_code == 200
+        assert check_a.json()["status"] == "applied", f"Bulk modified app A state! Got {check_a.json()['status']}"
+
+        check_b = client.get(f"/api/v1/recruiter/applications/{bulk_app_b_id}", headers=headers_r1)
+        assert check_b.status_code == 200
+        assert check_b.json()["status"] == "rejected", f"Bulk modified app B state! Got {check_b.json()['status']}"
+        print("  -> Passed: Bulk status update atomically rejected invalid batch and mutated 0 records.")
+
         # TEST 17: Recruiter cannot update another recruiter's application (403)
-        print("[Test 17/22] Recruiter cannot update another recruiter's application (403)...")
+        print("[Test 17/26] Recruiter cannot update another recruiter's application (403)...")
         r17_res = client.patch(
             f"/api/v1/recruiter/applications/{app1_id}",
             json={"status": "rejected"},
@@ -365,7 +477,7 @@ def run_application_tests():
         print("  -> Passed: Cross-recruiter status modification rejected with 403 Forbidden.")
 
         # TEST 18: Student cannot update application status (403)
-        print("[Test 18/22] Student cannot update application status (403)...")
+        print("[Test 18/26] Student cannot update application status (403)...")
         r18_res = client.patch(
             f"/api/v1/recruiter/applications/{app1_id}",
             json={"status": "accepted"},
@@ -375,7 +487,7 @@ def run_application_tests():
         print("  -> Passed: Student prohibited from recruiter status endpoint with 403.")
 
         # TEST 19: Invalid status returns 422
-        print("[Test 19/22] Invalid status returns 422 Unprocessable Entity...")
+        print("[Test 19/26] Invalid status returns 422 Unprocessable Entity...")
         r19_res = client.patch(
             f"/api/v1/recruiter/applications/{app1_id}",
             json={"status": "hired_immediately"},
@@ -385,29 +497,31 @@ def run_application_tests():
         print("  -> Passed: Invalid status string correctly rejected with 422.")
 
         # TEST 20: job_posting_id cannot be changed
-        print("[Test 20/22] job_posting_id cannot be changed via PATCH...")
+        print("[Test 20/26] job_posting_id cannot be changed via PATCH...")
         r20_res = client.patch(
             f"/api/v1/recruiter/applications/{app1_id}",
-            json={"status": "reviewing", "job_posting_id": job3_id},
+            json={"status": "rejected", "job_posting_id": job3_id},
             headers=headers_r1,
         )
         assert r20_res.status_code == 200
         assert r20_res.json()["job_posting_id"] == job1_id
+        assert r20_res.json()["status"] == "rejected"
         print("  -> Passed: job_posting_id remains immutable on PATCH.")
 
         # TEST 21: student_id cannot be changed
-        print("[Test 21/22] student_id cannot be changed via PATCH...")
+        print("[Test 21/26] student_id cannot be changed via PATCH...")
         r21_res = client.patch(
             f"/api/v1/recruiter/applications/{app1_id}",
-            json={"status": "reviewing", "student_id": student2_id},
+            json={"status": "rejected", "student_id": student2_id},
             headers=headers_r1,
         )
         assert r21_res.status_code == 200
         assert r21_res.json()["student_id"] == student1_id
+        assert r21_res.json()["status"] == "rejected"
         print("  -> Passed: student_id remains immutable on PATCH.")
 
         # TEST 22: Cascade deletion of job posting deletes its applications
-        print("[Test 22/22] Cascade deletion of job posting deletes its applications...")
+        print("[Test 22/26] Cascade deletion of job posting deletes its applications...")
         # Create a temporary job posting
         with SessionLocal() as db:
             temp_job = JobPosting(
@@ -454,7 +568,7 @@ def run_application_tests():
         print("  -> Passed: Admin can view application detail with 200 OK.")
 
         print("\n=========================================================")
-        print("ALL 22 APPLICATION TEST CASES PASSED SUCCESSFULLY!")
+        print("ALL 26 APPLICATION TEST CASES PASSED SUCCESSFULLY!")
         print("=========================================================\n")
 
     finally:

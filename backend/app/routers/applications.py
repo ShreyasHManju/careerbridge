@@ -25,6 +25,55 @@ from app.services.notification_service import NotificationService
 
 router = APIRouter(tags=["Applications"])
 
+# Recruiter-controlled application lifecycle transitions.
+# OFFERED / ACCEPTED / REJECTED are controlled by the Job Offer workflow
+# or are terminal states and cannot be changed through the generic
+# application-status endpoint.
+VALID_APPLICATION_STATUS_TRANSITIONS = {
+    ApplicationStatus.APPLIED: {
+        ApplicationStatus.REVIEWING,
+        ApplicationStatus.REJECTED,
+    },
+    ApplicationStatus.REVIEWING: {
+        ApplicationStatus.SHORTLISTED,
+        ApplicationStatus.REJECTED,
+    },
+    ApplicationStatus.SHORTLISTED: {
+        ApplicationStatus.REJECTED,
+    },
+    ApplicationStatus.OFFERED: set(),
+    ApplicationStatus.ACCEPTED: set(),
+    ApplicationStatus.REJECTED: set(),
+}
+
+
+def validate_application_status_transition(
+    current_status: ApplicationStatus,
+    requested_status: ApplicationStatus,
+) -> None:
+    """
+    Validate recruiter-controlled application lifecycle transitions.
+
+    OFFERED, ACCEPTED, and REJECTED cannot be changed through the generic
+    recruiter application-status endpoint. OFFERED/ACCEPTED/REJECTED
+    transitions are owned by the Job Offer workflow where applicable.
+    """
+    if current_status == requested_status:
+        return
+
+    allowed_statuses = VALID_APPLICATION_STATUS_TRANSITIONS.get(
+        current_status,
+        set(),
+    )
+
+    if requested_status not in allowed_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Invalid application status transition: "
+                f"{current_status.value} -> {requested_status.value}"
+            ),
+        )
 
 # --------------------------------------------------------------------------
 # Student Application Submission
@@ -352,6 +401,7 @@ def update_application_status(
         )
 
     old_status = application.status
+    validate_application_status_transition(old_status, payload.status)
     application.status = payload.status
 
     # In-app notification for the applicant student
@@ -447,6 +497,14 @@ def bulk_update_application_status(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not enough permissions to update one or more specified applications",
             )
+
+    # Validate EVERY requested transition before mutating ANY application.
+    # This preserves the atomic behavior of the bulk endpoint.
+    for app in apps:
+        validate_application_status_transition(
+            app.status,
+            payload.status,
+        )
 
     # Perform atomic updates and trigger in-app notifications
     for app in apps:
