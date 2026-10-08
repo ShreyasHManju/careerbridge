@@ -136,6 +136,18 @@ class JobOfferService:
                 detail="Not authorized to extend job offers for this application",
             )
 
+        # Validate application status
+        allowed_statuses = [
+            ApplicationStatus.APPLIED,
+            ApplicationStatus.REVIEWING,
+            ApplicationStatus.SHORTLISTED,
+        ]
+        if application.status not in allowed_statuses:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot create job offer for application in '{application.status.value}' status",
+            )
+
         # Enforce unique offer per application
         existing_offer = db.scalar(
             select(JobOffer).where(JobOffer.application_id == application_id)
@@ -340,6 +352,19 @@ class JobOfferService:
                     detail=f"Cannot transition job offer from '{offer.status.value}' to '{payload.status.value}'.",
                 )
 
+            # Re-check application status when transitioning to OFFERED
+            if payload.status == OfferStatus.OFFERED:
+                allowed_send_statuses = [
+                    ApplicationStatus.APPLIED,
+                    ApplicationStatus.REVIEWING,
+                    ApplicationStatus.SHORTLISTED,
+                ]
+                if offer.application.status not in allowed_send_statuses:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Cannot send job offer for application in '{offer.application.status.value}' status",
+                    )
+
             old_status = offer.status
             offer.status = payload.status
             if payload.status == OfferStatus.OFFERED:
@@ -355,6 +380,7 @@ class JobOfferService:
                         commit=False,
                     )
             elif payload.status == OfferStatus.WITHDRAWN and old_status == OfferStatus.OFFERED:
+                offer.application.status = ApplicationStatus.SHORTLISTED
                 job = offer.application.job_posting
                 NotificationService.create_notification(
                     db,

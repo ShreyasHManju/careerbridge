@@ -1031,3 +1031,115 @@ def test_acceptance_transaction_rollback_on_failure():
             )
         )
         assert notif is None
+
+
+def test_rejected_application_cannot_receive_offer():
+    """Phase 38D: Rejected application cannot receive a job offer (HTTP 400)."""
+    env = create_fixture_environment()
+    headers_a = env["headers_a"]
+    app_id = env["app_a_id"]
+
+    # Put application into REJECTED
+    with SessionLocal() as db:
+        app = db.scalar(select(Application).where(Application.id == app_id))
+        app.status = ApplicationStatus.REJECTED
+        db.commit()
+
+    # Attempt to create offer with is_sent=True
+    res = client.post(
+        f"/api/v1/applications/{app_id}/offers",
+        headers=headers_a,
+        json={"title": "Junior Engineer", "compensation": 90000.0, "is_sent": True},
+    )
+    assert res.status_code == 400, res.text
+    assert "Cannot create job offer for application in 'rejected' status" in res.json()["detail"]
+
+    # Assert application remains REJECTED and no offer was created
+    with SessionLocal() as db:
+        app = db.scalar(select(Application).where(Application.id == app_id))
+        assert app.status == ApplicationStatus.REJECTED
+
+        offer = db.scalar(select(JobOffer).where(JobOffer.application_id == app_id))
+        assert offer is None
+
+
+def test_withdrawn_offer_releases_application_to_shortlisted():
+    """Phase 38D: Withdrawn offer releases application from OFFERED to SHORTLISTED."""
+    env = create_fixture_environment()
+    headers_a = env["headers_a"]
+    app_id = env["app_a_id"]
+
+    # 1. Create and send offer
+    res_offer = client.post(
+        f"/api/v1/applications/{app_id}/offers",
+        headers=headers_a,
+        json={"title": "Software Engineer", "compensation": 95000.0, "is_sent": True},
+    )
+    assert res_offer.status_code == 201, res_offer.text
+    offer_id = res_offer.json()["id"]
+
+    # 2. Verify application became OFFERED
+    with SessionLocal() as db:
+        app = db.scalar(select(Application).where(Application.id == app_id))
+        assert app.status == ApplicationStatus.OFFERED
+
+    # 3. Withdraw the offer
+    res_with = client.post(f"/api/v1/offers/{offer_id}/withdraw", headers=headers_a)
+    assert res_with.status_code == 200, res_with.text
+    assert res_with.json()["status"] == "withdrawn"
+
+    # 4. Assert offer becomes WITHDRAWN and application becomes SHORTLISTED
+    with SessionLocal() as db:
+        offer = db.scalar(select(JobOffer).where(JobOffer.id == offer_id))
+        assert offer.status == OfferStatus.WITHDRAWN
+
+        app = db.scalar(select(Application).where(Application.id == app_id))
+        assert app.status == ApplicationStatus.SHORTLISTED
+
+    # 5. Verify recruiter can subsequently perform a valid SHORTLISTED -> REJECTED transition
+    res_reject = client.patch(
+        f"/api/v1/recruiter/applications/{app_id}",
+        headers=headers_a,
+        json={"status": "rejected", "rejection_reason": "Position closed"},
+    )
+    assert res_reject.status_code == 200, res_reject.text
+    with SessionLocal() as db:
+        app = db.scalar(select(Application).where(Application.id == app_id))
+        assert app.status == ApplicationStatus.REJECTED
+
+
+def test_stale_draft_offer_cannot_be_sent_after_application_rejection():
+    """Phase 38D: Stale draft offer cannot be sent if application transitioned to REJECTED."""
+    env = create_fixture_environment()
+    headers_a = env["headers_a"]
+    app_id = env["app_a_id"]
+
+    # 1. Create offer in DRAFT state
+    res_draft = client.post(
+        f"/api/v1/applications/{app_id}/offers",
+        headers=headers_a,
+        json={"title": "Draft Offer", "compensation": 90000.0, "is_sent": False},
+    )
+    assert res_draft.status_code == 201, res_draft.text
+    offer_id = res_draft.json()["id"]
+
+    # 2. Transition application to REJECTED
+    res_app_reject = client.patch(
+        f"/api/v1/recruiter/applications/{app_id}",
+        headers=headers_a,
+        json={"status": "rejected", "rejection_reason": "Candidate declined preliminary terms"},
+    )
+    assert res_app_reject.status_code == 200, res_app_reject.text
+
+    # 3. Attempt to send draft offer
+    res_send = client.post(f"/api/v1/offers/{offer_id}/send", headers=headers_a)
+    assert res_send.status_code == 400, res_send.text
+    assert "Cannot send job offer for application in 'rejected' status" in res_send.json()["detail"]
+
+    # 4. Assert offer remains DRAFT and application remains REJECTED
+    with SessionLocal() as db:
+        offer = db.scalar(select(JobOffer).where(JobOffer.id == offer_id))
+        assert offer.status == OfferStatus.DRAFT
+
+        app = db.scalar(select(Application).where(Application.id == app_id))
+        assert app.status == ApplicationStatus.REJECTED
