@@ -15,6 +15,43 @@ from app.services.notification_service import NotificationService
 
 
 
+VALID_INTERVIEW_STATUS_TRANSITIONS = {
+    InterviewStatus.SCHEDULED: {
+        InterviewStatus.RESCHEDULED,
+        InterviewStatus.COMPLETED,
+        InterviewStatus.CANCELLED,
+    },
+    InterviewStatus.RESCHEDULED: {
+        InterviewStatus.COMPLETED,
+        InterviewStatus.CANCELLED,
+    },
+    InterviewStatus.COMPLETED: set(),
+    InterviewStatus.CANCELLED: set(),
+}
+
+
+def validate_interview_status_transition(
+    current_status: InterviewStatus,
+    requested_status: InterviewStatus,
+) -> None:
+    if current_status == requested_status:
+        return
+
+    allowed_statuses = VALID_INTERVIEW_STATUS_TRANSITIONS.get(
+        current_status,
+        set(),
+    )
+
+    if requested_status not in allowed_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Invalid interview status transition: "
+                f"{current_status.value} -> {requested_status.value}"
+            ),
+        )
+
+
 class InterviewService:
     """
     Domain service layer managing interview scheduling, double-booking conflict prevention,
@@ -254,6 +291,13 @@ class InterviewService:
         # Target status
         target_status = payload.status if payload.status is not None else interview.status
         if time_changed and target_status != InterviewStatus.CANCELLED:
+            if payload.status is None:
+                target_status = InterviewStatus.RESCHEDULED
+
+        # Validate status transition before mutating the model
+        validate_interview_status_transition(interview.status, target_status)
+
+        if time_changed and target_status != InterviewStatus.CANCELLED:
             cls.check_conflicts(
                 db,
                 recruiter_id=recruiter_id,
@@ -264,7 +308,6 @@ class InterviewService:
             )
             if payload.status is None:
                 interview.status = InterviewStatus.RESCHEDULED
-                target_status = InterviewStatus.RESCHEDULED
 
         # Apply updates
         if payload.scheduled_at is not None:
@@ -340,6 +383,8 @@ class InterviewService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to cancel this interview",
             )
+
+        validate_interview_status_transition(interview.status, InterviewStatus.CANCELLED)
 
         interview.status = InterviewStatus.CANCELLED
 

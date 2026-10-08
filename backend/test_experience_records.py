@@ -340,6 +340,36 @@ def test_4_verified_record_immutability():
     assert res_alter_org.status_code == 400
     print("  [PASS] Altering organization_name on verified record blocked with 400.")
 
+    # Attempt status demotion VERIFIED -> DRAFT -> MUST FAIL WITH 400
+    res_demote_draft = client.patch(
+        f"/api/v1/students/me/experiences/{exp_id}",
+        json={"status": "draft"},
+        headers=headers1,
+    )
+    assert res_demote_draft.status_code == 400, f"Expected 400, got {res_demote_draft.status_code}: {res_demote_draft.text}"
+    assert "Verified experience status cannot be modified." in res_demote_draft.json()["detail"]
+
+    # Verify status remains VERIFIED
+    res_check1 = client.get(f"/api/v1/students/me/experiences/{exp_id}", headers=headers1)
+    assert res_check1.status_code == 200
+    assert res_check1.json()["status"] == "verified"
+    print("  [PASS] Status demotion VERIFIED -> DRAFT blocked with 400; status remains VERIFIED.")
+
+    # Attempt status demotion VERIFIED -> CLAIMED -> MUST FAIL WITH 400
+    res_demote_claimed = client.patch(
+        f"/api/v1/students/me/experiences/{exp_id}",
+        json={"status": "claimed"},
+        headers=headers1,
+    )
+    assert res_demote_claimed.status_code == 400, f"Expected 400, got {res_demote_claimed.status_code}: {res_demote_claimed.text}"
+    assert "Verified experience status cannot be modified." in res_demote_claimed.json()["detail"]
+
+    # Verify status remains VERIFIED
+    res_check2 = client.get(f"/api/v1/students/me/experiences/{exp_id}", headers=headers1)
+    assert res_check2.status_code == 200
+    assert res_check2.json()["status"] == "verified"
+    print("  [PASS] Status demotion VERIFIED -> CLAIMED blocked with 400; status remains VERIFIED.")
+
 
 def test_5_rejection_and_resubmission_flow():
     print("\n--- TEST 5: Rejection and Resubmission Flow ---")

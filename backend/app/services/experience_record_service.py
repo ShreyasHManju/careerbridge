@@ -194,6 +194,11 @@ class ExperienceRecordService:
 
         # Immutability Guard: Core verified fields cannot be mutated on a VERIFIED record
         if experience.status == VerificationStatus.VERIFIED:
+            if "status" in update_data and update_data["status"] != VerificationStatus.VERIFIED:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Verified experience status cannot be modified.",
+                )
             core_fields = [
                 "title",
                 "organization_name",

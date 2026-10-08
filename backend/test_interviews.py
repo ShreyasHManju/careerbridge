@@ -1359,6 +1359,166 @@ def test_interview_conflict_boundary_conditions():
             db.commit()
 
 
+def test_interview_status_lifecycle_transitions():
+    """
+    Verify interview status transition state machine:
+    1. SCHEDULED -> RESCHEDULED (valid)
+    2. RESCHEDULED -> COMPLETED (valid)
+    3. SCHEDULED -> CANCELLED (valid)
+    4. Invalid terminal: COMPLETED -> SCHEDULED (HTTP 409)
+    5. Invalid terminal: COMPLETED -> RESCHEDULED (HTTP 409)
+    6. Invalid terminal: CANCELLED -> SCHEDULED (HTTP 409)
+    7. Invalid terminal: CANCELLED -> COMPLETED (HTTP 409)
+    8. Verify rejected transitions do NOT mutate the interview
+    """
+    rec1_headers = get_auth_headers(RECRUITER1_EMAIL)
+
+    with SessionLocal() as db:
+        app1 = db.scalar(select(Application).join(JobPosting).where(JobPosting.title == "Senior Python Backend Engineer"))
+        app1_id = app1.id
+        rec1 = db.scalar(select(User).where(User.email == RECRUITER1_EMAIL))
+        stu1 = db.scalar(select(User).where(User.email == STUDENT1_EMAIL))
+        rec1_id = rec1.id
+        stu1_id = stu1.id
+
+        # Create interview A (SCHEDULED)
+        inv_a = Interview(
+            application_id=app1_id,
+            recruiter_id=rec1_id,
+            student_id=stu1_id,
+            scheduled_at=datetime.now(timezone.utc) + timedelta(days=20),
+            duration_minutes=30,
+            interview_type=InterviewType.ONLINE,
+            status=InterviewStatus.SCHEDULED,
+        )
+        # Create interview B (COMPLETED)
+        inv_b = Interview(
+            application_id=app1_id,
+            recruiter_id=rec1_id,
+            student_id=stu1_id,
+            scheduled_at=datetime.now(timezone.utc) + timedelta(days=21),
+            duration_minutes=30,
+            interview_type=InterviewType.ONLINE,
+            status=InterviewStatus.COMPLETED,
+        )
+        # Create interview C (CANCELLED)
+        inv_c = Interview(
+            application_id=app1_id,
+            recruiter_id=rec1_id,
+            student_id=stu1_id,
+            scheduled_at=datetime.now(timezone.utc) + timedelta(days=22),
+            duration_minutes=30,
+            interview_type=InterviewType.ONLINE,
+            status=InterviewStatus.CANCELLED,
+        )
+        db.add_all([inv_a, inv_b, inv_c])
+        db.commit()
+        db.refresh(inv_a)
+        db.refresh(inv_b)
+        db.refresh(inv_c)
+        inv_a_id = inv_a.id
+        inv_b_id = inv_b.id
+        inv_c_id = inv_c.id
+
+    try:
+        # 1. Valid: SCHEDULED -> RESCHEDULED
+        resp1 = client.patch(
+            f"/api/v1/interviews/{inv_a_id}",
+            headers=rec1_headers,
+            json={"status": "rescheduled"},
+        )
+        assert resp1.status_code == 200
+        assert resp1.json()["status"] == "rescheduled"
+
+        # 2. Valid: RESCHEDULED -> COMPLETED
+        resp2 = client.patch(
+            f"/api/v1/interviews/{inv_a_id}",
+            headers=rec1_headers,
+            json={"status": "completed"},
+        )
+        assert resp2.status_code == 200
+        assert resp2.json()["status"] == "completed"
+
+        # 3. Valid: SCHEDULED -> CANCELLED
+        with SessionLocal() as db:
+            inv_d = Interview(
+                application_id=app1_id,
+                recruiter_id=rec1_id,
+                student_id=stu1_id,
+                scheduled_at=datetime.now(timezone.utc) + timedelta(days=23),
+                duration_minutes=30,
+                interview_type=InterviewType.ONLINE,
+                status=InterviewStatus.SCHEDULED,
+            )
+            db.add(inv_d)
+            db.commit()
+            db.refresh(inv_d)
+            inv_d_id = inv_d.id
+
+        resp3 = client.patch(
+            f"/api/v1/interviews/{inv_d_id}",
+            headers=rec1_headers,
+            json={"status": "cancelled"},
+        )
+        assert resp3.status_code == 200
+        assert resp3.json()["status"] == "cancelled"
+
+        # 4. Invalid terminal: COMPLETED -> SCHEDULED (HTTP 409)
+        resp4 = client.patch(
+            f"/api/v1/interviews/{inv_b_id}",
+            headers=rec1_headers,
+            json={"status": "scheduled"},
+        )
+        assert resp4.status_code == 409
+        assert "Invalid interview status transition" in resp4.json()["detail"]
+
+        # 5. Invalid terminal: COMPLETED -> RESCHEDULED (HTTP 409)
+        resp5 = client.patch(
+            f"/api/v1/interviews/{inv_b_id}",
+            headers=rec1_headers,
+            json={"status": "rescheduled"},
+        )
+        assert resp5.status_code == 409
+        assert "Invalid interview status transition" in resp5.json()["detail"]
+
+        # Verify inv_b status remains COMPLETED
+        with SessionLocal() as db:
+            db_b = db.scalar(select(Interview).where(Interview.id == inv_b_id))
+            assert db_b.status == InterviewStatus.COMPLETED
+
+        # 6. Invalid terminal: CANCELLED -> SCHEDULED (HTTP 409)
+        resp6 = client.patch(
+            f"/api/v1/interviews/{inv_c_id}",
+            headers=rec1_headers,
+            json={"status": "scheduled"},
+        )
+        assert resp6.status_code == 409
+        assert "Invalid interview status transition" in resp6.json()["detail"]
+
+        # 7. Invalid terminal: CANCELLED -> COMPLETED (HTTP 409)
+        resp7 = client.patch(
+            f"/api/v1/interviews/{inv_c_id}",
+            headers=rec1_headers,
+            json={"status": "completed"},
+        )
+        assert resp7.status_code == 409
+        assert "Invalid interview status transition" in resp7.json()["detail"]
+
+        # 8. Verify inv_c status remains CANCELLED
+        with SessionLocal() as db:
+            db_c = db.scalar(select(Interview).where(Interview.id == inv_c_id))
+            assert db_c.status == InterviewStatus.CANCELLED
+
+    finally:
+        with SessionLocal() as db:
+            ids = [inv_a_id, inv_b_id, inv_c_id]
+            if "inv_d_id" in locals():
+                ids.append(inv_d_id)
+            db.execute(text(f"DELETE FROM notifications WHERE id > 0 AND title LIKE '%Interview%'"))
+            db.execute(text(f"DELETE FROM interviews WHERE id IN ({','.join(map(str, ids))})"))
+            db.commit()
+
+
 if __name__ == "__main__":
     setup_module()
     try:
@@ -1450,8 +1610,10 @@ if __name__ == "__main__":
         print("PASS: test_cascade_deletion_on_student_user_delete")
         test_cascade_deletion_on_recruiter_user_delete()
         print("PASS: test_cascade_deletion_on_recruiter_user_delete")
+        test_interview_status_lifecycle_transitions()
+        print("PASS: test_interview_status_lifecycle_transitions")
         print("\n=======================================================")
-        print("ALL 43 INTERVIEW TEST CASES PASSED SUCCESSFULLY!")
+        print("ALL 44 INTERVIEW TEST CASES PASSED SUCCESSFULLY!")
         print("=======================================================\n")
     finally:
         teardown_module()
