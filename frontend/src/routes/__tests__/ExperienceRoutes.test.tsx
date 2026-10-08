@@ -102,7 +102,7 @@ describe('Verified Experience Routing and Role Protection', () => {
   });
 
   describe('/app/recruiter/experiences/verification (Recruiter Route)', () => {
-    it('allows recruiter access to /app/recruiter/experiences/verification', () => {
+    it('allows recruiter access to /app/recruiter/experiences/verification', async () => {
       setupAuthMock(recruiterUser);
 
       render(
@@ -111,7 +111,7 @@ describe('Verified Experience Routing and Role Protection', () => {
         </MemoryRouter>
       );
 
-      expect(screen.getByTestId('recruiter-verification-page')).toBeInTheDocument();
+      expect(await screen.findByTestId('recruiter-verification-page')).toBeInTheDocument();
       expect(screen.queryByText(/403 — Access Denied/i)).not.toBeInTheDocument();
     });
 
@@ -130,7 +130,7 @@ describe('Verified Experience Routing and Role Protection', () => {
   });
 
   describe('/app/admin/experiences/verification (Admin Route)', () => {
-    it('allows admin access to /app/admin/experiences/verification', () => {
+    it('allows admin access to /app/admin/experiences/verification', async () => {
       setupAuthMock(adminUser);
 
       render(
@@ -139,7 +139,7 @@ describe('Verified Experience Routing and Role Protection', () => {
         </MemoryRouter>
       );
 
-      expect(screen.getByTestId('admin-experience-verification-page')).toBeInTheDocument();
+      expect(await screen.findByTestId('admin-experience-verification-page')).toBeInTheDocument();
       expect(screen.queryByText(/403 — Access Denied/i)).not.toBeInTheDocument();
     });
 

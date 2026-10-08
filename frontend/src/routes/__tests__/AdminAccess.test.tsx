@@ -72,7 +72,7 @@ describe('Admin Routes & Navigation Access Control (Phase F-11)', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('heading', { name: 'User Management' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'User Management' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'User Management' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Recruiter Verification' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Job Moderation' })).toBeInTheDocument();
@@ -94,7 +94,7 @@ describe('Admin Routes & Navigation Access Control (Phase F-11)', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Recruiter Organization Verification')).toBeInTheDocument();
+    expect(await screen.findByText('Recruiter Organization Verification')).toBeInTheDocument();
   });
 
   it('allows administrator to access /app/admin/jobs', async () => {
@@ -113,7 +113,7 @@ describe('Admin Routes & Navigation Access Control (Phase F-11)', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Job & Internship Moderation')).toBeInTheDocument();
+    expect(await screen.findByText('Job & Internship Moderation')).toBeInTheDocument();
   });
 
   it('blocks student from accessing /app/admin/users and hides admin navigation links', () => {
