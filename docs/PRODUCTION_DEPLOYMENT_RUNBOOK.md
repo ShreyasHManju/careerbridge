@@ -2,7 +2,7 @@
 
 **Document Revision:** 2.0 (Phase 5 Production Hardening Baseline)
 **Target Platform:** Ubuntu 22.04 LTS / Ubuntu 24.04 LTS Cloud VM / AWS EC2
-**Topology:** Single-Node Production Docker Compose (PostgreSQL 16 + FastAPI + Nginx SPA) + S3/R2 Object Storage
+**Topology:** Single-Node Production Docker Compose (PostgreSQL 16 + FastAPI + Nginx SPA) + S3/R2 Cloud Object Storage or Local Persistent Storage
 **Release Baseline:** `v1.0.0`
 
 ---
@@ -11,11 +11,11 @@
 
 Before initiating the deployment process, ensure you have:
 
-- **Target Cloud Server**: Provisioned cloud instance (e.g. AWS EC2 `t3.medium`, DigitalOcean Droplet 4GB, Hetzner Cloud `CPX21`, or Google Cloud Compute Engine `e2-standard-2`).
-- **Operating System**: Clean installation of Ubuntu 22.04 LTS or Ubuntu 24.04 LTS (x86_64 or arm64).
+- **Target Cloud Server / Host**: Provisioned cloud instance (e.g. AWS EC2 `t3.medium`, DigitalOcean Droplet 4GB, Hetzner Cloud `CPX21`, Google Cloud Compute Engine `e2-standard-2`, or a dedicated local/self-hosted Linux host).
+- **Operating System**: Clean installation of Ubuntu 22.04 LTS or Ubuntu 24.04 LTS (x86_64 or arm64), or Docker Desktop on Windows/macOS.
 - **SSH Credentials**: Dedicated non-root user with `sudo` privileges and public-key authentication configured.
-- **Registered Domain Name**: Fully qualified domain name (e.g., `careerbridge.io` or `app.careerbridge.io`).
-- **Object Storage Bucket**: AWS S3 or Cloudflare R2 bucket provisioned for durable uploads (resumes, profile pictures).
+- **Registered Domain Name**: Fully qualified domain name (e.g., `careerbridge.io` or `app.careerbridge.io`), or local IP / localhost for self-hosted instances.
+- **Storage Engine**: AWS S3 or Cloudflare R2 bucket for cloud deployments (`STORAGE_PROVIDER=s3`), OR local persistent volume storage (`STORAGE_PROVIDER=local`, mounted to `/app/uploads`) for ₹0 self-hosted production deployments.
 - **Third-Party API Accounts**:
   - Google Cloud Console project with OAuth 2.0 Web Client ID provisioned for the production domain.
   - Production SMTP service credentials (SendGrid, Amazon SES, Mailgun, or Postmark).
@@ -55,11 +55,11 @@ Before initiating the deployment process, ensure you have:
        │  │ - Health Probes: `/health/live`, `/health/ready`      │  │
        │  └─────────────┬───────────────────────────┬─────────────┘  │
        │                │                           │                │
-       │                ▼ Internal Network          ▼ HTTPS (TLS)    │
+       │                ▼ Internal Network          ▼ Storage Backend│
        │  ┌──────────────────────────┐   ┌────────────────────────┐  │
        │  │ db container             │   │ AWS S3 / Cloudflare R2 │  │
-       │  │ (postgres:16)            │   │ Durable Object Storage │  │
-       │  │ - Persistent volume data │   │ (Resumes & Avatars)    │  │
+       │  │ (postgres:16)            │   │ OR Local /app/uploads  │  │
+       │  │ - Persistent volume data │   │ Persistent Volume      │  │
        │  └──────────────────────────┘   └────────────────────────┘  │
        └─────────────────────────────────────────────────────────────┘
 ```
@@ -180,8 +180,8 @@ When `ENVIRONMENT=production`, the application runs strict startup security vali
 1. `JWT_SECRET_KEY` must be $\ge$ 32 characters, non-default, and high entropy.
 2. `DEBUG` must be `False`.
 3. `POSTGRES_PASSWORD` must be non-default and non-empty.
-4. `BACKEND_CORS_ORIGINS` must not contain wildcards (`*`) or localhost domains.
-5. `STORAGE_PROVIDER` must be set to `s3` with valid `STORAGE_BUCKET` and `STORAGE_REGION` configured (local storage is prohibited in production).
+4. `BACKEND_CORS_ORIGINS` must not contain wildcards (`*`).
+5. `STORAGE_PROVIDER` must be configured as either `s3` (with non-empty `STORAGE_BUCKET` and `STORAGE_REGION`) for cloud production, OR `local` (with valid `UPLOAD_DIR` mounted to persistent storage) for ₹0 self-hosted production.
 6. Rate limiting must be enabled (`RATE_LIMIT_ENABLED=True`).
 
 ### Environment Variable Contract Table
@@ -194,10 +194,11 @@ When `ENVIRONMENT=production`, the application runs strict startup security vali
 | `POSTGRES_DB` | **Required** | Database name | `internship_db` |
 | `POSTGRES_USER` | **Required** | Database superuser account name | `postgres` |
 | `POSTGRES_PASSWORD` | **Required** | High-entropy database password | Generate with: `openssl rand -hex 24` |
-| `STORAGE_PROVIDER` | **Required (Prod)** | Durable storage engine (`s3` in production, `local` in dev) | `s3` |
-| `STORAGE_BUCKET` | **Required (Prod)** | S3 / R2 Bucket name | `careerbridge-production-uploads` |
-| `STORAGE_REGION` | **Required (Prod)** | AWS S3 region (or `auto` for Cloudflare R2) | `us-east-1` |
+| `STORAGE_PROVIDER` | **Required (Prod)** | Durable storage engine (`s3` for cloud, `local` for ₹0 self-hosted) | `s3` or `local` |
+| `STORAGE_BUCKET` | Conditional | S3 / R2 Bucket name (Required when `STORAGE_PROVIDER=s3`) | `careerbridge-production-uploads` |
+| `STORAGE_REGION` | Conditional | AWS S3 region (Required when `STORAGE_PROVIDER=s3`, or `auto` for R2) | `us-east-1` |
 | `STORAGE_ENDPOINT_URL` | Optional | Custom S3 endpoint (for Cloudflare R2 / MinIO) | `https://<account-id>.r2.cloudflarestorage.com` |
+| `UPLOAD_DIR` | Conditional | Local persistent storage folder (Required when `STORAGE_PROVIDER=local`) | `uploads` |
 | `AWS_ACCESS_KEY_ID` | Conditional | S3 / R2 Access Key ID | S3 access key |
 | `AWS_SECRET_ACCESS_KEY` | Conditional | S3 / R2 Secret Access Key | S3 secret access key |
 | `GOOGLE_CLIENT_ID` | **Required** | Google OAuth 2.0 Web Client ID | `xxxxxx.apps.googleusercontent.com` |
@@ -430,7 +431,7 @@ If an operational anomaly or critical regression occurs post-release:
 - [x] **Firewall Isolation**: Only ports 22, 80, 443 permitted. PostgreSQL port 5432 closed to external interfaces.
 - [x] **Non-Root Containers**: Backend runs under unprivileged `appuser` (UID 1000), frontend under `nginx`.
 - [x] **Brute-Force Protection**: `fail2ban` installed and active for SSH service (`sudo apt-get install fail2ban`).
-- [x] **Production Config Gate**: `security_validator.py` enforces production secrets, CORS origins, and S3 storage at startup.
+- [x] **Production Config Gate**: `security_validator.py` enforces production secrets, CORS origins, and storage configuration (S3 bucket or validated local upload directory) at startup.
 - [x] **Abuse & Rate Limiting**: In-memory rate limiting with `Retry-After` headers protects login, password resets, messages, and applications.
 - [x] **Unattended Security Updates**: Enabled via `sudo apt-get install unattended-upgrades`.
 - [x] **Secret Isolation**: `.env` file set to `chmod 600` and excluded from source control.
@@ -442,10 +443,10 @@ If an operational anomaly or critical regression occurs post-release:
 | Symptom | Probable Cause | Corrective Action |
 | :--- | :--- | :--- |
 | **502 Bad Gateway on `/api/*`** | Backend container starting or crashed | Check backend logs: `docker compose logs backend`. Verify DB is healthy and `/health/live` is responding. |
-| **Backend Startup Fails (Security Validator)** | Insecure production configuration detected | Check backend logs for `CRITICAL: Configuration validation failed`. Ensure `STORAGE_PROVIDER=s3`, `DEBUG=False`, strong `JWT_SECRET_KEY`, and valid `BACKEND_CORS_ORIGINS`. |
+| **Backend Startup Fails (Security Validator)** | Insecure production configuration detected | Check backend logs for configuration validation failure details. Ensure `STORAGE_PROVIDER` (`s3` with bucket or `local` with upload dir), `DEBUG=False`, strong `JWT_SECRET_KEY`, and valid `BACKEND_CORS_ORIGINS`. |
 | **Database Connection Refused** | PostgreSQL container still initializing | Verify healthcheck: `docker compose ps db`. Check credentials in `.env`. |
 | **Alembic Target database is not up to date** | Migrations pending | Run `docker compose run --rm backend alembic upgrade head`. |
 | **S3 Upload Error** | Invalid credentials, bucket, or region | Verify `STORAGE_BUCKET`, `STORAGE_REGION`, and AWS credentials in `.env`. Check `/health/ready` probe output. |
 | **Rate Limit 429 Too Many Requests** | Threshold exceeded for sensitive endpoint | Wait for window expiry specified in `Retry-After` header or adjust `RATE_LIMIT_*` settings in `.env`. |
 | **CORS error in browser console** | `BACKEND_CORS_ORIGINS` mismatch | Ensure `.env` includes exact client scheme and domain `["https://yourdomain.com"]`. |
-| **Port 80 already in use** | Apache or default Nginx running on host | Stop conflicting service: `sudo systemctl stop apache2 && sudo systemctl disable apache2`. |
+| **Port 80 already in use** | Apache or default Nginx running on host | Stop conflicting service (`sudo systemctl stop apache2`) or set `FRONTEND_PORT=8080` in `.env`. |
