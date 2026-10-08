@@ -39,6 +39,7 @@ from app.routers import (
     student_profile_router,
     users_router,
     websocket_messaging_router,
+    project_blueprints_router,
 )
 
 # Initialize centralized structured logging
@@ -312,6 +313,7 @@ app.include_router(candidates_router, prefix=settings.API_V1_STR)
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)
 app.include_router(dashboards_router, prefix=settings.API_V1_STR)
+app.include_router(project_blueprints_router, prefix=settings.API_V1_STR)
 
 
 @app.get(

@@ -33,6 +33,13 @@ from app.models.candidate_evaluation import (
 from app.models.job_invitation import JobInvitation, InvitationStatus
 from app.models.job_offer import JobOffer, OfferStatus
 from app.models.passport_share import PassportShare
+from app.models.project_blueprint import (
+    ProjectBlueprint,
+    ProjectBlueprintSkill,
+    ProjectBlueprintMilestone,
+    BlueprintDifficulty,
+    BlueprintStatus,
+)
 
 __all__ = [
     "Base",
@@ -90,4 +97,9 @@ __all__ = [
     "JobOffer",
     "OfferStatus",
     "PassportShare",
+    "ProjectBlueprint",
+    "ProjectBlueprintSkill",
+    "ProjectBlueprintMilestone",
+    "BlueprintDifficulty",
+    "BlueprintStatus",
 ]

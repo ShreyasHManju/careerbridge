@@ -13,6 +13,8 @@ from app.models.innovation_project import (
     ProjectType,
     ProjectVisibility,
 )
+from app.models.project_blueprint import BlueprintStatus, ProjectBlueprint
+from app.models.project_milestone import MilestoneStatus, ProjectMilestone
 from app.models.student_profile import StudentProfile
 from app.models.user import User, UserRole
 from app.schemas.innovation_project import InnovationProjectCreate, InnovationProjectUpdate
@@ -275,3 +277,119 @@ class InnovationProjectService:
 
         db.delete(project)
         db.commit()
+
+    @staticmethod
+    def instantiate_blueprint(
+        db: Session,
+        blueprint_id: int,
+        student_id: int,
+    ) -> InnovationProject:
+        """
+        Instantiate a published ProjectBlueprint into a student-owned private InnovationProject.
+        - Enforces published status (404 if not published).
+        - Prevents duplicate active/draft projects (409).
+        - Allows fresh instantiation if previous derived project was archived.
+        - Sets visibility strictly to PRIVATE.
+        - Clones blueprint skills into ProjectSkill records.
+        - Clones blueprint milestones into ProjectMilestone records with evidence guidance.
+        - Sets source_blueprint_id and source_blueprint_version.
+        """
+        blueprint = db.scalar(
+            select(ProjectBlueprint)
+            .options(
+                selectinload(ProjectBlueprint.blueprint_skills),
+                selectinload(ProjectBlueprint.milestones),
+            )
+            .where(ProjectBlueprint.id == blueprint_id)
+        )
+        if not blueprint:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project blueprint not found",
+            )
+
+        if blueprint.status != BlueprintStatus.PUBLISHED:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project blueprint not found",
+            )
+
+        # Duplicate Check:
+        existing_projects = db.scalars(
+            select(InnovationProject).where(
+                InnovationProject.student_id == student_id,
+                InnovationProject.source_blueprint_id == blueprint.id,
+            )
+        ).all()
+
+        for ep in existing_projects:
+            if ep.status == ProjectStatus.ACTIVE:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="You already have an active project created from this blueprint.",
+                )
+            if ep.status == ProjectStatus.DRAFT:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="You have a draft project created from this blueprint. Please resume or remove your draft.",
+                )
+
+        slug = generate_project_slug(blueprint.title, db)
+
+        project = InnovationProject(
+            student_id=student_id,
+            source_blueprint_id=blueprint.id,
+            source_blueprint_version=blueprint.version,
+            title=blueprint.title,
+            slug=slug,
+            short_description=blueprint.summary,
+            description=blueprint.description,
+            project_type=blueprint.project_type,
+            status=ProjectStatus.ACTIVE,
+            visibility=ProjectVisibility.PRIVATE,
+        )
+        db.add(project)
+        db.flush()
+
+        # Clone skills
+        for bs in (blueprint.blueprint_skills or []):
+            db.add(ProjectSkill(
+                innovation_project_id=project.id,
+                skill_id=bs.skill_id,
+            ))
+
+        # Clone milestones
+        for bm in (blueprint.milestones or []):
+            desc_parts = [bm.description.strip()]
+            if bm.expected_deliverable:
+                desc_parts.append(f"\n\n**Expected Deliverable:** {bm.expected_deliverable.strip()}")
+            if bm.evidence_guidance:
+                ev_type_str = (
+                    bm.recommended_evidence_type.value
+                    if hasattr(bm.recommended_evidence_type, "value")
+                    else str(bm.recommended_evidence_type)
+                )
+                desc_parts.append(f"\n\n**Evidence Guidance ({ev_type_str}):** {bm.evidence_guidance.strip()}")
+
+            db.add(ProjectMilestone(
+                innovation_project_id=project.id,
+                title=bm.title,
+                description="".join(desc_parts),
+                status=MilestoneStatus.TODO,
+                display_order=bm.display_order,
+            ))
+
+        db.commit()
+        db.refresh(project)
+
+        # Reload with relationships
+        reloaded = db.scalar(
+            select(InnovationProject)
+            .options(
+                selectinload(InnovationProject.project_skills).joinedload(ProjectSkill.skill),
+                selectinload(InnovationProject.milestones),
+            )
+            .where(InnovationProject.id == project.id)
+        )
+        populate_owner_names(db, [reloaded])
+        return reloaded

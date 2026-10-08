@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.project_blueprint import ProjectBlueprint
     from app.models.project_evaluation import ProjectEvaluation
     from app.models.project_evidence import ProjectEvidence
     from app.models.project_milestone import ProjectMilestone
@@ -89,6 +90,16 @@ class InnovationProject(Base):
     skills: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     repository_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     live_demo_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    source_blueprint_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("project_blueprints.id", ondelete="RESTRICT"),
+        index=True,
+        nullable=True,
+    )
+    # Lineage metadata: records the blueprint version active at the moment of instantiation.
+    # Note: Not a historical snapshot. The instantiated project and its cloned milestones
+    # represent the authoritative historical state.
+    source_blueprint_version: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -104,6 +115,10 @@ class InnovationProject(Base):
 
     # Relationships
     student: Mapped["User"] = relationship("User", back_populates="innovation_projects")
+    source_blueprint: Mapped[Optional["ProjectBlueprint"]] = relationship(
+        "ProjectBlueprint",
+        back_populates="instantiated_projects",
+    )
     project_skills: Mapped[list["ProjectSkill"]] = relationship(
         "ProjectSkill",
         back_populates="innovation_project",

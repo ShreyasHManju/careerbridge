@@ -23,6 +23,7 @@ from app.routers.skills import router as skills_router
 from app.routers.student_profile import router as student_profile_router
 from app.routers.users import router as users_router
 from app.routers.websocket_messaging import router as websocket_messaging_router
+from app.routers.project_blueprints import router as project_blueprints_router
 
 __all__ = [
     "admin_router",
@@ -51,4 +52,5 @@ __all__ = [
     "job_invitations_router",
     "candidates_router",
     "job_offers_router",
+    "project_blueprints_router",
 ]
