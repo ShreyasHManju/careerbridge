@@ -33,6 +33,7 @@ from app.models.candidate_evaluation import (
 from app.models.job_invitation import JobInvitation, InvitationStatus
 from app.models.job_offer import JobOffer, OfferStatus
 from app.models.passport_share import PassportShare
+from app.models.password_reset_token import PasswordResetToken
 from app.models.project_blueprint import (
     ProjectBlueprint,
     ProjectBlueprintSkill,
@@ -97,6 +98,7 @@ __all__ = [
     "JobOffer",
     "OfferStatus",
     "PassportShare",
+    "PasswordResetToken",
     "ProjectBlueprint",
     "ProjectBlueprintSkill",
     "ProjectBlueprintMilestone",

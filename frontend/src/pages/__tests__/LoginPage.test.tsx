@@ -79,6 +79,7 @@ describe('LoginPage Component', () => {
     expect(screen.getByLabelText(/^Password$/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Sign In/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Create an account/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Forgot password\?/i })).toHaveAttribute('href', '/forgot-password');
   });
 
   it('validates required fields on client before calling login', async () => {

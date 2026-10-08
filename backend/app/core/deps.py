@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+import hashlib
 import logging
 from typing import Optional, Set
 from fastapi import Depends, HTTPException, status
@@ -38,7 +40,8 @@ def get_current_user(
     3. Extract user ID from 'sub' claim.
     4. Query PostgreSQL database for corresponding user record.
     5. Ensure user exists and account is active.
-    6. Return User ORM instance.
+    6. Verify token was not issued prior to password change/reset (session invalidation).
+    7. Return User ORM instance.
     """
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise CREDENTIALS_EXCEPTION
@@ -76,6 +79,17 @@ def get_current_user(
             detail="Inactive user account",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Session invalidation check: verify token credentials match current user password hash
+    token_pwd_sig = payload.get("pwd_sig")
+    if token_pwd_sig is not None and user.password_hash:
+        current_sig = hashlib.sha256(user.password_hash.encode("utf-8")).hexdigest()[:16]
+        if token_pwd_sig != current_sig:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication token has been revoked or invalidated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
     return user
 

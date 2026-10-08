@@ -1,16 +1,19 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { JobMatchSummary } from '@/types/job';
+import { SkillGapProjectRecommendations } from './SkillGapProjectRecommendations';
 
 interface SkillGapDiagnosticsProps {
   matchSummary: JobMatchSummary;
   jobTitle?: string;
+  jobId?: number;
   className?: string;
 }
 
 export const SkillGapDiagnostics: React.FC<SkillGapDiagnosticsProps> = ({
   matchSummary,
   jobTitle,
+  jobId,
   className = '',
 }) => {
   const navigate = useNavigate();
@@ -196,6 +199,11 @@ export const SkillGapDiagnostics: React.FC<SkillGapDiagnosticsProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Guided Project Blueprint Recommendations */}
+            {jobId != null && (
+              <SkillGapProjectRecommendations jobId={jobId} jobTitle={jobTitle} />
+            )}
           </>
         ) : (
           <div className="cb-skill-all-matched-banner" data-testid="all-skills-matched">

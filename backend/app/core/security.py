@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import hashlib
 from typing import Any, Dict, Optional, Union
 import bcrypt
 import jwt
@@ -22,6 +23,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(
     subject: Union[str, int],
+    pwd_hash: Optional[str] = None,
     expires_delta: Optional[timedelta] = None,
 ) -> str:
     """
@@ -29,6 +31,7 @@ def create_access_token(
     - 'sub' (Subject): The unique user identifier (converted to string).
     - 'exp' (Expiration): UTC timestamp when token becomes invalid.
     - 'iat' (Issued At): UTC timestamp when token was created.
+    - 'pwd_sig': Short hash of password_hash for instant session invalidation on password change.
     """
     now = datetime.now(timezone.utc)
     if expires_delta is not None:
@@ -41,6 +44,9 @@ def create_access_token(
         "exp": expire,
         "iat": now,
     }
+    if pwd_hash:
+        payload["pwd_sig"] = hashlib.sha256(pwd_hash.encode("utf-8")).hexdigest()[:16]
+
     encoded_jwt = jwt.encode(
         payload,
         settings.JWT_SECRET_KEY,

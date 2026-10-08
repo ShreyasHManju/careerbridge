@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from app.models.message import Message
     from app.models.notification import Notification
     from app.models.notification_preference import NotificationPreference
+    from app.models.password_reset_token import PasswordResetToken
     from app.models.profile_image import ProfileImage
     from app.models.project_evaluation import ProjectEvaluation
     from app.models.recruiter_profile import RecruiterProfile
@@ -224,6 +225,13 @@ class User(Base):
     sent_messages: Mapped[list["Message"]] = relationship(
         "Message",
         back_populates="sender",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-many relationship with PasswordResetToken
+    password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(
+        "PasswordResetToken",
+        back_populates="user",
         cascade="all, delete-orphan",
     )
 

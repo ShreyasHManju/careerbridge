@@ -261,6 +261,9 @@ export const LoginPage: React.FC = () => {
             <label htmlFor="password" className="cb-glass-label">
               Password
             </label>
+            <Link to="/forgot-password" className="cb-auth-link cb-auth-forgot-link">
+              Forgot password?
+            </Link>
           </div>
           <PasswordInput
             id="password"

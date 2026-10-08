@@ -1,17 +1,30 @@
+from datetime import datetime, timedelta, timezone
+import hashlib
 import logging
+import secrets
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.rate_limit import rate_limiter
-from app.core.security import create_access_token, verify_password
+from app.core.security import create_access_token, hash_password, verify_password
+from app.models.password_reset_token import PasswordResetToken
 from app.models.user import User, UserRole
-from app.schemas.auth import LoginRequest, PasswordResetRequest, PasswordResetResponse, TokenResponse
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    ChangePasswordResponse,
+    LoginRequest,
+    PasswordResetConfirmRequest,
+    PasswordResetConfirmResponse,
+    PasswordResetRequest,
+    PasswordResetResponse,
+    TokenResponse,
+)
 from app.schemas.google_auth import GoogleLoginRequest
 from app.schemas.user import UserResponse
 from app.services.email_service import EmailService
@@ -49,14 +62,15 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     """
     Authenticate user credentials:
     1. Check and enforce in-memory sliding window rate limits.
-    2. Search database for user by email.
+    2. Search database for user by email using case-insensitive normalized comparison.
     3. Mitigate timing attacks by executing dummy bcrypt verification if user not found.
     4. Securely verify plaintext password against stored bcrypt hash.
     5. Verify account is active.
     6. Audit log authentication events and issue signed JWT access token.
     """
     client_ip = request.client.host if request.client else "unknown"
-    rate_key = f"login:{client_ip}:{payload.email.strip().lower()}"
+    normalized_email = payload.email.strip().lower()
+    rate_key = f"login:{client_ip}:{normalized_email}"
 
     if settings.RATE_LIMIT_LOGIN_ENABLED:
         rate_limiter.check_rate_limit(
@@ -73,7 +87,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 
     user = db.scalar(
         select(User).where(
-            User.email == payload.email,
+            func.lower(User.email) == normalized_email,
             User.auth_provider == "local",
         )
     )
@@ -126,20 +140,20 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     security_logger.info(
         "Authentication successful: User ID %s, Role '%s' from IP %s",
         user.id,
-        user.role.value,
+        user.role.value if hasattr(user.role, "value") else str(user.role),
         client_ip,
     )
 
-    access_token = create_access_token(subject=user.id)
+    access_token = create_access_token(subject=user.id, pwd_hash=user.password_hash)
     return TokenResponse(access_token=access_token, token_type="bearer")
 
 
-@router.get("/me",
+@router.get(
+    "/me",
     response_model=UserResponse,
     summary="Get current user",
     description="Retrieve account details of the currently authenticated user using the Bearer JWT token.",
 )
-
 def get_current_user_profile(current_user: User = Depends(get_current_user)):
     """
     Protected endpoint:
@@ -147,6 +161,7 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
     Returns safe user profile data (passwords and password hashes are strictly excluded).
     """
     return current_user
+
 
 @router.post(
     "/google",
@@ -175,7 +190,6 @@ def google_login(
         security_logger.warning(
             "Google authentication failed: invalid ID token"
         )
-
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Google authentication token.",
@@ -187,6 +201,9 @@ def google_login(
     email_verified = google_data.get("email_verified", False)
 
     if not google_subject or not email:
+        security_logger.warning(
+            "Google authentication failed: missing sub or email"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Google account information is incomplete.",
@@ -194,58 +211,64 @@ def google_login(
         )
 
     if not email_verified:
+        security_logger.warning(
+            "Google authentication failed: email not verified"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Google email address is not verified.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    email = email.strip().lower()
+    normalized_email = email.strip().lower()
 
-    # First find the account using Google's immutable subject identifier.
+    # 1. Existing user with this Google subject
     user = db.scalar(
-        select(User).where(
-            User.google_subject == google_subject
-        )
+        select(User).where(User.google_subject == google_subject)
     )
 
     if user:
         if not user.is_active:
+            security_logger.warning(
+                "Google authentication failed: Inactive account for User ID %s",
+                user.id,
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Inactive user account.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        access_token = create_access_token(subject=user.id)
-
         security_logger.info(
             "Google authentication successful: User ID %s",
             user.id,
         )
 
+        access_token = create_access_token(subject=user.id, pwd_hash=user.password_hash)
         return TokenResponse(
             access_token=access_token,
             token_type="bearer",
         )
 
-    # Do not silently link Google to an existing local account.
-    existing_user = db.scalar(
-        select(User).where(User.email == email)
+    # 2. Check if a local account with the same email already exists
+    existing_user_by_email = db.scalar(
+        select(User).where(func.lower(User.email) == normalized_email)
     )
 
-    if existing_user:
+    if existing_user_by_email:
+        security_logger.warning(
+            "Google authentication conflict: account exists for email '%s' with auth_provider='%s'",
+            _mask_email(normalized_email),
+            existing_user_by_email.auth_provider,
+        )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "An account with this email already exists. "
-                "Please sign in using your existing email and password."
-            ),
+            detail="An account with this email already exists. Please log in using your original method.",
         )
 
-    # Create a new Google-based CareerBridge student account.
+    # 3. Create a new Google-authenticated student user
     user = User(
-        email=email,
+        email=normalized_email,
         password_hash=None,
         auth_provider="google",
         google_subject=google_subject,
@@ -263,7 +286,7 @@ def google_login(
         user.id,
     )
 
-    access_token = create_access_token(subject=user.id)
+    access_token = create_access_token(subject=user.id, pwd_hash=user.password_hash)
 
     return TokenResponse(
         access_token=access_token,
@@ -286,8 +309,8 @@ def request_password_reset(
     """
     Request a password reset link:
     1. Apply dual-key sliding-window rate limiting (per email and per client IP).
-    2. Search user by email without leaking account existence.
-    3. If user exists and is active, dispatch password reset email.
+    2. Search user by email using case-insensitive normalized comparison without leaking existence.
+    3. If user exists, is active, and is local, invalidate previous unused tokens, generate secure token, and dispatch email.
     4. Always return generic 200 response to prevent account enumeration.
     """
     client_ip = request.client.host if request.client else "unknown"
@@ -311,13 +334,39 @@ def request_password_reset(
 
     user = db.scalar(
         select(User).where(
-            User.email == normalized_email,
+            func.lower(User.email) == normalized_email,
             User.auth_provider == "local",
         )
     )
-    if user and user.is_active:
-        reset_token = create_access_token(subject=user.id)
-        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+
+    if user and user.is_active and user.password_hash:
+        now_utc = datetime.now(timezone.utc)
+
+        # Invalidate previous unused reset tokens for this user
+        db.execute(
+            update(PasswordResetToken)
+            .where(
+                PasswordResetToken.user_id == user.id,
+                PasswordResetToken.used_at.is_(None),
+            )
+            .values(used_at=now_utc)
+        )
+
+        # Generate cryptographically secure random token (32 bytes urlsafe)
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        expires_at = now_utc + timedelta(minutes=15)
+
+        reset_record = PasswordResetToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            ip_address=client_ip,
+        )
+        db.add(reset_record)
+        db.commit()
+
+        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={raw_token}"
         EmailService.dispatch_password_reset(
             to_email=user.email,
             reset_url=reset_url,
@@ -331,9 +380,170 @@ def request_password_reset(
         )
     else:
         security_logger.info(
-            "Password reset requested for non-existent or inactive email '%s' from IP %s",
+            "Password reset requested for non-existent, inactive, or non-local email '%s' from IP %s",
             _mask_email(normalized_email),
             client_ip,
         )
 
     return PasswordResetResponse()
+
+
+@router.post(
+    "/password-reset/confirm",
+    response_model=PasswordResetConfirmResponse,
+    summary="Confirm password reset",
+    description="Validate single-use password reset token and update user password.",
+)
+def confirm_password_reset(
+    payload: PasswordResetConfirmRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Confirm password reset:
+    1. Validate password match and complexity.
+    2. Compute SHA-256 hash of supplied token.
+    3. Look up active, unused, unexpired reset token record.
+    4. Hash new password with bcrypt and update user record.
+    5. Mark reset token as used and invalidate any other tokens for that user.
+    6. Advance user updated_at timestamp to invalidate previous JWT sessions.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password and confirmation do not match.",
+        )
+
+    token_str = payload.token.strip()
+    if not token_str:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired password reset token.",
+        )
+
+    token_hash = hashlib.sha256(token_str.encode("utf-8")).hexdigest()
+
+    token_record = db.scalar(
+        select(PasswordResetToken).where(
+            PasswordResetToken.token_hash == token_hash
+        )
+    )
+
+    if not token_record:
+        security_logger.warning(
+            "Password reset confirmation failed: Unknown token hash from IP %s",
+            client_ip,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired password reset token.",
+        )
+
+    now_utc = datetime.now(timezone.utc)
+    token_exp = (
+        token_record.expires_at
+        if token_record.expires_at.tzinfo
+        else token_record.expires_at.replace(tzinfo=timezone.utc)
+    )
+
+    if token_record.used_at is not None or token_exp < now_utc:
+        security_logger.warning(
+            "Password reset confirmation failed: Token ID %s already used or expired from IP %s",
+            token_record.id,
+            client_ip,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired password reset token.",
+        )
+
+    user = db.scalar(select(User).where(User.id == token_record.user_id))
+    if not user or not user.is_active or user.auth_provider != "local":
+        security_logger.warning(
+            "Password reset confirmation failed: Ineligible or missing user for token ID %s",
+            token_record.id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired password reset token.",
+        )
+
+    # Update password and advance updated_at timestamp for session invalidation
+    user.password_hash = hash_password(payload.new_password)
+    user.updated_at = now_utc
+
+    # Mark current token as used
+    token_record.used_at = now_utc
+
+    # Invalidate any other active reset tokens for this user
+    db.execute(
+        update(PasswordResetToken)
+        .where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        )
+        .values(used_at=now_utc)
+    )
+
+    db.commit()
+
+    security_logger.info(
+        "Password reset confirmed successfully for User ID %s from IP %s",
+        user.id,
+        client_ip,
+    )
+
+    return PasswordResetConfirmResponse()
+
+
+@router.post(
+    "/change-password",
+    response_model=ChangePasswordResponse,
+    summary="Change user password",
+    description="Change password for the currently authenticated local account user.",
+)
+def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Change user password:
+    1. Verify current user is an active local account.
+    2. Verify current password against stored bcrypt hash.
+    3. Validate new password match and complexity.
+    4. Hash new password with bcrypt and update user.
+    5. Advance user updated_at timestamp to invalidate previous JWT sessions.
+    """
+    if current_user.auth_provider != "local" or not current_user.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password change is only supported for accounts with local credentials.",
+        )
+
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
+
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password and confirmation do not match.",
+        )
+
+    now_utc = datetime.now(timezone.utc)
+    current_user.password_hash = hash_password(payload.new_password)
+    current_user.updated_at = now_utc
+
+    db.commit()
+
+    security_logger.info(
+        "Password changed successfully for User ID %s",
+        current_user.id,
+    )
+
+    return ChangePasswordResponse()

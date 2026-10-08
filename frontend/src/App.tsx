@@ -5,6 +5,9 @@ import { AppLayout } from '@/layouts/AppLayout';
 import { PublicLayout } from '@/layouts/PublicLayout';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
+import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
+import { SecuritySettingsPage } from '@/pages/SecuritySettingsPage';
 import { AppHome } from '@/pages/AppHome';
 import { StudentProfilePage } from '@/pages/StudentProfilePage';
 import { StudentProjectsPage } from '@/pages/StudentProjectsPage';
@@ -44,6 +47,8 @@ export const App: React.FC = () => {
       <Route element={<PublicLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
       </Route>
 
       {/* Public Career Passport Sharing Route (Unauthenticated) */}
@@ -55,6 +60,7 @@ export const App: React.FC = () => {
         <Route element={<AppLayout />}>
           <Route path="/app" element={<AppHome />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          <Route path="/app/security" element={<SecuritySettingsPage />} />
           {/* Opportunity Discovery Routes (all authenticated roles) */}
           <Route path="/app/jobs" element={<JobDiscoveryPage />} />
           <Route path="/app/jobs/:jobId" element={<JobDetailPage />} />

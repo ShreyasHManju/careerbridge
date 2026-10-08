@@ -1,5 +1,16 @@
 import { apiClient, getRootUrl } from './client';
-import { LoginRequest, LoginResponse, RegisterRequest, User } from '@/types/auth';
+import {
+  ChangePasswordRequest,
+  ChangePasswordResponse,
+  LoginRequest,
+  LoginResponse,
+  PasswordResetConfirmRequest,
+  PasswordResetConfirmResponse,
+  PasswordResetRequest,
+  PasswordResetResponse,
+  RegisterRequest,
+  User,
+} from '@/types/auth';
 
 /**
  * Authentication API Service
@@ -7,7 +18,7 @@ import { LoginRequest, LoginResponse, RegisterRequest, User } from '@/types/auth
  */
 
 /**
- * Authenticate credentials and receive a 30-minute JWT access token.
+ * Authenticate credentials and receive a JWT access token.
  * Route: POST /api/v1/auth/login
  */
 export async function loginApi(credentials: LoginRequest): Promise<LoginResponse> {
@@ -30,6 +41,48 @@ export async function getMeApi(): Promise<User> {
  */
 export async function registerApi(payload: RegisterRequest): Promise<User> {
   const response = await apiClient.post<User>('/users', payload);
+  return response.data;
+}
+
+/**
+ * Request a password reset link.
+ * Route: POST /api/v1/auth/password-reset/request
+ */
+export async function requestPasswordResetApi(
+  payload: PasswordResetRequest
+): Promise<PasswordResetResponse> {
+  const response = await apiClient.post<PasswordResetResponse>(
+    '/auth/password-reset/request',
+    payload
+  );
+  return response.data;
+}
+
+/**
+ * Confirm password reset using a time-sensitive token.
+ * Route: POST /api/v1/auth/password-reset/confirm
+ */
+export async function confirmPasswordResetApi(
+  payload: PasswordResetConfirmRequest
+): Promise<PasswordResetConfirmResponse> {
+  const response = await apiClient.post<PasswordResetConfirmResponse>(
+    '/auth/password-reset/confirm',
+    payload
+  );
+  return response.data;
+}
+
+/**
+ * Change password for authenticated user.
+ * Route: POST /api/v1/auth/change-password
+ */
+export async function changePasswordApi(
+  payload: ChangePasswordRequest
+): Promise<ChangePasswordResponse> {
+  const response = await apiClient.post<ChangePasswordResponse>(
+    '/auth/change-password',
+    payload
+  );
   return response.data;
 }
 

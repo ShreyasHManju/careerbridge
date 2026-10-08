@@ -20,6 +20,7 @@ from app.models.interview import Interview
 from app.models.job_posting import EmploymentType, JobPosting, OpportunityType
 from app.models.message import Message
 from app.models.notification import Notification
+from app.models.password_reset_token import PasswordResetToken
 from app.models.profile_image import ProfileImage
 from app.models.recruiter_profile import RecruiterProfile
 from app.models.resume import Resume
@@ -216,7 +217,8 @@ def clean_test_records(
     db.execute(delete(Message).where(Message.sender_id.in_(id_list)))
     db.execute(delete(ConversationParticipant).where(ConversationParticipant.user_id.in_(id_list)))
 
-    # 6. Uploaded files & profiles
+    # 6. Uploaded files, tokens & profiles
+    db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id.in_(id_list)))
     db.execute(delete(Resume).where(Resume.student_id.in_(id_list)))
     db.execute(delete(ProfileImage).where(ProfileImage.student_id.in_(id_list)))
     db.execute(delete(StudentProfile).where(StudentProfile.user_id.in_(id_list)))

@@ -1,6 +1,6 @@
 from typing import List
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -25,7 +25,8 @@ def create_user(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    existing_user = db.scalar(select(User).where(User.email == payload.email))
+    normalized_email = payload.email.strip().lower()
+    existing_user = db.scalar(select(User).where(func.lower(User.email) == normalized_email))
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -34,7 +35,7 @@ def create_user(
 
     hashed_pwd = hash_password(payload.password)
     new_user = User(
-        email=payload.email,
+        email=normalized_email,
         password_hash=hashed_pwd,
         role=payload.role,
     )
@@ -117,17 +118,20 @@ def update_user(
     if not update_data:
         return user
 
-    if "email" in update_data and update_data["email"] != user.email:
-        email_collision = db.scalar(
-            select(User).where(
-                User.email == update_data["email"], User.id != user_id
+    if "email" in update_data and update_data["email"]:
+        normalized_update_email = update_data["email"].strip().lower()
+        update_data["email"] = normalized_update_email
+        if normalized_update_email != user.email.lower():
+            email_collision = db.scalar(
+                select(User).where(
+                    func.lower(User.email) == normalized_update_email, User.id != user_id
+                )
             )
-        )
-        if email_collision:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Email '{update_data['email']}' is already in use by another account.",
-            )
+            if email_collision:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Email '{update_data['email']}' is already in use by another account.",
+                )
 
     for field, value in update_data.items():
         setattr(user, field, value)
