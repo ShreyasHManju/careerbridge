@@ -175,14 +175,20 @@ class StudentSkillCompilationService:
         db: Session,
         student_id: int,
         visibility_scope: str = "all_owned",
+        include_inactive: bool = False,
     ) -> Dict[int, Dict[str, Any]]:
         """
         Load student with all necessary relationships and compile their skills.
         """
+        student_stmt = select(User).where(
+            User.id == student_id,
+            User.role == UserRole.STUDENT,
+        )
+        if not include_inactive:
+            student_stmt = student_stmt.where(User.is_active == True)  # noqa: E712
+
         student = db.scalar(
-            select(User)
-            .where(User.id == student_id, User.role == UserRole.STUDENT, User.is_active == True)  # noqa: E712
-            .options(
+            student_stmt.options(
                 selectinload(User.student_profile)
                 .selectinload(StudentProfile.student_skills)
                 .selectinload(StudentSkill.skill),

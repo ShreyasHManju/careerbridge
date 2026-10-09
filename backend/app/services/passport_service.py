@@ -338,6 +338,7 @@ class PassportService:
             db,
             target_student_id,
             visibility_scope="all_owned" if (is_owner or is_admin) else "public_only",
+            include_inactive=(is_owner or is_admin),
         )
 
         passport_skills = [

@@ -465,5 +465,41 @@ def test_provenance_hierarchy_upgrade_and_verification_retention(db, skills):
     assert entry["sources"] == {"profile", "project", "experience"}
 
 
+def test_inactive_student_requires_explicit_skill_compilation_inclusion(db, skills):
+    """Inactive students stay excluded unless a trusted caller explicitly opts in."""
+    u_id = uuid.uuid4().hex[:8]
+    python_skill = skills["python"]
+
+    student = User(
+        email=f"stu_inactive_{u_id}@test_compilation.io",
+        password_hash="hash",
+        role=UserRole.STUDENT,
+        is_active=False,
+    )
+    db.add(student)
+    db.flush()
+
+    profile = StudentProfile(user_id=student.id, full_name="Inactive Test Student")
+    db.add(profile)
+    db.flush()
+    db.add(StudentSkill(
+        student_profile_id=profile.id,
+        skill_id=python_skill.id,
+    ))
+    db.commit()
+
+    default_skills = StudentSkillCompilationService.compile_student_skills(
+        db, student.id
+    )
+    assert python_skill.id not in default_skills
+
+    included = StudentSkillCompilationService.compile_student_skills(
+        db, student.id, include_inactive=True
+    )
+    assert python_skill.id in included
+    assert included[python_skill.id]["is_verified"] is False
+    assert included[python_skill.id]["source"] == "profile"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
