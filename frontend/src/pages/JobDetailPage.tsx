@@ -5,6 +5,7 @@ import { getJobById } from '@/api/jobs';
 import { getSavedJobStatus, saveJob, unsaveJob } from '@/api/savedJobs';
 import { JobPosting } from '@/types/job';
 import { ApplyModal } from '@/components/jobs/ApplyModal';
+import { SkillGapDiagnostics } from '@/components/jobs/SkillGapDiagnostics';
 import { ApiErrorResponse } from '@/types/api';
 
 export const JobDetailPage: React.FC = () => {
@@ -334,6 +335,11 @@ export const JobDetailPage: React.FC = () => {
               )}
             </dl>
           </section>
+        )}
+
+        {/* Skill Match & Gap Diagnostics */}
+        {isStudent && job.match_summary != null && (
+          <SkillGapDiagnostics matchSummary={job.match_summary} jobTitle={job.title} />
         )}
 
         {/* Student Career Evidence Overview */}

@@ -17,6 +17,7 @@ from app.schemas.job_posting import (
     JobSortBy,
     SortOrder,
 )
+from app.services.opportunity_match_service import OpportunityMatchService
 from app.services.skill_service import sync_job_skills_from_text
 
 router = APIRouter(prefix="/jobs", tags=["Jobs & Internships"])
@@ -233,18 +234,37 @@ def browse_active_job_postings(
 
     # Database-side pagination with OFFSET and LIMIT
     offset = (page - 1) * page_size
-    items = db.scalars(
-        select(JobPosting)
-        .where(*filters)
-        .order_by(order_clause, JobPosting.id.desc())
-        .offset(offset)
-        .limit(page_size)
-    ).all()
+    items = list(
+        db.scalars(
+            select(JobPosting)
+            .options(
+                selectinload(JobPosting.job_skills).selectinload(JobSkill.skill),
+            )
+            .where(*filters)
+            .order_by(order_clause, JobPosting.id.desc())
+            .offset(offset)
+            .limit(page_size)
+        ).all()
+    )
 
     total_pages = math.ceil(total / page_size) if total > 0 else 0
 
+    # Student-specific match calculation (Phase 6)
+    student_skills_map = None
+    if current_user.role == UserRole.STUDENT:
+        student_skills_map = OpportunityMatchService.compile_student_skills(db, current_user.id)
+
+    response_items: List[JobPostingResponse] = []
+    for item in items:
+        resp_item = JobPostingResponse.model_validate(item)
+        if student_skills_map is not None:
+            resp_item.match_summary = OpportunityMatchService.compute_job_match(
+                item.structured_skills, student_skills_map
+            )
+        response_items.append(resp_item)
+
     return JobPostingPaginationResponse(
-        items=list(items),
+        items=response_items,
         page=page,
         page_size=page_size,
         total=total,
@@ -267,7 +287,13 @@ def get_job_posting_by_id(
     Retrieve single job posting.
     Hides inactive postings from unauthorized candidates by returning 404.
     """
-    posting = db.scalar(select(JobPosting).where(JobPosting.id == job_id))
+    posting = db.scalar(
+        select(JobPosting)
+        .options(
+            selectinload(JobPosting.job_skills).selectinload(JobSkill.skill),
+        )
+        .where(JobPosting.id == job_id)
+    )
     if not posting:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -287,7 +313,14 @@ def get_job_posting_by_id(
                 detail="Job posting not found",
             )
 
-    return posting
+    resp = JobPostingResponse.model_validate(posting)
+    if current_user.role == UserRole.STUDENT:
+        student_skills_map = OpportunityMatchService.compile_student_skills(db, current_user.id)
+        resp.match_summary = OpportunityMatchService.compute_job_match(
+            posting.structured_skills, student_skills_map
+        )
+
+    return resp
 
 
 @router.patch(

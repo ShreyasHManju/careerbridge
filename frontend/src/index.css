@@ -798,6 +798,246 @@ body {
   border: 1px solid #fcd34d;
 }
 
+/* Match Score Badges */
+.cb-badge-match {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.cb-badge-match-high {
+  background-color: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+.cb-badge-match-medium {
+  background-color: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.cb-badge-match-low {
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+/* Skill Match & Gap Diagnostics Component */
+.cb-skill-match-card {
+  border: 1px solid var(--cb-border);
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.cb-skill-match-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.cb-skill-match-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  margin: 0 0 0.25rem 0;
+}
+
+.cb-skill-match-subtitle {
+  font-size: 0.875rem;
+  color: var(--cb-text-muted);
+  margin: 0;
+}
+
+.cb-skill-match-progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cb-progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background-color: #e2e8f0;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.cb-progress-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.cb-progress-bar-high {
+  background-color: #10b981;
+}
+
+.cb-progress-bar-medium {
+  background-color: #f59e0b;
+}
+
+.cb-progress-bar-low {
+  background-color: #64748b;
+}
+
+.cb-skill-match-stats-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--cb-text-muted);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cb-match-stat-verified {
+  color: #059669;
+  font-weight: 600;
+}
+
+.cb-skill-breakdown-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cb-skill-section-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--cb-text);
+  margin: 0;
+}
+
+.cb-skill-pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cb-skill-diagnostics-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.cb-skill-pill-matched {
+  background-color: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.cb-skill-pill-verified {
+  background-color: #ecfdf5;
+  border-color: #6ee7b7;
+  font-weight: 600;
+}
+
+.cb-skill-pill-missing {
+  background-color: #fef2f2;
+  color: #991b1b;
+  border: 1px dashed #fca5a5;
+}
+
+.cb-skill-pill-check {
+  font-weight: 700;
+  color: #15803d;
+}
+
+.cb-skill-pill-gap {
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.cb-skill-pill-verified-tag {
+  font-size: 0.675rem;
+  font-weight: 700;
+  background-color: #059669;
+  color: #ffffff;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.cb-skill-pill-source-hint {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-left: 0.2rem;
+}
+
+.cb-skill-gap-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background-color: #fffbeb;
+  border: 1px solid #fef3c7;
+  border-left: 4px solid #f59e0b;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+}
+
+.cb-skill-gap-callout-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.cb-skill-gap-callout-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cb-skill-gap-callout-text {
+  font-size: 0.85rem;
+  color: #92400e;
+}
+
+.cb-skill-gap-action-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #d97706;
+  text-decoration: underline;
+}
+
+.cb-skill-gap-action-link:hover {
+  color: #b45309;
+}
+
+.cb-skill-all-matched-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.cb-match-success-icon {
+  font-size: 1.1rem;
+}
+
+.cb-skill-empty-notice {
+  font-size: 0.85rem;
+  color: var(--cb-text-muted);
+  font-style: italic;
+  margin: 0;
+}
+
 .cb-job-description {
   font-size: 0.9rem;
   color: var(--cb-text-muted);

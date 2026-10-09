@@ -814,6 +814,65 @@ def test_8_passport_recruiter_evaluations_aggregation_and_privacy():
     print("  [PASS] Withdrawn evaluations are strictly omitted from Passport.")
 
 
+def test_9_inactive_student_admin_passport_preserves_canonical_skills():
+    """Admin retains verified skills while recruiter access stays blocked."""
+    print("\n[Test 9] Testing inactive student Passport skill visibility...")
+    data = setup_users()
+    student_id = data["s1_id"]
+
+    with SessionLocal() as db:
+        student = db.get(User, student_id)
+        assert student is not None
+        student.is_active = False
+
+        python_skill = get_or_create_skill(db, "Python")
+        db.flush()
+
+        experience = ExperienceRecord(
+            student_id=student_id,
+            title="Verified Backend Engineer",
+            organization_name="CareerBridge Test Organization",
+            experience_type=ExperienceType.WORK,
+            start_date=date(2025, 1, 1),
+            description="Verified backend work for Passport regression testing.",
+            status=VerificationStatus.VERIFIED,
+            verification_source=VerificationSource.ADMIN_CONFIRMED,
+        )
+        db.add(experience)
+        db.flush()
+        db.add(ExperienceSkill(
+            experience_record_id=experience.id,
+            skill_id=python_skill.id,
+        ))
+        db.commit()
+
+    admin_headers = {"Authorization": f"Bearer {data['token_admin']}"}
+    admin_response = client.get(
+        f"/api/v1/passport/{student_id}",
+        headers=admin_headers,
+    )
+    assert admin_response.status_code == 200, admin_response.text
+
+    skills = admin_response.json()["skills"]
+    python_entry = next(
+        (item for item in skills if item["name"] == "Python"),
+        None,
+    )
+    assert python_entry is not None
+    assert python_entry["is_verified"] is True
+    assert "experience" in python_entry["sources"]
+
+    recruiter_headers = {"Authorization": f"Bearer {data['token_r1']}"}
+    recruiter_response = client.get(
+        f"/api/v1/passport/{student_id}",
+        headers=recruiter_headers,
+    )
+    assert recruiter_response.status_code == 404
+
+    cleanup_test_data()
+    print("  [PASS] Admin retains verified skills; recruiter access remains blocked.")
+
+
 def run_all():
     print("=" * 70)
     print("CAREERBRIDGE 2.0-E — EXPERIENCE PASSPORT TEST SUITE")
@@ -826,6 +885,7 @@ def run_all():
     test_6_security_and_nonexistent_students()
     test_7_passport_verified_evidence_aggregation_and_privacy()
     test_8_passport_recruiter_evaluations_aggregation_and_privacy()
+    test_9_inactive_student_admin_passport_preserves_canonical_skills()
     cleanup_test_data()
     print("\n" + "=" * 70)
     print("ALL 2.0-E EXPERIENCE PASSPORT TESTS PASSED!")
