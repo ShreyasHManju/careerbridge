@@ -463,3 +463,7 @@ def test_provenance_hierarchy_upgrade_and_verification_retention(db, skills):
     assert entry["is_verified"] is True
     assert entry["source"] == "experience"
     assert entry["sources"] == {"profile", "project", "experience"}
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__, "-q"]))

@@ -755,3 +755,7 @@ def test_unverified_experience_statuses_ignored(db, match_skills):
     assert s_react.id not in compiled
     assert s_docker.id not in compiled
     assert s_sql.id not in compiled
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__, "-q"]))

@@ -305,3 +305,7 @@ def test_has_verified_passport_filter():
     assert "Alice Candidate" in names
     assert "Bob Candidate" in names
     assert "Charlie Private" not in names
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__, "-q"]))
