@@ -442,3 +442,83 @@ Named Tunnels provide persistent remote access and demonstration ingress on your
 | **Uploads fail with 400 `Invalid storage path`** | Upload directory traversal or invalid path configuration. | Verify `UPLOAD_DIR=uploads` in `.env`. Ensure volume `careerbridge_uploads_production` is mounted to `/app/uploads`. |
 | **Browser displays CORS Error on API requests** | The origin in the browser address bar is not in `BACKEND_CORS_ORIGINS`. | Add the exact URL (including protocol and port, e.g. `http://192.168.1.50:8080`) to `BACKEND_CORS_ORIGINS` in `.env` and restart containers. |
 | **502 Bad Gateway on `/api/*`** | Nginx cannot reach backend container on internal port 8000. | Verify backend container is running and healthy: `docker compose -f docker-compose.production.yml ps backend`. |
+
+---
+
+## 10. Local Backup, Restore & Disaster Recovery Operations
+
+CareerBridge includes native Windows PowerShell tooling for self-hosted operators to capture atomic, SHA-256 verified backup bundles and perform fail-closed restorations without cloud fees.
+
+```
+                     [ CareerBridge Backup Bundle ]
+                                   │
+       ┌───────────────────────────┴───────────────────────────┐
+       ▼                                                       ▼
+[ Relational State ]                                  [ Storage Filesystem ]
+• database.sql (PostgreSQL 16 dump)                   • uploads.tar.gz (/app/uploads)
+  - Tables, users, applications                         - Resumes (/resumes)
+  - Full schema snapshot                                - Avatars (/profile_images)
+                                   │
+       ┌───────────────────────────┴───────────────────────────┐
+       ▼                                                       ▼
+• checksums.sha256 (SHA-256 integrity)                • manifest.json (Metadata & paths)
+```
+
+### 10.1 Creating a Consistent Local Backup
+
+The backup tool automatically manages service quiescence to eliminate relational-to-filesystem snapshot drift:
+
+```powershell
+# Run full quiesced backup (recommended)
+powershell -ExecutionPolicy Bypass -File .\scripts\backup_local.ps1
+
+# Custom target compose file or output directory
+powershell -ExecutionPolicy Bypass -File .\scripts\backup_local.ps1 -ComposeFile .\docker-compose.production.yml -BackupDir .\local-backups
+```
+
+#### Quiescence Lifecycle & State Invariants:
+1. **Initial State Capture:** Records running status of `frontend`, `backend`, and `db`.
+2. **Ingress Suspension:** Suspends `backend` and `frontend` to prevent concurrent writes/deletes.
+3. **Connection Draining:** Queries PostgreSQL until active client connections reach `0`.
+4. **Binary-Safe Extraction:** Uses `docker cp` to extract database dump and compressed upload archive without PowerShell text-encoding corruption.
+5. **Guaranteed Service Resumption:** Restores originally running services in a guaranteed `finally` execution block.
+
+---
+
+### 10.2 Restoring from a Backup Bundle
+
+The restore utility enforces pre-flight privilege validation, zip-slip security scanning, staged database creation, catalog-aware rename switching, and automatic rollback on failure:
+
+```powershell
+# Interactive restore (prompts for typed confirmation)
+powershell -ExecutionPolicy Bypass -File .\scripts\restore_local.ps1 .\local-backups\careerbridge_backup_YYYYMMDD_HHMMSS
+
+# Automated restore (bypasses prompt for scripted recovery)
+powershell -ExecutionPolicy Bypass -File .\scripts\restore_local.ps1 .\local-backups\careerbridge_backup_YYYYMMDD_HHMMSS -Force
+```
+
+#### Multi-Stage Staged Restoration Workflow:
+1. **Pre-Flight Integrity & Privileges:** Verifies SHA-256 hashes against `manifest.json` and asserts PostgreSQL role permissions (`SUPERUSER` or `CREATEDB` + target ownership + session termination).
+2. **Pre-Restore Safety Snapshot:** Automatically snapshots current active state to `local-backups/.pre_restore_safety_<op_id>/` before touching live data.
+3. **Staged Database Import:** Restores SQL dump into an isolated staging database (`<db>_stage_<op_id>`) and verifies core tables (`users`, `job_postings`, `applications`, `resumes`, `profile_images`).
+4. **Staged Uploads Extraction:** Extracts archive into `/app/uploads/.staging_<op_id>/` after scanning for directory traversal (`..`) and absolute paths.
+5. **Atomic Rename Switch:** Renames live DB to `<db>_old_<op_id>` and staging DB to `<db>`.
+6. **Uploads Directory Replacement:** Preserves live uploads in `/app/uploads/.live_old_<op_id>/` and installs staged directories.
+7. **Readiness Verification:** Restarts services and runs deep health probe (`/health/ready`).
+8. **Safety Retention:** Preserves `<db>_old_<op_id>` and `.live_old_<op_id>` indefinitely for operator safety (never automatically dropped).
+
+---
+
+### 10.3 Crash Recovery & Fail-Closed Journaling
+
+Restorations are tracked in a durable JSON journal (`local-backups/.restore_journal_<op_id>.json`). If an unexpected power outage or container crash interrupts a restore:
+
+* Upon restart, `restore_local.ps1` reconciles the journal step against the active PostgreSQL catalog (`pg_database`) and filesystem subdirectories.
+* **Fail-Closed Guarantee:** If the catalog or filesystem state is ambiguous or unrecognized, the script halts immediately without modifying or deleting any databases or files, requiring operator review.
+
+---
+
+### 10.4 Single-Machine Storage & Hardware Limitations
+
+* **Single-Drive Risk:** Local backup bundles stored under `local-backups/` reside on the same physical disk as your Docker installation.
+* **Disaster Recovery Best Practice:** To protect against complete hardware loss (e.g. SSD failure, theft), operators should periodically synchronize or copy `local-backups/` to an external USB drive or remote off-site location.

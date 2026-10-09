@@ -58,4 +58,6 @@ storage/
 Thumbs.db
 
 # Local database backups
-local-backups/
+/local-backups/
+/backups/
+/backend/backups/
