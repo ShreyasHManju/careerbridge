@@ -86,12 +86,9 @@ export const CandidateEvaluationPanel: React.FC<CandidateEvaluationPanelProps> =
         initialInterviewId === null
           ? undefined
           : items.find((item) => item.interview_id === initialInterviewId);
-      const active =
-        activeForRequestedInterview ??
-        items.find((item) => item.id === selectedId) ??
-        draft ??
-        items[0] ??
-        null;
+      const active = initialInterviewId !== null
+        ? activeForRequestedInterview ?? null
+        : items.find((item) => item.id === selectedId) ?? draft ?? items[0] ?? null;
       setSelectedId(active?.id ?? null);
       setForm(active ? {
         interview_id: active.interview_id,
