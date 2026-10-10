@@ -5,6 +5,7 @@ import { CandidateReviewModal } from '../CandidateReviewModal';
 import * as passportApi from '@/api/passport';
 import * as interviewsApi from '@/api/interviews';
 import * as projectEvaluationsApi from '@/api/projectEvaluations';
+import * as candidateEvaluationsApi from '@/api/candidateEvaluations';
 import { Application } from '@/types/application';
 import { JobPosting } from '@/types/job';
 import { PassportResponse } from '@/types/passport';
@@ -166,6 +167,7 @@ describe('CandidateReviewModal Component', () => {
     vi.spyOn(passportApi, 'getStudentPassport').mockResolvedValue(mockPassport);
     vi.spyOn(interviewsApi, 'getRecruiterInterviews').mockResolvedValue([mockInterview]);
     vi.spyOn(projectEvaluationsApi, 'getProjectEvaluations').mockResolvedValue([]);
+    vi.spyOn(candidateEvaluationsApi, 'getCandidateEvaluations').mockResolvedValue([]);
   });
 
   it('renders modal with candidate identity and tabs when open', async () => {
@@ -326,6 +328,32 @@ describe('CandidateReviewModal Component', () => {
       expect(cancelSpy).toHaveBeenCalledWith(88);
       expect(screen.getByText(/Interview cancelled successfully/i)).toBeInTheDocument();
     });
+  });
+
+  it('opens a round-specific scorecard for a completed interview', async () => {
+    vi.spyOn(interviewsApi, 'getRecruiterInterviews').mockResolvedValue([
+      { ...mockInterview, status: 'completed' },
+    ]);
+
+    render(
+      <MemoryRouter>
+        <CandidateReviewModal
+          isOpen={true}
+          application={mockApplication}
+          job={mockJob}
+          onClose={vi.fn()}
+          onStatusChange={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    await screen.findByText('Alex Rivera');
+    fireEvent.click(screen.getByTestId('tab-interviews'));
+    fireEvent.click(await screen.findByTestId('evaluate-interview-round-btn-88'));
+
+    expect(await screen.findByTestId('candidate-evaluation-context')).toHaveTextContent(
+      'Interview round #88'
+    );
   });
 
   it('opens RescheduleInterviewModal when Reschedule is clicked', async () => {
