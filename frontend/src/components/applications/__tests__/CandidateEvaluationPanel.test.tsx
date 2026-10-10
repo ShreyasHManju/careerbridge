@@ -57,6 +57,22 @@ describe('CandidateEvaluationPanel', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Draft saved.');
   });
 
+  it('creates a scorecard scoped to the selected interview round', async () => {
+    vi.mocked(createCandidateEvaluation).mockResolvedValue(makeEvaluation({ interview_id: 88 }));
+    render(<CandidateEvaluationPanel applicationId={501} initialInterviewId={88} />);
+
+    expect(await screen.findByTestId('candidate-evaluation-form')).toBeInTheDocument();
+    expect(screen.getByTestId('candidate-evaluation-context')).toHaveTextContent('Interview round #88');
+
+    fireEvent.change(screen.getByLabelText('Technical competency'), { target: { value: '4' } });
+    fireEvent.click(screen.getByTestId('save-candidate-evaluation-draft-btn'));
+
+    await waitFor(() => expect(createCandidateEvaluation).toHaveBeenCalledWith(
+      501,
+      expect.objectContaining({ interview_id: 88, technical_score: 4, is_submitted: false })
+    ));
+  });
+
   it('requires all four scores and a recommendation before submission', async () => {
     render(<CandidateEvaluationPanel applicationId={501} />);
 
