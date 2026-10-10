@@ -475,6 +475,49 @@ def test_draft_can_be_updated():
     assert updated["status"] == "draft"
 
 
+def test_draft_update_can_explicitly_clear_nullable_fields():
+    env = create_fixture_environment()
+    headers = {"Authorization": f"Bearer {env['token_rec_a']}"}
+
+    create_resp = client.post(
+        f"/api/v1/applications/{env['app_a_id']}/evaluations",
+        json={
+            "technical_score": 2,
+            "problem_solving_score": 4,
+            "communication_score": 5,
+            "role_fit_score": 4,
+            "recommendation": "hire",
+            "strengths": "Strong communication",
+            "areas_for_growth": "Needs deeper systems knowledge",
+            "summary_notes": "Initial notes",
+            "is_submitted": False,
+        },
+        headers=headers,
+    )
+    assert create_resp.status_code == 201
+    eval_id = create_resp.json()["id"]
+
+    update_resp = client.patch(
+        f"/api/v1/evaluations/{eval_id}",
+        json={
+            "technical_score": None,
+            "recommendation": None,
+            "strengths": None,
+            "areas_for_growth": None,
+            "summary_notes": None,
+        },
+        headers=headers,
+    )
+    assert update_resp.status_code == 200
+    updated = update_resp.json()
+    assert updated["technical_score"] is None
+    assert updated["recommendation"] is None
+    assert updated["strengths"] is None
+    assert updated["areas_for_growth"] is None
+    assert updated["summary_notes"] is None
+    assert updated["overall_score"] == 4.33
+
+
 def test_submitted_evaluation_cannot_be_modified():
     env = create_fixture_environment()
     headers = {"Authorization": f"Bearer {env['token_rec_a']}"}
