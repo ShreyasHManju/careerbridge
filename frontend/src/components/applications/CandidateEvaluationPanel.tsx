@@ -13,6 +13,8 @@ import { ApiErrorResponse } from '@/types/api';
 
 interface CandidateEvaluationPanelProps {
   applicationId: number;
+  /** When opened from a completed interview, scope a new scorecard to that round. */
+  initialInterviewId?: number | null;
 }
 
 type ScoreField =
@@ -37,7 +39,8 @@ const RECOMMENDATIONS: { value: CandidateRecommendation; label: string }[] = [
   { value: 'strong_no_hire', label: 'Strong no hire' },
 ];
 
-const emptyPayload = (): CandidateEvaluationPayload => ({
+const emptyPayload = (interviewId: number | null = null): CandidateEvaluationPayload => ({
+  interview_id: interviewId,
   technical_score: null,
   problem_solving_score: null,
   communication_score: null,
@@ -56,10 +59,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 export const CandidateEvaluationPanel: React.FC<CandidateEvaluationPanelProps> = ({
   applicationId,
+  initialInterviewId = null,
 }) => {
   const [evaluations, setEvaluations] = useState<CandidateEvaluation[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [form, setForm] = useState<CandidateEvaluationPayload>(emptyPayload);
+  const [form, setForm] = useState<CandidateEvaluationPayload>(() => emptyPayload(initialInterviewId));
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +82,16 @@ export const CandidateEvaluationPanel: React.FC<CandidateEvaluationPanelProps> =
       const items = await getCandidateEvaluations(applicationId);
       setEvaluations(items);
       const draft = items.find((item) => item.status === 'draft');
-      const active = items.find((item) => item.id === selectedId) ?? draft ?? items[0] ?? null;
+      const activeForRequestedInterview =
+        initialInterviewId === null
+          ? undefined
+          : items.find((item) => item.interview_id === initialInterviewId);
+      const active =
+        activeForRequestedInterview ??
+        items.find((item) => item.id === selectedId) ??
+        draft ??
+        items[0] ??
+        null;
       setSelectedId(active?.id ?? null);
       setForm(active ? {
         interview_id: active.interview_id,
@@ -90,13 +103,13 @@ export const CandidateEvaluationPanel: React.FC<CandidateEvaluationPanelProps> =
         strengths: active.strengths ?? '',
         areas_for_growth: active.areas_for_growth ?? '',
         summary_notes: active.summary_notes ?? '',
-      } : emptyPayload());
+      } : emptyPayload(initialInterviewId));
     } catch (err) {
       setError(getErrorMessage(err, 'Could not load candidate scorecards.'));
     } finally {
       setIsLoading(false);
     }
-  }, [applicationId, selectedId]);
+  }, [applicationId, initialInterviewId, selectedId]);
 
   useEffect(() => {
     void loadEvaluations();
@@ -185,6 +198,14 @@ export const CandidateEvaluationPanel: React.FC<CandidateEvaluationPanelProps> =
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
             <h4 className="cb-inner-box-title" style={{ marginBottom: '0.25rem' }}>Candidate scorecard</h4>
+            <p
+              data-testid="candidate-evaluation-context"
+              style={{ margin: '0 0 0.375rem', color: '#1d4ed8', fontSize: '0.8125rem', fontWeight: 600 }}
+            >
+              {form.interview_id === null || form.interview_id === undefined
+                ? 'Application-level evaluation'
+                : `Interview round #${form.interview_id}`}
+            </p>
             <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem' }}>
               Rate each dimension from 1 (low) to 5 (excellent). Evaluations are private to authorized recruiters.
             </p>
@@ -195,7 +216,7 @@ export const CandidateEvaluationPanel: React.FC<CandidateEvaluationPanelProps> =
               className="cb-btn cb-btn-outline-primary cb-btn-sm"
               onClick={() => {
                 setSelectedId(null);
-                setForm(emptyPayload());
+                setForm(emptyPayload(null));
                 setError(null);
                 setNotice(null);
               }}
@@ -216,7 +237,7 @@ export const CandidateEvaluationPanel: React.FC<CandidateEvaluationPanelProps> =
                 onClick={() => selectEvaluation(evaluation)}
                 data-testid={`candidate-evaluation-history-${evaluation.id}`}
               >
-                {evaluation.status === 'submitted' ? 'Submitted' : 'Draft'} #{evaluation.id}
+                {evaluation.status === 'submitted' ? 'Submitted' : 'Draft'} · {evaluation.interview_id === null ? 'Application' : `Interview #${evaluation.interview_id}`}
                 {evaluation.overall_score !== null ? ` · ${evaluation.overall_score}/5` : ''}
               </button>
             ))}
