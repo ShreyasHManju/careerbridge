@@ -352,23 +352,21 @@ class CandidateEvaluationService:
                 )
             evaluation.interview_id = payload.interview_id
 
-        # Update scores and notes
-        if payload.technical_score is not None:
-            evaluation.technical_score = payload.technical_score
-        if payload.problem_solving_score is not None:
-            evaluation.problem_solving_score = payload.problem_solving_score
-        if payload.communication_score is not None:
-            evaluation.communication_score = payload.communication_score
-        if payload.role_fit_score is not None:
-            evaluation.role_fit_score = payload.role_fit_score
-        if payload.recommendation is not None:
-            evaluation.recommendation = payload.recommendation
-        if payload.strengths is not None:
-            evaluation.strengths = payload.strengths
-        if payload.areas_for_growth is not None:
-            evaluation.areas_for_growth = payload.areas_for_growth
-        if payload.summary_notes is not None:
-            evaluation.summary_notes = payload.summary_notes
+        # Apply only explicitly supplied fields. For nullable score and
+        # recommendation fields, an explicit null clears the existing value;
+        # an omitted field remains unchanged.
+        for field in (
+            "technical_score",
+            "problem_solving_score",
+            "communication_score",
+            "role_fit_score",
+            "recommendation",
+            "strengths",
+            "areas_for_growth",
+            "summary_notes",
+        ):
+            if field in payload.model_fields_set:
+                setattr(evaluation, field, getattr(payload, field))
 
         evaluation.overall_score = calculate_candidate_overall_score(
             evaluation.technical_score,
