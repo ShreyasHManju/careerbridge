@@ -189,7 +189,7 @@ export const CandidateEvaluationPanel: React.FC<CandidateEvaluationPanelProps> =
               Rate each dimension from 1 (low) to 5 (excellent). Evaluations are private to authorized recruiters.
             </p>
           </div>
-          {!isReadOnly && (
+          {!evaluations.some((item) => item.interview_id === null) && (
             <button
               type="button"
               className="cb-btn cb-btn-outline-primary cb-btn-sm"
@@ -199,10 +199,10 @@ export const CandidateEvaluationPanel: React.FC<CandidateEvaluationPanelProps> =
                 setError(null);
                 setNotice(null);
               }}
-              disabled={isSaving || !selectedEvaluation && evaluations.some((item) => item.status === 'draft')}
+              disabled={isSaving}
               data-testid="new-candidate-evaluation-btn"
             >
-              New draft
+              New application scorecard
             </button>
           )}
         </div>
