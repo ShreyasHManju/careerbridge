@@ -20,6 +20,7 @@ import { ProjectEvaluationModal } from '@/components/evaluations/ProjectEvaluati
 import { ScheduleInterviewModal } from '@/components/interviews/ScheduleInterviewModal';
 import { RescheduleInterviewModal } from '@/components/interviews/RescheduleInterviewModal';
 import { ApiErrorResponse } from '@/types/api';
+import { CandidateEvaluationPanel } from './CandidateEvaluationPanel';
 
 interface CandidateReviewModalProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ interface CandidateReviewModalProps {
   isUpdating?: boolean;
 }
 
-type ReviewTab = 'application' | 'skills' | 'projects' | 'interviews';
+type ReviewTab = 'application' | 'skills' | 'projects' | 'interviews' | 'evaluation';
 
 const PIPELINE_STEPS: { key: string; label: string }[] = [
   { key: 'applied', label: 'Applied' },
@@ -505,6 +506,16 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
             data-testid="tab-interviews"
           >
             📅 Interviews {interviews.length ? `(${interviews.length})` : ''}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'evaluation'}
+            className={`cb-review-tab ${activeTab === 'evaluation' ? 'active' : ''}`}
+            onClick={() => setActiveTab('evaluation')}
+            data-testid="tab-candidate-evaluation"
+          >
+            ⭐ Scorecard
           </button>
         </nav>
 
@@ -1015,6 +1026,11 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* TAB E: CANDIDATE SCORECARD */}
+              {activeTab === 'evaluation' && (
+                <CandidateEvaluationPanel applicationId={application.id} />
               )}
             </>
           )}
