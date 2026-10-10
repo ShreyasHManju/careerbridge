@@ -7,6 +7,7 @@ from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.application import Application
+    from app.models.candidate_evaluation import CandidateEvaluation
     from app.models.conversation import ConversationParticipant
     from app.models.interview import Interview
     from app.models.innovation_project import InnovationProject
@@ -192,6 +193,14 @@ class User(Base):
         "ProjectEvaluation",
         foreign_keys="[ProjectEvaluation.student_id]",
         back_populates="student",
+        cascade="all, delete-orphan",
+    )
+
+    # One-to-many relationship with CandidateEvaluation (as recruiter)
+    candidate_evaluations_as_recruiter: Mapped[list["CandidateEvaluation"]] = relationship(
+        "CandidateEvaluation",
+        foreign_keys="[CandidateEvaluation.recruiter_id]",
+        back_populates="recruiter",
         cascade="all, delete-orphan",
     )
 

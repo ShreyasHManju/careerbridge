@@ -8,6 +8,7 @@ from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.application import Application
+    from app.models.candidate_evaluation import CandidateEvaluation
     from app.models.user import User
 
 
@@ -109,6 +110,9 @@ class Interview(Base):
     )
     student: Mapped["User"] = relationship(
         "User", foreign_keys=[student_id], back_populates="interviews_as_student"
+    )
+    candidate_evaluations: Mapped[list["CandidateEvaluation"]] = relationship(
+        "CandidateEvaluation", back_populates="interview"
     )
 
     __table_args__ = (
