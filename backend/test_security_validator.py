@@ -121,6 +121,8 @@ def test_production_rejects_short_jwt_secret():
         "your_jwt_secret_key_here",
         "your_secret_key_here",
         "careerbridge_secret",
+        "careerbridge_dev_secret_key_minimum_32_chars_long",
+        "test-jwt-secret-key-careerbridge-safety-32bytes",
     ],
 )
 def test_production_rejects_known_weak_or_placeholder_jwt_secret(weak_secret: str):
@@ -235,6 +237,58 @@ def test_production_rejects_empty_database_password():
     settings = create_valid_production_settings(POSTGRES_PASSWORD="   ")
     errors = validate_production_configuration(settings)
     assert any("POSTGRES_PASSWORD must be configured" in err for err in errors)
+
+
+def test_production_rejects_none_database_password():
+    """Production startup must fail if POSTGRES_PASSWORD is None."""
+    settings = create_valid_production_settings(POSTGRES_PASSWORD=None)
+    errors = validate_production_configuration(settings)
+    assert any("POSTGRES_PASSWORD must be configured" in err for err in errors)
+
+
+def test_production_rejects_none_jwt_secret():
+    """Production startup must fail if JWT_SECRET_KEY is None."""
+    settings = create_valid_production_settings(JWT_SECRET_KEY=None)
+    errors = validate_production_configuration(settings)
+    assert any("JWT_SECRET_KEY is missing or empty" in err for err in errors)
+
+
+def test_production_database_url_refuses_construction_without_password():
+    """Production sync_database_url refuses to construct connection string if POSTGRES_PASSWORD is None."""
+    settings = create_valid_production_settings(POSTGRES_PASSWORD=None, DATABASE_URL=None)
+    with pytest.raises(ValueError) as exc_info:
+        _ = settings.sync_database_url
+    assert "Cannot construct production database URL" in str(exc_info.value)
+
+
+def test_production_validation_cannot_be_bypassed_by_test_mode_env(monkeypatch):
+    """
+    Security invariant: Setting CAREERBRIDGE_TEST_MODE=1 must NEVER bypass or weaken
+    production configuration checks when ENVIRONMENT='production'.
+    """
+    monkeypatch.setenv("CAREERBRIDGE_TEST_MODE", "1")
+    monkeypatch.setenv("ENVIRONMENT", "production")
+
+    # 1. Unsafe production instance with missing JWT secret must still fail closed
+    unsafe_settings = create_valid_production_settings(JWT_SECRET_KEY=None)
+    errors = validate_production_configuration(unsafe_settings)
+    assert any("JWT_SECRET_KEY is missing or empty" in err for err in errors)
+
+    # 2. Production instance with dev fallback secret must still fail closed
+    dev_fallback_settings = create_valid_production_settings(
+        JWT_SECRET_KEY="careerbridge_dev_secret_key_minimum_32_chars_long"
+    )
+    errors_dev = validate_production_configuration(dev_fallback_settings)
+    assert any("known weak, default, or example placeholder" in err for err in errors_dev)
+
+    # 3. Settings model itself in production must not populate test fallbacks even with CAREERBRIDGE_TEST_MODE=1
+    prod_settings = Settings(_env_file=None, ENVIRONMENT="production")
+    assert prod_settings.JWT_SECRET_KEY is None
+    assert prod_settings.POSTGRES_PASSWORD is None
+
+    errors_model = validate_production_configuration(prod_settings)
+    assert any("JWT_SECRET_KEY is missing or empty" in err for err in errors_model)
+    assert any("POSTGRES_PASSWORD must be configured" in err for err in errors_model)
 
 
 def test_production_rejects_placeholder_in_database_url():

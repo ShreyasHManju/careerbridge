@@ -1,6 +1,7 @@
+import os
 from pathlib import Path
 from typing import List, Optional, Union
-from pydantic import AliasChoices, Field, computed_field, field_validator
+from pydantic import AliasChoices, Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -47,18 +48,18 @@ class Settings(BaseSettings):
         return [str(self.BACKEND_CORS_ORIGINS)]
 
     # Database Configuration (PostgreSQL 16)
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: Optional[str] = None
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "internship_db"
 
     # Google Authentication
-    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_ID: Optional[str] = None
 
     # Security & JWT Configuration
-    JWT_SECRET_KEY: str = Field(
-        ...,
+    JWT_SECRET_KEY: Optional[str] = Field(
+        default=None,
         validation_alias=AliasChoices("JWT_SECRET_KEY", "SECRET_KEY"),
         description="Secret cryptographic key for signing JWT tokens",
     )
@@ -156,6 +157,38 @@ class Settings(BaseSettings):
     # Optional explicit DATABASE_URL
     DATABASE_URL: Optional[str] = None
 
+    # Dedicated Test Database Configuration (Explicit Test Isolation Gate)
+    TEST_DATABASE_URL: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("TEST_DATABASE_URL"),
+        description="Explicit test PostgreSQL database URL. Required when running test suites.",
+    )
+
+    @model_validator(mode="after")
+    def resolve_environment_defaults(self) -> "Settings":
+        env = (self.ENVIRONMENT or "").strip().lower()
+        if env == "production":
+            # In production, never apply fallback credentials.
+            # Missing secrets remain None so security validation fails closed.
+            pass
+        elif env == "test" or os.environ.get("CAREERBRIDGE_TEST_MODE") == "1":
+            # Confined strictly to non-production test execution
+            if not self.JWT_SECRET_KEY:
+                self.JWT_SECRET_KEY = "test-jwt-secret-key-careerbridge-safety-32bytes"
+            if not self.POSTGRES_PASSWORD:
+                self.POSTGRES_PASSWORD = "postgres"
+            if not self.GOOGLE_CLIENT_ID:
+                self.GOOGLE_CLIENT_ID = "test-client-id.apps.googleusercontent.com"
+        elif env == "development":
+            # Local development fallbacks for developer workflow
+            if not self.JWT_SECRET_KEY:
+                self.JWT_SECRET_KEY = "careerbridge_dev_secret_key_minimum_32_chars_long"
+            if not self.POSTGRES_PASSWORD:
+                self.POSTGRES_PASSWORD = "postgres"
+            if not self.GOOGLE_CLIENT_ID:
+                self.GOOGLE_CLIENT_ID = "dev-google-client-id.apps.googleusercontent.com"
+        return self
+
     @computed_field
     @property
     def sync_database_url(self) -> str:
@@ -164,8 +197,16 @@ class Settings(BaseSettings):
             if url.startswith("postgres://"):
                 url = f"postgresql://{url[11:]}"
             return url
+        if (self.ENVIRONMENT or "").strip().lower() == "production":
+            pw = (self.POSTGRES_PASSWORD or "").strip()
+            if not pw:
+                raise ValueError(
+                    "Cannot construct production database URL: POSTGRES_PASSWORD is missing or empty."
+                )
+        else:
+            pw = self.POSTGRES_PASSWORD or ""
         return (
-            f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+            f"postgresql://{self.POSTGRES_USER}:{pw}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         )
 

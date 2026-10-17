@@ -40,6 +40,8 @@ WEAK_OR_PLACEHOLDER_JWT_SECRETS = {
     "admin",
     "jwt_secret",
     "supersecret",
+    "careerbridge_dev_secret_key_minimum_32_chars_long",
+    "test-jwt-secret-key-careerbridge-safety-32bytes",
 }
 
 # Blacklist of known placeholder or weak database passwords
@@ -90,6 +92,8 @@ def _validate_jwt_secret(settings: Settings, errors: List[str]) -> None:
         "change_this_to_a_super_secret_key",
         "your_jwt_secret_key_here",
         "your_secret_key_here",
+        "careerbridge_dev",
+        "test-jwt-secret",
     ]:
         if placeholder in normalized:
             errors.append(
