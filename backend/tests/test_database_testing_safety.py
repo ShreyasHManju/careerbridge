@@ -35,7 +35,7 @@ from app.core import test_database
 
 
 
-def test_url(database_name: str, host: str = "localhost") -> str:
+def make_test_url(database_name: str, host: str = "localhost") -> str:
     """Build a credential-free URL without printing it in tests."""
     return f"postgresql://{host}:5432/{database_name}"
 
@@ -43,7 +43,7 @@ def test_url(database_name: str, host: str = "localhost") -> str:
 class TestTestDatabaseUrlValidation(unittest.TestCase):
     def test_accepts_local_explicit_test_database_without_connecting(self):
         with patch.object(test_database, "create_engine") as create_engine:
-            result = test_database.validate_test_database_url(test_url("careerbridge_test"))
+            result = test_database.validate_test_database_url(make_test_url("careerbridge_test"))
 
         self.assertTrue(result.endswith("/careerbridge_test"))
         create_engine.assert_not_called()
@@ -51,14 +51,14 @@ class TestTestDatabaseUrlValidation(unittest.TestCase):
     def test_rejects_remote_host_without_connecting(self):
         with patch.object(test_database, "create_engine") as create_engine:
             with self.assertRaisesRegex(RuntimeError, "approved local host"):
-                test_database.validate_test_database_url(test_url("careerbridge_test", "db.example"))
+                test_database.validate_test_database_url(make_test_url("careerbridge_test", "db.example"))
 
         create_engine.assert_not_called()
 
     def test_rejects_protected_database_without_connecting(self):
         with patch.object(test_database, "create_engine") as create_engine:
             with self.assertRaisesRegex(RuntimeError, "protected database"):
-                test_database.validate_test_database_url(test_url("postgres"))
+                test_database.validate_test_database_url(make_test_url("postgres"))
 
         create_engine.assert_not_called()
 
@@ -85,7 +85,7 @@ class TestMigrationBootstrapGuard(unittest.TestCase):
 
     def test_requested_bootstrap_aborts_before_any_suite_subprocess(self):
         fake_test_database = types.ModuleType("app.core.test_database")
-        fake_test_database.validate_test_database_url = lambda: test_url("careerbridge_test")
+        fake_test_database.validate_test_database_url = lambda: make_test_url("careerbridge_test")
 
         with patch.dict(sys.modules, {"app.core.test_database": fake_test_database}):
             with patch.object(run_tests.subprocess, "run") as subprocess_run:
@@ -255,14 +255,14 @@ class TestE2ECleanupSafeguards(unittest.TestCase):
         mock_engine = unittest.mock.MagicMock()
         mock_engine.connect.return_value.__enter__.return_value = mock_conn
 
-        with patch.dict(os.environ, {"TEST_DATABASE_URL": test_url("internship_test_db")}):
+        with patch.dict(os.environ, {"TEST_DATABASE_URL": make_test_url("internship_test_db")}):
             with patch.object(test_database, "verify_test_database_identity", return_value={"database": "internship_test_db", "user": "careerbridge_test_runner", "is_superuser": False}):
                 result = self.cleanup_mod.verify_safe_cleanup_target(mock_engine)
                 self.assertEqual(result, mock_engine)
 
     def test_cleanup_guard_rejects_unexpected_database(self):
         mock_engine = unittest.mock.MagicMock()
-        with patch.dict(os.environ, {"TEST_DATABASE_URL": test_url("some_other_test_db")}):
+        with patch.dict(os.environ, {"TEST_DATABASE_URL": make_test_url("some_other_test_db")}):
             with patch.object(test_database, "verify_test_database_identity", return_value={"database": "some_other_test_db", "user": "careerbridge_test_runner", "is_superuser": False}):
                 with self.assertRaisesRegex(RuntimeError, "Connected to unexpected database"):
                     self.cleanup_mod.verify_safe_cleanup_target(mock_engine)
@@ -273,7 +273,7 @@ class TestE2ECleanupSafeguards(unittest.TestCase):
         mock_engine = unittest.mock.MagicMock()
         mock_engine.connect.return_value.__enter__.return_value = mock_conn
 
-        with patch.dict(os.environ, {"TEST_DATABASE_URL": test_url("internship_test_db")}):
+        with patch.dict(os.environ, {"TEST_DATABASE_URL": make_test_url("internship_test_db")}):
             with patch.object(test_database, "verify_test_database_identity", return_value={"database": "internship_test_db", "user": "careerbridge_test_runner", "is_superuser": False}):
                 with self.assertRaisesRegex(RuntimeError, "Unexpected schema revision"):
                     self.cleanup_mod.verify_safe_cleanup_target(mock_engine)
