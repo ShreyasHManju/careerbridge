@@ -12,7 +12,11 @@ import uuid
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.core.database import SessionLocal
+from app.core.test_database import SessionLocal, apply_test_dependency_overrides
+
+# Explicitly wire FastAPI dependency overrides for test clients so requests use the isolated test database.
+# Fails visibly if dependency override setup cannot be completed.
+apply_test_dependency_overrides()
 from app.core.security import create_access_token, hash_password
 from app.models.application import Application, ApplicationStatus
 from app.models.conversation import Conversation, ConversationParticipant

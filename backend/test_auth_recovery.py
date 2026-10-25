@@ -24,19 +24,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
 from app.core.config import settings
-from app.core.database import SessionLocal, engine
+from app.core.test_database import SessionLocal
 from app.core.rate_limit import rate_limiter
 from app.core.security import create_access_token, hash_password, verify_password
 from app.main import app
-from app.models.base import Base
 from app.models.password_reset_token import PasswordResetToken
 from app.models.user import User, UserRole
 from app.services.email_service import EmailService
 
 client = TestClient(app)
-
-# Ensure password_reset_tokens table exists in the test DB schema
-Base.metadata.create_all(bind=engine, tables=[PasswordResetToken.__table__], checkfirst=True)
 
 PREFIX = f"recovery_{uuid.uuid4().hex[:6]}"
 TEST_LOCAL_EMAIL = f"{PREFIX}_user@careerbridge.io"

@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 # Ensure backend is in sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -10,45 +10,69 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from app.core.config import Settings, settings
 from app.core.database import engine, check_db_connection
+from app.core.test_database import test_engine, get_test_database_name, validate_test_database_url
 from app.main import app
 
 client = TestClient(app)
 
 
 def test_db_connection_workflow():
-    print("[1/6] Testing Python sqlalchemy connectivity to PostgreSQL")
+    print("[1/6] Testing Python sqlalchemy connectivity to isolated PostgreSQL test database")
     try:
-        connected_initial = check_db_connection()
-        assert connected_initial is True
-        print("  -> Successfully executed 'SELECT 1' ping query.")
+        # Pre-connection verification: Ensure target database is valid test database before connecting
+        test_db_url = validate_test_database_url()
+        expected_test_db = get_test_database_name(test_db_url)
+        assert expected_test_db not in {"internship_db", "internship_staging_db", "postgres", "production", "staging"}, (
+            "Fatal: Configured test database points to protected database!"
+        )
+        assert expected_test_db.endswith("_test") or expected_test_db.endswith("_test_db") or expected_test_db.startswith("test_"), (
+            "Fatal: Configured database is not an explicitly test-designated database name!"
+        )
 
-        with engine.connect() as conn:
+        with test_engine.connect() as conn:
             result = conn.execute(
                 text("SELECT current_database(), current_user, version();")
             )
             row = result.one()
-            print(f"  -> Database Name: {row[0]}")
-            print(f"  -> Database User: {row[1]}")
+            print(f"  -> Test Database Name: {row[0]}")
+            print(f"  -> Test Database User: {row[1]}")
             print(f"  -> Server Version: {row[2].split(',')[0]}")
             print(f"  -> Host: {settings.POSTGRES_HOST}")
             print(f"  -> Port: {settings.POSTGRES_PORT}")
 
-        print("[2/6] Verifying database selection")
-        assert row[0] == "internship_db"
-        print("  -> Confirmed: connected to 'internship_db'.")
+        print("[2/6] Verifying test database selection")
+        assert row[0] == expected_test_db, f"Expected test database '{expected_test_db}', got '{row[0]}'"
+        assert row[0] not in {"internship_db", "internship_staging_db", "postgres"}, "Fatal: Connected to protected database!"
+        print(f"  -> Confirmed: connected to dedicated test database '{expected_test_db}'.")
 
         print("[3/6] Verifying /health returns HTTP 200 when database is healthy")
-        res_healthy = client.get("/health")
-        assert res_healthy.status_code == 200
-        assert res_healthy.json()["status"] == "ok"
-        assert res_healthy.json()["database"] == "connected"
-        print("  -> Confirmed: /health returns status 200 with database connected.")
+        with patch("app.main.check_db_connection", return_value=True):
+            res_healthy = client.get("/health")
+            assert res_healthy.status_code == 200
+            assert res_healthy.json()["status"] == "ok"
+            assert res_healthy.json()["database"] == "connected"
+            print("  -> Confirmed: /health returns status 200 with database connected.")
 
-        print("[4/6] Verifying check_db_connection() exception shielding on connectivity failure")
+        print("[4/6] Verifying check_db_connection() health-check probe behavior (mocked engine)")
+        # Mock engine connection to verify positive check_db_connection() logic without touching application database
+        mock_conn = MagicMock()
+        mock_conn.execute.return_value.scalar.return_value = 1
+        with patch.object(engine, "connect") as mock_connect:
+            mock_connect.return_value.__enter__.return_value = mock_conn
+            assert check_db_connection() is True, "check_db_connection() should return True when connection executes SELECT 1"
+        print("  -> Confirmed: check_db_connection() returns True when ping query succeeds.")
+
+        # Verify OperationalError exception shielding on application engine
         with patch.object(engine, "connect", side_effect=OperationalError("connection refused", {}, None)):
             res_down = check_db_connection()
             assert res_down is False, "check_db_connection() should return False on OperationalError"
         print("  -> Confirmed: check_db_connection() safely catches OperationalError and returns False.")
+
+        # Verify generic Exception shielding on application engine
+        with patch.object(engine, "connect", side_effect=Exception("unexpected connection crash")):
+            res_down_generic = check_db_connection()
+            assert res_down_generic is False, "check_db_connection() should return False on generic Exception"
+        print("  -> Confirmed: check_db_connection() safely catches generic Exception and returns False.")
 
         print("[5/6] Verifying /health returns HTTP 503 when database connection fails")
         with patch("app.main.check_db_connection", return_value=False):

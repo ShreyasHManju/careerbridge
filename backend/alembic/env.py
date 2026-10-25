@@ -24,9 +24,16 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def get_migration_url() -> str:
+    if os.environ.get("CAREERBRIDGE_TEST_MODE") == "1" or os.environ.get("TEST_DATABASE_URL"):
+        from app.core.test_database import validate_test_database_url
+        return validate_test_database_url()
+    return settings.sync_database_url
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
-    url = settings.sync_database_url
+    url = get_migration_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -42,7 +49,7 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     connectable = create_engine(
-        settings.sync_database_url,
+        get_migration_url(),
         poolclass=pool.NullPool,
     )
 

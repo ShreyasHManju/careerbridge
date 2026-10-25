@@ -16,7 +16,7 @@ if str(backend_dir) not in sys.path:
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app.core.database import SessionLocal
+from app.core.test_database import SessionLocal
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models.conversation import Conversation, ConversationParticipant
@@ -1028,7 +1028,7 @@ def test_cascade_deletion_on_user_delete():
 def test_batched_conversation_listing_multi_conversations():
     """Verify batched conversation listing handles multiple conversations with exact latest message, unread count, and <= 3 DB queries."""
     from sqlalchemy import event
-    from app.core.database import engine
+    from app.core.test_database import engine
 
     headers_s1 = get_auth_headers(STUDENT1_EMAIL)
 

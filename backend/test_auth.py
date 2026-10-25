@@ -19,7 +19,7 @@ import jwt
 from sqlalchemy import delete, select
 
 from app.core.config import settings
-from app.core.database import SessionLocal
+from app.core.test_database import SessionLocal
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models.user import User, UserRole

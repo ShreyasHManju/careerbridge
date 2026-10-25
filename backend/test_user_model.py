@@ -5,7 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.schema import CreateTable
-from app.core.database import engine
+from app.core.test_database import engine
 from app.models import Base, User, UserRole
 
 

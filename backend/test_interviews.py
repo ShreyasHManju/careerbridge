@@ -14,7 +14,7 @@ if str(backend_dir) not in sys.path:
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 
-from app.core.database import SessionLocal
+from app.core.test_database import SessionLocal
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models.application import Application, ApplicationStatus
@@ -1350,7 +1350,6 @@ def test_interview_conflict_boundary_conditions():
                 ids_to_del.append(boundary_inv_id)
             if 'boundary_start_inv_id' in locals():
                 ids_to_del.append(boundary_start_inv_id)
-            db.execute(text(f"DELETE FROM notifications WHERE id > 0 AND title LIKE '%Interview%'"))
             db.execute(text(f"DELETE FROM interviews WHERE id IN ({','.join(map(str, ids_to_del))})"))
             db.commit()
     finally:
@@ -1514,7 +1513,6 @@ def test_interview_status_lifecycle_transitions():
             ids = [inv_a_id, inv_b_id, inv_c_id]
             if "inv_d_id" in locals():
                 ids.append(inv_d_id)
-            db.execute(text(f"DELETE FROM notifications WHERE id > 0 AND title LIKE '%Interview%'"))
             db.execute(text(f"DELETE FROM interviews WHERE id IN ({','.join(map(str, ids))})"))
             db.commit()
 

@@ -10,7 +10,7 @@ from sqlalchemy import delete
 from starlette.testclient import TestClient
 
 from app.core.config import settings
-from app.core.database import SessionLocal
+from app.core.test_database import SessionLocal
 from app.core.rate_limit import RateLimiter, rate_limiter
 from app.core.security import create_access_token, hash_password
 from app.core.test_fixtures import clean_test_records

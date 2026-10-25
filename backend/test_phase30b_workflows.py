@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
-from app.core.database import Base, SessionLocal, engine
+from app.core.test_database import Base, SessionLocal, engine
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models.application import Application, ApplicationStatus

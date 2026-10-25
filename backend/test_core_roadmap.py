@@ -26,7 +26,7 @@ if str(backend_dir) not in sys.path:
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
-from app.core.database import SessionLocal
+from app.core.test_database import SessionLocal
 from app.core.security import hash_password, verify_password
 from app.core.test_fixtures import (
     DEFAULT_TEST_PASSWORD,

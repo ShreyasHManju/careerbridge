@@ -5,7 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
-from app.core.database import engine
+from app.core.test_database import engine
 from app.main import app
 
 _emails_to_clean = set()

@@ -1,3 +1,4 @@
+import os
 import re
 import uuid
 from contextlib import asynccontextmanager
@@ -218,7 +219,35 @@ async def lifespan(app: FastAPI):
     """
     Application lifespan context manager:
     - Enforces production configuration security validation gate prior to serving traffic.
+    - When CAREERBRIDGE_TEST_MODE=1, enforces test database isolation on the actual application engine.
     """
+    if os.environ.get("CAREERBRIDGE_TEST_MODE") == "1":
+        from sqlalchemy import text
+        from app.core.database import engine as app_engine
+        from app.core.test_database import validate_test_database_url, verify_test_database_identity
+        # Validate that the actual application engine uses a valid, test-designated database URL
+        validate_test_database_url(str(app_engine.url))
+        # Independently verify live connection identity and non-superuser least-privilege status
+        identity = verify_test_database_identity(app_engine)
+        if identity.get("database") != "internship_test_db":
+            raise RuntimeError(
+                f"FAIL-CLOSED: Connected to unexpected test database '{identity.get('database')}'. Expected 'internship_test_db'."
+            )
+        if identity.get("user") != "careerbridge_test_runner":
+            raise RuntimeError(
+                f"FAIL-CLOSED: Connected with unauthorized role '{identity.get('user')}'. Expected 'careerbridge_test_runner'."
+            )
+        if identity.get("is_superuser") is not False:
+            raise RuntimeError(
+                "FAIL-CLOSED: Superuser access detected on application engine during test mode."
+            )
+        # Verify Alembic migration revision
+        with app_engine.connect() as conn:
+            rev = conn.execute(text("SELECT version_num FROM alembic_version;")).scalar()
+            if rev != "b8c9d0e1f2a3":
+                raise RuntimeError(
+                    f"FAIL-CLOSED: Test database migration revision '{rev}' does not match expected revision 'b8c9d0e1f2a3'."
+                )
     assert_production_configuration_or_fail(settings)
     yield
 

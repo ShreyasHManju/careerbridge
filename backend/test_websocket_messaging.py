@@ -27,7 +27,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.core.database import SessionLocal
+from app.core.test_database import SessionLocal
 from app.core.security import create_access_token, hash_password
 from app.main import app
 from app.models.conversation import Conversation, ConversationParticipant
@@ -39,6 +39,11 @@ from app.models.user import User, UserRole
 from app.services.websocket_manager import ws_manager
 
 client = TestClient(app)
+
+# Explicitly ensure WebSocket route uses the isolated test session factory
+import app.routers.websocket_messaging as ws_module
+ws_module.SessionLocal = SessionLocal
+
 
 WS_STUDENT1_EMAIL = "ws.student1@careerbridge.io"
 WS_STUDENT2_EMAIL = "ws.student2@careerbridge.io"

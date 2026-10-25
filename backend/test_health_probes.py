@@ -29,18 +29,24 @@ class TestLivenessProbe:
 
 class TestReadinessProbe:
     def test_readiness_healthy_system_returns_200(self):
-        res = client.get("/health/ready")
-        assert res.status_code == 200
-        data = res.json()
-        assert data["status"] == "ready"
-        assert "checks" in data
-        assert data["checks"]["database"]["status"] == "healthy"
-        assert "latency_ms" in data["checks"]["database"]
-        assert data["checks"]["migrations"]["status"] == "aligned"
-        assert data["checks"]["storage"]["status"] == "ready"
+        mock_db = (True, {"status": "healthy", "latency_ms": 1.25})
+        mock_mig = (True, {"status": "aligned", "current_revision": "head_rev_123", "head_revision": "head_rev_123"})
+        with patch("app.core.health.check_database_readiness", return_value=mock_db), \
+             patch("app.core.health.check_migration_readiness", return_value=mock_mig):
+            res = client.get("/health/ready")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["status"] == "ready"
+            assert "checks" in data
+            assert data["checks"]["database"]["status"] == "healthy"
+            assert "latency_ms" in data["checks"]["database"]
+            assert data["checks"]["migrations"]["status"] == "aligned"
+            assert data["checks"]["storage"]["status"] == "ready"
 
     def test_readiness_database_failure_returns_503(self):
-        with patch("app.core.health.check_database_readiness", return_value=(False, {"status": "unavailable", "detail": "database connection failed"})):
+        mock_mig = (True, {"status": "aligned", "current_revision": "head_rev_123", "head_revision": "head_rev_123"})
+        with patch("app.core.health.check_database_readiness", return_value=(False, {"status": "unavailable", "detail": "database connection failed"})), \
+             patch("app.core.health.check_migration_readiness", return_value=mock_mig):
             res = client.get("/health/ready")
             assert res.status_code == 503
             data = res.json()
@@ -48,12 +54,14 @@ class TestReadinessProbe:
             assert data["checks"]["database"]["status"] == "unavailable"
 
     def test_readiness_migration_mismatch_returns_503(self):
-        with patch("app.core.health.check_migration_readiness", return_value=(False, {
-            "status": "mismatch",
-            "current_revision": "old_rev_123",
-            "head_revision": "new_rev_456",
-            "detail": "database schema revision does not match code head revision"
-        })):
+        mock_db = (True, {"status": "healthy", "latency_ms": 1.25})
+        with patch("app.core.health.check_database_readiness", return_value=mock_db), \
+             patch("app.core.health.check_migration_readiness", return_value=(False, {
+                 "status": "mismatch",
+                 "current_revision": "old_rev_123",
+                 "head_revision": "new_rev_456",
+                 "detail": "database schema revision does not match code head revision"
+             })):
             res = client.get("/health/ready")
             assert res.status_code == 503
             data = res.json()
@@ -62,7 +70,11 @@ class TestReadinessProbe:
             assert data["checks"]["migrations"]["current_revision"] == "old_rev_123"
 
     def test_readiness_storage_failure_returns_503(self):
-        with patch("app.core.health.check_storage_readiness", return_value=(False, {"status": "unavailable", "detail": "local upload directory is not writable"})):
+        mock_db = (True, {"status": "healthy", "latency_ms": 1.25})
+        mock_mig = (True, {"status": "aligned", "current_revision": "head_rev_123", "head_revision": "head_rev_123"})
+        with patch("app.core.health.check_database_readiness", return_value=mock_db), \
+             patch("app.core.health.check_migration_readiness", return_value=mock_mig), \
+             patch("app.core.health.check_storage_readiness", return_value=(False, {"status": "unavailable", "detail": "local upload directory is not writable"})):
             res = client.get("/health/ready")
             assert res.status_code == 503
             data = res.json()
@@ -77,7 +89,11 @@ class TestReadinessProbe:
         mock_s3_client = MagicMock()
         mock_s3_client.head_bucket.return_value = {}
 
-        with patch("app.core.storage.S3StorageProvider._get_client", return_value=mock_s3_client):
+        mock_db = (True, {"status": "healthy", "latency_ms": 1.25})
+        mock_mig = (True, {"status": "aligned", "current_revision": "head_rev_123", "head_revision": "head_rev_123"})
+        with patch("app.core.health.check_database_readiness", return_value=mock_db), \
+             patch("app.core.health.check_migration_readiness", return_value=mock_mig), \
+             patch("app.core.storage.S3StorageProvider._get_client", return_value=mock_s3_client):
             res = client.get("/health/ready")
             assert res.status_code == 200
             data = res.json()
@@ -94,7 +110,11 @@ class TestReadinessProbe:
         mock_s3_client = MagicMock()
         mock_s3_client.head_bucket.side_effect = Exception("AWS S3 Connection Timeout")
 
-        with patch("app.core.storage.S3StorageProvider._get_client", return_value=mock_s3_client):
+        mock_db = (True, {"status": "healthy", "latency_ms": 1.25})
+        mock_mig = (True, {"status": "aligned", "current_revision": "head_rev_123", "head_revision": "head_rev_123"})
+        with patch("app.core.health.check_database_readiness", return_value=mock_db), \
+             patch("app.core.health.check_migration_readiness", return_value=mock_mig), \
+             patch("app.core.storage.S3StorageProvider._get_client", return_value=mock_s3_client):
             res = client.get("/health/ready")
             assert res.status_code == 503
             data = res.json()
@@ -114,12 +134,14 @@ class TestReadinessProbe:
 
 class TestBackwardCompatibility:
     def test_legacy_health_endpoint_still_works(self):
-        res = client.get("/health")
-        assert res.status_code == 200
-        data = res.json()
-        assert data["status"] == "ok"
-        assert data["database"] == "connected"
-        assert data["service"] == "CareerBridge API"
+        with patch("app.main.check_db_connection", return_value=True):
+            res = client.get("/health")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["status"] == "ok"
+            assert data["database"] == "connected"
+            assert data["service"] == "CareerBridge API"
+
 
     def test_root_endpoint_still_works(self):
         res = client.get("/")

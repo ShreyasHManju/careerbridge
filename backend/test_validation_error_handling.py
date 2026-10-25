@@ -36,7 +36,7 @@ import jwt
 from sqlalchemy import delete, select
 
 from app.core.config import settings
-from app.core.database import SessionLocal
+from app.core.test_database import SessionLocal
 from app.core.exceptions import (
     AppException,
     AuthenticationRequiredException,

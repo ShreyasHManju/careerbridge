@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 import pytest
 from sqlalchemy import select
-from app.core.database import SessionLocal
+from app.core.test_database import SessionLocal
 from app.core.test_fixtures import clean_test_records
 from app.models.experience_record import ExperienceRecord, ExperienceSkill, VerificationSource, VerificationStatus
 from app.models.innovation_project import InnovationProject, ProjectSkill, ProjectStatus, ProjectVisibility

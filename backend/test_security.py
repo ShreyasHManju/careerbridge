@@ -39,7 +39,7 @@ from sqlalchemy import delete, select
 from starlette.websockets import WebSocketDisconnect
 
 from app.core.config import settings
-from app.core.database import SessionLocal
+from app.core.test_database import SessionLocal
 from app.core.rate_limit import rate_limiter
 from app.core.security import create_access_token, hash_password, verify_password
 from app.main import app
