@@ -17,12 +17,29 @@ export default async function globalTeardown() {
     ? localVenvPython
     : 'python';
 
+  const env = {
+    ...process.env,
+    CAREERBRIDGE_TEST_MODE: '1',
+    DATABASE_URL: process.env.TEST_DATABASE_URL || '',
+    TEST_DATABASE_URL: process.env.TEST_DATABASE_URL || '',
+  };
+
   try {
-    execSync(`"${pythonPath}" "${cleanupScript}"`, {
+    const output = execSync(`"${pythonPath}" "${cleanupScript}"`, {
       cwd: backendDir,
-      stdio: 'pipe',
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf-8',
     });
-  } catch {
-    // If backend python is unavailable or teardown encounters an issue, do not crash Playwright
+    if (output) {
+      console.log(`[E2E-TEARDOWN] ${output.trim()}`);
+    }
+  } catch (error: any) {
+    const stderr = error.stderr ? error.stderr.toString() : '';
+    const stdout = error.stdout ? error.stdout.toString() : '';
+    console.error(`[E2E-TEARDOWN ERROR] Global teardown cleanup failed: ${error.message}`);
+    if (stdout) console.error(`[E2E-TEARDOWN STDOUT]:\n${stdout}`);
+    if (stderr) console.error(`[E2E-TEARDOWN STDERR]:\n${stderr}`);
+    throw new Error(`E2E Global Teardown failed during cleanup: ${error.message}`);
   }
 }

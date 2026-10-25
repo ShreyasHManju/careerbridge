@@ -1,0 +1,39 @@
+# ==============================================================================
+# CareerBridge — Dedicated Ephemeral Test Database Compose Configuration
+# ==============================================================================
+# Strictly isolated from development, staging (Phase 40C), and Phase 41B.
+# Designed solely for isolated automated backend test suite execution.
+#
+# INVARIANTS:
+# 1. Unique Container Name: careerbridge-isolated-test-db
+# 2. Host Port Binding: 127.0.0.1:5434 (loopback only, non-default port)
+# 3. Dedicated Isolated Volume: careerbridge_isolated_test_postgres_data (no shared data)
+# 4. Disposable Test Database: internship_test_db (ends in _test_db)
+# 5. Scoped Credentials: Uses TEST_POSTGRES_* variables to prevent accidental production reuse.
+# ==============================================================================
+
+services:
+  test-db:
+    image: postgres:16
+    container_name: careerbridge-isolated-test-db
+    restart: "no"
+    env_file:
+      - path: .env.test
+        required: false
+    environment:
+      POSTGRES_DB: internship_test_db
+      POSTGRES_USER: ${TEST_POSTGRES_USER:-test_user}
+      POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:?TEST_POSTGRES_PASSWORD must be set in environment or .env.test}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - careerbridge_isolated_test_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TEST_POSTGRES_USER:-test_user} -d internship_test_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  careerbridge_isolated_test_postgres_data:
+    name: careerbridge_isolated_test_postgres_data

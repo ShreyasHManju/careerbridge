@@ -6,8 +6,8 @@ import { test, expect } from '@playwright/test';
  * Validates the core cross-role business journey in isolated browser contexts:
  * 1. Recruiter registers, logs in, and posts a new job opportunity.
  * 2. Student registers, logs in, discovers the opportunity, and submits an application.
- * 3. Recruiter reviews the student's incoming application and advances status to "Accepted".
- * 4. Student verifies the updated "Accepted" status reflected in their application tracker.
+ * 3. Recruiter reviews the student's incoming application and advances status to "Reviewing".
+ * 4. Student verifies the updated "Reviewing" status reflected in their application tracker.
  */
 test.describe('Student & Recruiter Application Lifecycle', () => {
   const timestamp = Date.now();
@@ -123,7 +123,7 @@ test.describe('Student & Recruiter Application Lifecycle', () => {
     await expect(studentPage.getByRole('status', { name: /Application status: Applied/i })).toBeVisible();
 
     // -------------------------------------------------------------------------
-    // STEP 3: Recruiter Context — Review Application & Update Status to Accepted
+    // STEP 3: Recruiter Context — Review Application & Update Status to Reviewing
     // -------------------------------------------------------------------------
     await recruiterPage.locator('nav.cb-nav-links').getByRole('link', { name: 'Applications' }).click();
     await expect(recruiterPage).toHaveURL(/\/app\/recruiter\/applications/);
@@ -131,19 +131,19 @@ test.describe('Student & Recruiter Application Lifecycle', () => {
     await expect(recruiterPage.getByText(jobTitle).first()).toBeVisible({ timeout: 10000 });
     await expect(recruiterPage.getByText('Automated E2E student application statement.')).toBeVisible();
 
-    // Transition status to "Accepted"
+    // Transition status to "Reviewing"
     const statusSelect = recruiterPage.getByRole('combobox', { name: /Change status for Application/i });
-    await statusSelect.selectOption('accepted');
+    await statusSelect.selectOption('reviewing');
 
     // Verify status updated in recruiter view
-    await expect(recruiterPage.getByRole('status', { name: /Application status: Accepted/i })).toBeVisible({ timeout: 10000 });
+    await expect(recruiterPage.getByRole('status', { name: /Application status: Reviewing/i })).toBeVisible({ timeout: 10000 });
 
     // -------------------------------------------------------------------------
     // STEP 4: Student Context — Verify Updated Status Reflection
     // -------------------------------------------------------------------------
     await studentPage.reload();
     await expect(studentPage.getByText(jobTitle).first()).toBeVisible({ timeout: 10000 });
-    await expect(studentPage.getByRole('status', { name: /Application status: Accepted/i })).toBeVisible({ timeout: 10000 });
+    await expect(studentPage.getByRole('status', { name: /Application status: Reviewing/i })).toBeVisible({ timeout: 10000 });
 
     // Clean up isolated contexts
     await studentContext.close();
