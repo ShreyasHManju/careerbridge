@@ -20,6 +20,7 @@ import { ProjectEvaluationModal } from '@/components/evaluations/ProjectEvaluati
 import { ScheduleInterviewModal } from '@/components/interviews/ScheduleInterviewModal';
 import { RescheduleInterviewModal } from '@/components/interviews/RescheduleInterviewModal';
 import { JobOfferModal } from '@/components/offers/JobOfferModal';
+import { CandidateEvaluationPanel } from './CandidateEvaluationPanel';
 import { ApiErrorResponse } from '@/types/api';
 
 interface CandidateReviewModalProps {
@@ -32,7 +33,7 @@ interface CandidateReviewModalProps {
   isUpdating?: boolean;
 }
 
-type ReviewTab = 'application' | 'skills' | 'projects' | 'interviews';
+type ReviewTab = 'application' | 'skills' | 'projects' | 'interviews' | 'evaluation';
 
 const PIPELINE_STEPS: { key: string; label: string }[] = [
   { key: 'applied', label: 'Applied' },
@@ -86,6 +87,7 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
   const [activeTab, setActiveTab] = useState<ReviewTab>('application');
   const [passport, setPassport] = useState<PassportResponse | null>(null);
   const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [evaluationInterviewId, setEvaluationInterviewId] = useState<number | null>(null);
   const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
   const [dataError, setDataError] = useState<string | null>(null);
 
@@ -148,6 +150,7 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
   useEffect(() => {
     if (isOpen && application) {
       setActiveTab('application');
+      setEvaluationInterviewId(null);
       setCurrentStatus(application.status);
       setActionError(null);
       setActionSuccess(null);
@@ -514,6 +517,16 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
             data-testid="tab-interviews"
           >
             📅 Interviews {interviews.length ? `(${interviews.length})` : ''}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'evaluation'}
+            className={`cb-review-tab ${activeTab === 'evaluation' ? 'active' : ''}`}
+            onClick={() => setActiveTab('evaluation')}
+            data-testid="tab-candidate-evaluation"
+          >
+            ⭐ Scorecard
           </button>
         </nav>
 
@@ -972,6 +985,21 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
                               </strong>
                               <InterviewStatusBadge status={item.status} />
                             </div>
+                            {item.status === 'completed' && (
+                              <div style={{ marginBottom: '0.75rem' }}>
+                                <button
+                                  type="button"
+                                  className="cb-btn cb-btn-outline-primary cb-btn-sm"
+                                  onClick={() => {
+                                    setEvaluationInterviewId(item.id);
+                                    setActiveTab('evaluation');
+                                  }}
+                                  data-testid={`evaluate-interview-round-btn-${item.id}`}
+                                >
+                                  Evaluate this interview round
+                                </button>
+                              </div>
+                            )}
 
                             <div style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.5rem' }}>
                               <span>⏱️ Duration: {item.duration_minutes} minutes</span> •{' '}
@@ -1067,6 +1095,14 @@ export const CandidateReviewModal: React.FC<CandidateReviewModalProps> = ({
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* TAB E: CANDIDATE SCORECARD */}
+              {activeTab === 'evaluation' && (
+                <CandidateEvaluationPanel
+                  applicationId={application.id}
+                  initialInterviewId={evaluationInterviewId}
+                />
               )}
             </>
           )}
