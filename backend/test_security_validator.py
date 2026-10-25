@@ -270,6 +270,7 @@ def test_production_validation_cannot_be_bypassed_by_test_mode_env(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
     monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
 
     # 1. Unsafe production instance with missing JWT secret must still fail closed
     unsafe_settings = create_valid_production_settings(JWT_SECRET_KEY=None)
