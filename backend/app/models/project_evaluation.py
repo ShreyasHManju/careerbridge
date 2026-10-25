@@ -69,13 +69,11 @@ class ProjectEvaluation(Base):
     student_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="CASCADE"),
-        index=True,
         nullable=False,
     )
     recruiter_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="CASCADE"),
-        index=True,
         nullable=False,
     )
 
